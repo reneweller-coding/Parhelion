@@ -50,6 +50,7 @@
  * @note Copied from Totality `Core/include/tot/fx/Dynamics.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
  */
 #pragma once
+#include "parh/Vec.h"
 #include "parh/Dsp.h"
 #include <vector>
 
@@ -125,6 +126,24 @@ public:
     double between(const float* x) const
     {
         const float* p = x - kHalf + 1;
+#if PARH_VEC_PATH == 1
+        // The seven phases on the lanes of two AVX2 registers (the optimisation pass, 30.09.2026): each lane keeps the
+        // four partial sums below in their order, so every phase's value is the scalar loop's, bit for bit.
+        __m256d a[4], b[4];
+        for (int j = 0; j < 4; ++j) a[j] = b[j] = _mm256_setzero_pd();
+        for (int m = 0; m < kTaps; m += 4)
+            for (int j = 0; j < 4; ++j) {
+                const __m256d v = _mm256_set1_pd(static_cast<double>(p[m + j]));
+                a[j] = _mm256_add_pd(a[j], _mm256_mul_pd(_mm256_load_pd(hT_[m + j]), v));
+                b[j] = _mm256_add_pd(b[j], _mm256_mul_pd(_mm256_load_pd(hT_[m + j] + 4), v));
+            }
+        alignas(32) double s[8];
+        _mm256_store_pd(s, _mm256_add_pd(_mm256_add_pd(a[0], a[1]), _mm256_add_pd(a[2], a[3])));
+        _mm256_store_pd(s + 4, _mm256_add_pd(_mm256_add_pd(b[0], b[1]), _mm256_add_pd(b[2], b[3])));
+        double best = 0.0;
+        for (int k = 0; k < kPhases - 1; ++k) best = std::max(best, std::fabs(s[k]));
+        return best;
+#else
         double peak = 0.0;
         for (int k = 0; k < kPhases - 1; ++k) {
             // Four partial sums, not one. A single accumulator makes the inner loop a chain of kTaps
@@ -141,6 +160,7 @@ public:
             peak = std::max(peak, std::fabs((s0 + s1) + (s2 + s3)));
         }
         return peak;
+#endif
     }
     /**
      * @brief Largest magnitude any interpolated point can reach, per unit of the largest input sample.
@@ -161,6 +181,7 @@ public:
     }
 private:
     double h_[kPhases - 1][kTaps] = {};
+    alignas(32) double hT_[kTaps][8] = {};   ///< h_ transposed, a tap's seven phases and a zero (the vector path)
     double bound_ = 1.0;
 };
 

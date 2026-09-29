@@ -56,6 +56,8 @@ TruePeakInterpolator::TruePeakInterpolator()
         }
         bound_ = std::max(bound_, absSum);
     }
+    for (int k = 0; k < kPhases - 1; ++k)
+        for (int m = 0; m < kTaps; ++m) hT_[m][k] = h_[k][m];
 }
 
 void TruePeakLimiter::prepare(double sampleRate, float lookaheadMs)
