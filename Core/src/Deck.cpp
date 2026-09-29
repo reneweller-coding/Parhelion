@@ -622,12 +622,12 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
     { PARH_PROF(Kit); kit_.processLanes(n); }
     { PARH_PROF(Bass); bass_.process(bassL_.data(), bassR_.data(), n); acid_.process(acidL_.data(), acidR_.data(), n); }
     { PARH_PROF(Poly); for (int i = 0; i < kPolyInstances; ++i) poly_[i].process(polyL_[i].data(), polyR_[i].data(), n); }
-    piano_.process(pianoL_.data(), pianoR_.data(), n);
-    strings_.process(orchL_[0].data(), orchR_[0].data(), n);
-    choir_.process(orchL_[1].data(), orchR_[1].data(), n);
-    brass_.process(orchL_[2].data(), orchR_[2].data(), n);
-    timpani_.process(orchL_[3].data(), orchR_[3].data(), n);
-    sfx_.processSplit(fxL_.data(), fxR_.data(), fxSub_.data(), fxWetL_.data(), fxWetR_.data(), n);
+    { PARH_PROF(Piano); piano_.process(pianoL_.data(), pianoR_.data(), n); }
+    { PARH_PROF(Strings); strings_.process(orchL_[0].data(), orchR_[0].data(), n); }
+    { PARH_PROF(Choir); choir_.process(orchL_[1].data(), orchR_[1].data(), n); }
+    { PARH_PROF(Brass); brass_.process(orchL_[2].data(), orchR_[2].data(), n); }
+    { PARH_PROF(Timpani); timpani_.process(orchL_[3].data(), orchR_[3].data(), n); }
+    { PARH_PROF(Sfx); sfx_.processSplit(fxL_.data(), fxR_.data(), fxSub_.data(), fxWetL_.data(), fxWetR_.data(), n); }
     PARH_PROF_BEGIN(Buses);
 
     const float* ll = kit_.laneL();
@@ -765,7 +765,7 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
         drumR_[k] = dr;
     }
     PARH_PROF_END(Buses);
-    cloud_.process(cloudInL_.data(), cloudInR_.data(), cloudL_.data(), cloudR_.data(), n);
+    { PARH_PROF(Cloud); cloud_.process(cloudInL_.data(), cloudInR_.data(), cloudL_.data(), cloudR_.data(), n); }
     for (int i = 0; i < n; ++i) {
         const size_t k = static_cast<size_t>(i);
         plateInL_[k] += cloudL_[k] * cloudPlate_;

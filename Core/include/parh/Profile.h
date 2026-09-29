@@ -10,10 +10,12 @@
 namespace parh::prof {
 
 /** @brief The stages timed. */
-enum Slot : int { Kick, Sub, Kit, Bass, Poly, Buses, Rooms, TrackBus, Glue, Mixer, MasterTone, Clipper, Limiter, Count };
+enum Slot : int { Kick, Sub, Kit, Bass, Poly, Piano, Strings, Choir, Brass, Timpani, Sfx, Buses, Cloud, Rooms, TrackBus, Glue,
+                  Mixer, MasterTone, Clipper, Limiter, Count };
 /** @brief Their names. */
-inline const char* const kNames[Count] = { "kick", "sub", "kit (12 lanes)", "bass and 303", "poly (6 voices)", "buses, gates, pump",
-                                           "rooms", "track bus", "glue and trim", "mixer", "master tone", "clipper (4x)", "limiter" };
+inline const char* const kNames[Count] = { "kick", "sub", "kit (12 lanes)", "bass and 303", "poly (6 voices)", "piano", "strings",
+                                           "choir", "brass", "timpani", "effects", "buses, gates, pump", "cloud", "rooms",
+                                           "track bus", "glue and trim", "mixer", "master tone", "clipper (4x)", "limiter" };
 
 } // namespace parh::prof
 
