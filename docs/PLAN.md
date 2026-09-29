@@ -398,6 +398,36 @@ Parhelion neu belegt.
   Modrad das Rad, Kanaldruck den Druck); testUserPreset (ein Klang von Lane 3 nach Lane 8, vom Lead zum Arp,
   185 von 185 Knöpfen genau); Selbsttest 125, ctest 34/34.
 
+**Optimierung (29./30.09.2026, auf Wunsch des Nutzers: "Wir wollen keine Performance verschwenden").** Gemessen mit dem
+Profil (`PARH_PROFILE`, jetzt jede Engine eine Zeile, dazu Zellen und Ereignisse), geprüft mit den WAVs von fünf Stilen und
+einem 24-Minuten-Set, Desktop und Quest: jeder Schritt bitgleich zum Stand davor (12 von 12), der Vektortest (Skalar, AVX2,
+NEON-Shim) bitgleich.
+- **Zellen** (vorher 2,2 % eines Kerns, ein Achtel des Renders, im alten Profil unsichtbar): jede Zelle las alle 1670
+  Parameter und gab jedes Modul seiner Engine. Jetzt ein Zwischenspeicher der gespielten Werte, neu gelesen nur nach einem
+  Schreiben in den Speicher (`ParamStore::version`), einem Knopfsatz, Laden, Suchen, Qualität, sonst nur wo eine Kurve läuft;
+  `update()` nur bei geänderten Werten. Zwei `update()` waren nicht rein: der Mono-Synth wendet die Matrix in jeder Zelle neu
+  an, Poly kopiert die Hüllkurvenzeiten zurück -- beides läuft weiter jede Zelle. **Befund:** diese Kopie nimmt einer Stimme
+  den Drift ihres Attacks spätestens nach 32 Samples (Poly::noteOn wollte ihn für die Note halten); unverändert gelassen.
+  0,2 %.
+- **Poly**: nur klingende Slots, je Segment dicht in die ersten Lanes gepackt (VA und FM klingen drei von sieben Slots, die
+  Quest drei von sieben Unisono), Summen nur über Slots mit Pegel, stille Stimmen übersprungen; die Wavetable- und
+  Supersaw-Lesen mit AVX2-Gathers (Index in double wie skalar). Slot-Kernel 1,2 → 0,24 %. Was bleibt, sind die Filter der
+  Stimmen: die Schaltungsmodelle bei doppelter Rate, 2,7 % in einem Uplifting-Track -- an ihnen hängt der Klang.
+- **Hall und Raum**: die acht Linien des FDN auf den acht Lanes, ein Puffer für alle Linien. 1,0 → 0,67 % (mit der Platte).
+- **Streicher**: in Ruhe (kein Spieler, kein Korpus, Tiefschnitt auf null) kein Rechnen (0,3 % in jedem Track ohne
+  Orchester); die Korpusse als (Familie, Kanal)-Lanes.
+- **Bass und 303**: der Keytracking-Faktor nur bei neuer Tonhöhe.
+- **Befund Quest**: `setQuest` setzte Spieler und Sänger direkt, der Knopf überschrieb sie in der nächsten Zelle -- die
+  Quest spielte das ganze Orchester. Jetzt eine Grenze (`setPlayerLimit`), Test.
+- **Verworfen**: ein eigenes tanh (Cephes, auf Lanes) für Clipper, Drum-Bus, Bass und Bandecho brachte 0,1 % (der Clipper
+  kostet seine Halbband-Filter, nicht das tanh) und hätte die Renders um einige LSB verschoben, eine selbstoszillierende
+  303-Linie sogar in eine andere Wellenform -- zurückgenommen.
+- **Ergebnis** [M, % eines Kerns, vorher → nachher]: Uplifting mit Orchester 15,6 → 11,1, Progressive 10,6 → 7,9, Dream
+  House 14,9 → 10,0, Acid 11,2 → 6,8, Deep 12,2 → 7,7, ein Set (zwei Decks im Blend) 16,4 → 10,4; bei Quest-Qualität 15,1 →
+  9,5 für das Set. Offen, kleiner: Clipper und Limiter blockweise (die FIR-Ausgänge sind unabhängig, also über die Zeit
+  vektorisierbar, 0,5 und 0,4 %), das Tempo-Delay einer Stimme ohne Send in Ruhe, die Kit-Lanes (ihr Rauschen muss jedes
+  Sample laufen).
+
 ## 0. Kurzfassung
 
 Ein Instrument, das aus einem Seed, einem Stilprofil und einer Set-Dramaturgie Trance komponiert und in Echtzeit
