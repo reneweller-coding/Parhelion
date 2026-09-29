@@ -15,6 +15,8 @@ add_library(ParhelionCore STATIC
     src/synth/SubBass.cpp
     src/synth/Kit.cpp
     src/synth/Synth.cpp
+    src/synth/Piano.cpp
+    src/synth/PianoDesign.cpp
     src/synth/Poly.cpp
     src/synth/Sfx.cpp
     src/synth/SfxBankTables.cpp

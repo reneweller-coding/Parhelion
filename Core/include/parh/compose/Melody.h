@@ -37,7 +37,7 @@ struct MelodyContext {
     Score* score = nullptr;
     float humanize = 0.08f;   ///< velocity scatter (compose.humanize)
     Rng* vel = nullptr;       ///< its stream
-    bool piano = false;       ///< the lead is the piano's (Dream House): legato, the piano corpus, no octave up
+    bool piano = false;       ///< the lead is the piano's (Dream House): Part::Piano, legato, the piano corpus, no octave up
     float anthemShare = 0.7f; ///< the chance of the anthem motif (long notes) over the sixteenth riff
     /** @brief Whether the note at @p beat falls into a vacuum (the last beat before a drop): it is not written. */
     bool silent(double beat) const;

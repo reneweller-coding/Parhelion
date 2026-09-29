@@ -319,7 +319,10 @@ void writeLeadOnce(const MelodyContext& c, uint64_t seed)
             if (nb >= plan.bars || plan.at(nb, Layer::Lead) == LayerState::Off) continue;
             const int pitch = pitchOf(k) + oct;
             const double len = c.piano ? 0.25 * m.len[k] + 0.25 : anthem ? 0.25 * m.len[k] - 0.02 : 0.22;
-            c.note(4.0 * bar + 0.25 * m.on[k], len, Part::Lead, pitch, k == 0 ? 0.95f : (m.on[k] % 4 == 0 ? 0.85f : 0.72f));
+            // The piano plays mezzo-forte (its velocity is its hammer's speed, and it has the whole range of a piano).
+            const float vs = c.piano ? 0.72f : 1.0f;
+            c.note(4.0 * bar + 0.25 * m.on[k], len, c.piano ? Part::Piano : Part::Lead, pitch,
+                   vs * (k == 0 ? 0.95f : (m.on[k] % 4 == 0 ? 0.85f : 0.72f)));
         }
     }
 }
@@ -344,7 +347,7 @@ void writeLead(const MelodyContext& c, uint64_t seed)
     const size_t n0 = c.score->notes.size();
     for (int attempt = 0; attempt < 16; ++attempt) {
         writeLeadOnce(c, attempt == 0 ? seed : mixSeed(seed, static_cast<uint64_t>(attempt)));
-        if (!memoHitsAnyBar(topVoice(*c.score, n0, Part::Lead, c.plan->bars))) return;
+        if (!memoHitsAnyBar(topVoice(*c.score, n0, c.piano ? Part::Piano : Part::Lead, c.plan->bars))) return;
         c.score->notes.resize(n0);   // two bars of a known track: drawn again
     }
 }
@@ -357,7 +360,7 @@ void writeCounter(const MelodyContext& c, uint64_t seed)
     r.seed(seed);
     std::vector<NoteEvent> held;
     for (const NoteEvent& n : c.score->notes)
-        if (n.part == Part::Lead && n.length >= 0.95) held.push_back(n);
+        if ((n.part == Part::Lead || n.part == Part::Piano) && n.length >= 0.95) held.push_back(n);
     // The chord tone at or under @p pitch at @p bar.
     auto toneUnder = [&](int bar, int pitch) {
         for (int p = pitch; p > pitch - 12; --p) if (chordHas(h, bar, p)) return p;

@@ -24,9 +24,12 @@
 #include "parh/compose/Study.h"
 #include "parh/mix/TranceGate.h"
 #include "parh/synth/Kick.h"
+#include "parh/synth/Piano.h"
+#include "parh/synth/PianoDesign.h"
 #include "TestSupport.h"
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <cstdio>
 #include <cstring>
 #include <functional>
@@ -729,7 +732,7 @@ void testMelody()
             std::vector<int> top(static_cast<size_t>(plan.bars) * 16, -1);
             int n = 0;
             for (const NoteEvent& e : sc.notes) {
-                if (e.part != Part::Lead) continue;
+                if (e.part != Part::Lead && e.part != Part::Piano) continue;
                 ++n;
                 const int bar = std::min(static_cast<int>(e.beat / 4.0), plan.bars - 1);
                 const int pc = e.pitch % 12;
@@ -753,6 +756,232 @@ void testMelody()
     check(offScale == 0, "every note is a tone of the scale or the chord", fmt("%d not", offScale));
     check(register_ == 0, "the register between E3 and C7", fmt("%d outside", register_));
     check(hits == 0, "no two bars of a known track", fmt("%d tracks with a hit", hits));
+}
+
+/** @brief One piano note (held @p hold s) over @p secs s, the channels' mean, with the knobs' defaults and @p pedal. */
+std::vector<float> pianoNote(Piano& p, int midi, float vel, double hold, double secs, float pedal = 0.0f, float sympathetic = 1.0f,
+                             float phantom = 1.0f)
+{
+    ParamStore ps;
+    std::vector<float> v(static_cast<size_t>(piano::Count));
+    ps.readModule(Module::Piano, 0, v.data());
+    v[piano::Pedal] = pedal;
+    v[piano::Sympathetic] = sympathetic;
+    v[piano::Phantom] = phantom;
+    p.update(v.data());
+    p.reset();
+    const int total = static_cast<int>(secs * 48000.0), off = static_cast<int>(hold * 48000.0);
+    std::vector<float> out(static_cast<size_t>(total));
+    float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
+    p.noteOn(midi, vel, 0.0);
+    for (int i = 0; i < total; i += Piano::kMaxBlock) {
+        if (i <= off && off < i + Piano::kMaxBlock) p.noteOff(midi);
+        const int n = std::min(Piano::kMaxBlock, total - i);
+        p.process(L, R, n);
+        for (int k = 0; k < n; ++k) out[static_cast<size_t>(i + k)] = 0.5f * (L[k] + R[k]);
+    }
+    return out;
+}
+
+/** @brief The level (dB) of @p x between @p a and @p b seconds. */
+double levelDb(const std::vector<float>& x, double a, double b)
+{
+    const size_t i = static_cast<size_t>(a * 48000.0), j = std::min(x.size(), static_cast<size_t>(b * 48000.0));
+    double s = 0.0;
+    for (size_t k = i; k < j; ++k) s += static_cast<double>(x[k]) * x[k];
+    return 10.0 * std::log10(s / std::max<size_t>(1, j - i) + 1e-30);
+}
+
+/** @brief The frequency of the strongest peak of @p x (from @p start, 2^15 samples, Hann) within @p f +- 2 %. */
+double peakHz(const std::vector<float>& x, double start, double f)
+{
+    const size_t n = 32768, s0 = static_cast<size_t>(start * 48000.0);
+    std::vector<std::complex<double>> a(n);
+    for (size_t i = 0; i < n; ++i) a[i] = (s0 + i < x.size() ? x[s0 + i] : 0.0f) * (0.5 - 0.5 * std::cos(2.0 * 3.14159265358979 * i / (n - 1)));
+    for (size_t i = 1, j = 0; i < n; ++i) {
+        size_t bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) std::swap(a[i], a[j]);
+    }
+    for (size_t len = 2; len <= n; len <<= 1) {
+        const std::complex<double> wl = std::polar(1.0, -2.0 * 3.14159265358979 / static_cast<double>(len));
+        for (size_t i = 0; i < n; i += len) {
+            std::complex<double> w(1.0);
+            for (size_t j = 0; j < len / 2; ++j) {
+                const auto u = a[i + j], v = a[i + j + len / 2] * w;
+                a[i + j] = u + v;
+                a[i + j + len / 2] = u - v;
+                w *= wl;
+            }
+        }
+    }
+    const double bin = 48000.0 / n;
+    size_t lo = static_cast<size_t>(f * 0.98 / bin), hi = static_cast<size_t>(f * 1.02 / bin), at = lo;
+    for (size_t i = lo; i <= hi; ++i) if (std::abs(a[i]) > std::abs(a[at])) at = i;
+    const double l = std::log(std::abs(a[at - 1]) + 1e-30), c = std::log(std::abs(a[at]) + 1e-30), r = std::log(std::abs(a[at + 1]) + 1e-30);
+    return (static_cast<double>(at) + 0.5 * (l - r) / (l - 2.0 * c + r)) * bin;
+}
+
+/**
+ * The physical piano (Piano.h, PianoDesign.h, PLAN 5.8). The soundboard's Rayleigh-Ritz solver against the closed form
+ * of a simply supported orthotropic plate; the design's numbers (the board's first mode, the inharmonicity, the courses);
+ * then single notes: the partials where the stiff string puts them, the two-stage decay, the brightness rising with the
+ * velocity, the pitch falling after a fortissimo (the tension), the damper, the pedal, the strings ringing along.
+ */
+void testPiano()
+{
+    section("the physical piano");
+    const DenormalGuard guard;
+    {
+        const double a = 1.2, b = 0.9, dx = 900.0, dy = 300.0, d12 = 100.0, d66 = 50.0, m = 4.0;
+        const std::vector<double> rr = pianoPlateTest(a, b, dx, dy, d12, d66, m, 8);
+        std::vector<double> exact;
+        for (int i = 1; i <= 6; ++i)
+            for (int j = 1; j <= 6; ++j) {
+                const double kx = i * 3.14159265358979 / a, ky = j * 3.14159265358979 / b;
+                exact.push_back(std::sqrt((dx * std::pow(kx, 4) + 2.0 * (d12 + 2.0 * d66) * kx * kx * ky * ky + dy * std::pow(ky, 4)) / m)
+                                / (2.0 * 3.14159265358979));
+            }
+        std::sort(exact.begin(), exact.end());
+        double worst = 0.0;
+        for (size_t k = 0; k < rr.size(); ++k) worst = std::max(worst, std::fabs(rr[k] / exact[k] - 1.0));
+        check(rr.size() == 8 && worst < 0.005, "the plate solver finds a plate's modes", fmt("worst of eight %.3f %%, first %.1f Hz", 100.0 * worst, rr.empty() ? 0.0 : rr[0]));
+    }
+    auto piano = std::make_unique<Piano>();
+    piano->prepare(48000.0);
+    piano->setSpec(PianoSpec{});
+    const PianoDesign& d = *piano->design();
+    const PianoKey& c4 = d.keys[static_cast<size_t>(60 - kPianoLowKey)];
+    check(d.board.freq[0] > 35.0 && d.board.freq[0] < 65.0 && d.board.freq.size() > 20, "the board: a first mode near 45 Hz, tens of modes to 1.2 kHz",
+          fmt("%.1f Hz, %zu modes", d.board.freq[0], d.board.freq.size()));
+    check(c4.B > 2e-4 && c4.B < 8e-4 && c4.strings == 3 && d.keys[0].strings == 1 && d.keys[static_cast<size_t>(36 - kPianoLowKey)].strings == 2,
+          "C4's inharmonicity, a course of three; one string in the lowest bass, two in the wound", fmt("B %.2e", c4.B));
+    // The partials of C2: the stiff string's, not the harmonics.
+    {
+        const std::vector<float> x = pianoNote(*piano, 36, 0.7f, 3.0, 1.5);
+        const PianoKey& k = d.keys[static_cast<size_t>(36 - kPianoLowKey)];
+        double worst = 0.0;
+        for (int p = 4; p <= 12; ++p) {
+            const double model = p * k.f0 * std::sqrt(1.0 + k.B * p * p);
+            worst = std::max(worst, std::fabs(1200.0 * std::log2(peakHz(x, 0.2, model) / model)));
+        }
+        const double f12 = peakHz(x, 0.2, 12.0 * k.f0 * std::sqrt(1.0 + k.B * 144.0)), f1 = peakHz(x, 0.2, k.f0 * std::sqrt(1.0 + k.B));
+        const double stretch = 1200.0 * std::log2(f12 / (12.0 * f1));
+        check(worst < 5.0 && stretch > 5.0, "C2's partials 4 .. 12 where the stiff string puts them, the twelfth sharp of the harmonic",
+              fmt("within %.1f cents; the twelfth %+.1f cents", worst, stretch));
+    }
+    // The two-stage decay of C4 (the symmetric mode takes the bridge's losses, the others ring on).
+    {
+        const std::vector<float> x = pianoNote(*piano, 60, 0.7f, 12.0, 9.0);
+        const double early = (levelDb(x, 1.15, 1.25) - levelDb(x, 0.15, 0.25)) / 1.0, late = (levelDb(x, 7.95, 8.05) - levelDb(x, 3.95, 4.05)) / 4.0;
+        check(early < 2.0 * late && late < -1.0, "C4 decays in two stages", fmt("%.1f dB/s early, %.1f dB/s late", early, late));
+    }
+    // Brightness and level over the velocity.
+    {
+        double lastCentroid = 0.0, lo = 0.0, hi = 0.0;
+        bool rising = true;
+        for (float vel : { 0.2f, 0.5f, 0.8f, 1.0f }) {
+            const std::vector<float> x = pianoNote(*piano, 60, vel, 2.0, 0.5);
+            // Brightness by its simplest measure: the zero crossings per second of the first half second.
+            int zc = 0;
+            for (size_t i = 1; i < x.size(); ++i) zc += (x[i - 1] < 0.0f) != (x[i] < 0.0f);
+            const double centroid = zc / 2.0 / 0.5;
+            if (centroid <= lastCentroid) rising = false;
+            lastCentroid = centroid;
+            const double l = levelDb(x, 0.0, 0.5);
+            if (vel == 0.2f) lo = l;
+            if (vel == 1.0f) hi = l;
+        }
+        check(rising && hi - lo > 15.0, "harder is brighter and louder", fmt("%.1f dB from velocity 0.2 to 1", hi - lo));
+    }
+    // The tension: a fortissimo A1 starts sharp and settles.
+    {
+        const std::vector<float> x = pianoNote(*piano, 33, 1.0f, 6.0, 4.0);
+        const PianoKey& k = d.keys[static_cast<size_t>(33 - kPianoLowKey)];
+        const double f2 = 2.0 * k.f0 * std::sqrt(1.0 + 4.0 * k.B);
+        const double glide = 1200.0 * std::log2(peakHz(x, 0.0, f2) / peakHz(x, 3.0, f2));
+        check(glide > 0.2 && glide < 10.0, "a fortissimo's pitch falls as it decays (Kirchhoff-Carrier)", fmt("%.2f cents", glide));
+    }
+    // The phantom partials: the longitudinal modes on the square of the bridge force, so they grow with the square.
+    {
+        double share[2];
+        int idx = 0;
+        for (float vel : { 0.35f, 1.0f }) {
+            const std::vector<float> on = pianoNote(*piano, 36, vel, 2.0, 0.8, 0.0f, 1.0f, 1.0f), off = pianoNote(*piano, 36, vel, 2.0, 0.8, 0.0f, 1.0f, 0.0f);
+            double diff = 0.0, all = 0.0;
+            for (size_t i = 0; i < on.size(); ++i) {
+                diff += (static_cast<double>(on[i]) - off[i]) * (static_cast<double>(on[i]) - off[i]);
+                all += static_cast<double>(off[i]) * off[i];
+            }
+            share[idx++] = 10.0 * std::log10(diff / all + 1e-30);
+        }
+        check(share[1] > -45.0 && share[1] < -10.0 && share[1] - share[0] > 6.0, "C2's phantom partials, stronger the harder the key",
+              fmt("%.1f dB of the note at velocity 0.35, %.1f dB at 1", share[0], share[1]));
+    }
+    // The damper, the pedal.
+    {
+        const std::vector<float> damped = pianoNote(*piano, 60, 0.7f, 1.0, 2.0), pedal = pianoNote(*piano, 60, 0.7f, 1.0, 2.0, 1.0f);
+        const double dropDamped = levelDb(damped, 0.95, 1.0) - levelDb(damped, 1.45, 1.5), dropPedal = levelDb(pedal, 0.95, 1.0) - levelDb(pedal, 1.45, 1.5);
+        check(dropDamped > 30.0 && dropPedal < 12.0, "a released key is damped, with the pedal down it rings on",
+              fmt("%.0f dB down in half a second, with the pedal %.0f dB", dropDamped, dropPedal));
+    }
+    // The strings ring along with the pedal down, and nothing swings up.
+    {
+        const std::vector<float> with = pianoNote(*piano, 43, 0.8f, 0.3, 3.0, 1.0f, 1.0f), without = pianoNote(*piano, 43, 0.8f, 0.3, 3.0, 1.0f, 0.0f);
+        double diff = 0.0, all = 0.0, peakWith = 0.0, peakWithout = 0.0;
+        for (size_t i = static_cast<size_t>(1.0 * 48000.0); i < with.size(); ++i) {
+            diff += (static_cast<double>(with[i]) - without[i]) * (static_cast<double>(with[i]) - without[i]);
+            all += static_cast<double>(without[i]) * without[i];
+        }
+        for (size_t i = 0; i < with.size(); ++i) {
+            peakWith = std::max(peakWith, static_cast<double>(std::fabs(with[i])));
+            peakWithout = std::max(peakWithout, static_cast<double>(std::fabs(without[i])));
+        }
+        const double db = 10.0 * std::log10(diff / all + 1e-30);
+        check(db > -24.0 && db < -6.0 && peakWith < peakWithout * 1.06 && std::isfinite(peakWith), "with the pedal down the other strings ring along, under the note",
+              fmt("%.1f dB of the note, peak %+.2f dB", db, 20.0 * std::log10(peakWith / peakWithout)));
+    }
+}
+
+/** The piano in the engine: a Dream House track at block sizes 1, 37 and 512, bit for bit, where the piano plays. */
+void testPianoBlocks()
+{
+    section("the piano at any block size");
+    auto p = std::make_unique<ParamStore>();
+    p->parseText("compose.style=Dream House");
+    const Score sc = composeTrack(*p, 11);
+    double from = 0.0;
+    int notes = 0;
+    for (const NoteEvent& n : sc.notes) if (n.part == Part::Piano) { if (notes == 0) from = std::floor(n.beat / 4.0) * 4.0; ++notes; }
+    check(notes > 50, "Dream House writes its motif for the piano", fmt("%d notes", notes));
+    auto render = [&](int block) {
+        auto e = std::make_unique<Engine>();
+        e->params().copyValuesFrom(*p);
+        e->prepare(48000.0, block);
+        e->load(sc);
+        e->seek(from);
+        std::vector<float> out, L(static_cast<size_t>(block)), R(static_cast<size_t>(block));
+        const int n = static_cast<int>(6.0 * 48000.0);
+        for (int done = 0; done < n; done += block) {
+            const int m = std::min(block, n - done);
+            e->process(L.data(), R.data(), m);
+            for (int i = 0; i < m; ++i) out.push_back(L[static_cast<size_t>(i)]);
+        }
+        return out;
+    };
+    const std::vector<float> a = render(512), b = render(37), c = render(1);
+    size_t diffB = 0, diffC = 0;
+    double peak = 0.0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        diffB += std::memcmp(&a[i], &b[i], sizeof(float)) != 0;
+        diffC += std::memcmp(&a[i], &c[i], sizeof(float)) != 0;
+        peak = std::max(peak, static_cast<double>(std::fabs(a[i])));
+    }
+    size_t firstB = a.size();
+    for (size_t i = 0; i < a.size(); ++i) if (std::memcmp(&a[i], &b[i], sizeof(float)) != 0) { firstB = i; break; }
+    check(diffB == 0 && diffC == 0 && peak > 0.01, "37 and 1 equal 512, bit for bit",
+          fmt("%zu and %zu samples differ, the first at %zu (%.4f s after bar %.0f)", diffB, diffC, firstB, firstB / 48000.0, from / 4.0));
 }
 
 struct TestSection {
@@ -780,6 +1009,8 @@ const TestSection kSections[] = {
     { "testCorpus", testCorpus },
     { "testMemo", testMemo },
     { "testMelody", testMelody },
+    { "testPiano", testPiano },
+    { "testPianoBlocks", testPianoBlocks },
 };
 
 } // namespace

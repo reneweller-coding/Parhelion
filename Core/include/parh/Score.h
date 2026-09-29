@@ -37,6 +37,8 @@ enum class Part : int { Kick = 0, Sub,
                         Bass, Acid,
                         /** The polyphonic voices (Poly.h), in the order of PolyInstance. */
                         Lead, Counter, Pluck, Arp, Pad, Stab,
+                        /** The physical piano (Piano.h). */
+                        Piano,
                         /** The ghost kick: silent, it only ducks (PLAN 7.3). */
                         Ghost,
                         /** The effects (Sfx.h): the type is the pitch (kSfxBaseNote + type). */
@@ -135,7 +137,7 @@ struct LayerBlock {
  * @brief The parts the Leveler sets against the kick (Totality's Phase 18), each by its own correction: the kit's twelve
  *        lanes (0 .. 11, each by its role), the tonal voices and the rooms' returns.
  */
-enum class BalPart : int { Bass = 12, Acid, Lead, Counter, Pluck, Arp, Pad, Stab, Room, Fx, Count };
+enum class BalPart : int { Bass = 12, Acid, Lead, Counter, Pluck, Arp, Pad, Stab, Piano, Room, Fx, Count };
 constexpr int kBalLanes = 12;   ///< the kit's lanes come first
 constexpr int kBalParts = static_cast<int>(BalPart::Count);   ///< lanes and voices
 /** @brief A correction per part, dB (0: none). */

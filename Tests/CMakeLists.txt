@@ -32,7 +32,8 @@ if(NOT ANDROID AND CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64|AMD64|x64)")
         add_executable(parh_vectest_${variant} vectest.cpp ${CMAKE_SOURCE_DIR}/Core/src/Halfband.cpp
                        ${CMAKE_SOURCE_DIR}/Core/src/synth/Kit.cpp ${CMAKE_SOURCE_DIR}/Core/src/Params.cpp
                        ${CMAKE_SOURCE_DIR}/Core/src/synth/Poly.cpp ${CMAKE_SOURCE_DIR}/Core/src/synth/WaveTable.cpp
-                       ${CMAKE_SOURCE_DIR}/Core/src/synth/WaveTableFile.cpp)
+                       ${CMAKE_SOURCE_DIR}/Core/src/synth/WaveTableFile.cpp ${CMAKE_SOURCE_DIR}/Core/src/synth/Piano.cpp
+                       ${CMAKE_SOURCE_DIR}/Core/src/synth/PianoDesign.cpp)
         target_include_directories(parh_vectest_${variant} PRIVATE ${CMAKE_SOURCE_DIR}/Core/include)
         target_compile_features(parh_vectest_${variant} PRIVATE cxx_std_20)
         parh_add_test(vectest_${variant} parh_vectest_${variant})

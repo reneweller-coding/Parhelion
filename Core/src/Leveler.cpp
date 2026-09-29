@@ -166,6 +166,7 @@ void balanceWindow(int part, int role, float& lo, float& hi)
     case BalPart::Arp:     lo = -13.0f; hi = -8.0f;  return;
     case BalPart::Pad:     lo = -13.0f; hi = -8.0f;  return;
     case BalPart::Stab:    lo = -12.0f; hi = -7.0f;  return;
+    case BalPart::Piano:   lo = -9.0f;  hi = -3.0f;  return;
     case BalPart::Fx:      lo = -12.0f; hi = -5.0f;  return;
     default:               lo = -60.0f; hi = 0.0f;   return;
     }

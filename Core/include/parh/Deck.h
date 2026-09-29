@@ -48,6 +48,7 @@
 #include "parh/mix/TranceGate.h"
 #include "parh/synth/Kick.h"
 #include "parh/synth/Kit.h"
+#include "parh/synth/Piano.h"
 #include "parh/synth/Poly.h"
 #include "parh/synth/Sfx.h"
 #include "parh/synth/SubBass.h"
@@ -63,7 +64,7 @@ class Deck {
 public:
     /** @brief The stems, in the order Engine::setStems() takes them. */
     enum Stem : int { kStemKick = 0, kStemSub, kStemBass, kStemAcid, kStemHats, kStemPerc, kStemLead, kStemCounter, kStemPluck,
-                      kStemArp, kStemPad, kStemStab, kStemRoom, kStemPlate, kStemHall, kStemFx, kStems };
+                      kStemArp, kStemPad, kStemStab, kStemPiano, kStemRoom, kStemPlate, kStemHall, kStemFx, kStems };
     static constexpr int kRaster = 32;   ///< the engine's parameter raster, samples
     static constexpr int64_t kNever = std::numeric_limits<int64_t>::max();
 
@@ -126,6 +127,8 @@ public:
     float partPeak(int p) const { return partPeak_[p]; }
     /** @brief The kick (for the tests). */
     const Kick& kick() const { return kick_; }
+    /** @brief The piano (for the tests). */
+    const Piano& piano() const { return piano_; }
     /** @brief Polyphonic voice @p i (for the tests). */
     const Poly& poly(int i) const { return poly_[i]; }
     /** @brief The gain the pump gives polyphonic voice @p i at the last sample rendered (for the tests). */
@@ -188,6 +191,9 @@ private:
     Poly poly_[kPolyInstances];
     TranceGate gate_[kPolyInstances];
     Ducker polyDuck_[kPolyInstances], retDuck_;
+    Piano piano_;              ///< the physical piano (PLAN 5.8)
+    Ducker pianoDuck_;
+    Sends pianoSends_;
     Sfx sfx_;                  ///< the effects (PLAN 5.10)
     Ducker fxDuck_, subDropDuck_;   ///< the effects' pump and the sub drop's own (sfx.sub_duck)
     Sends fxSends_;
@@ -238,7 +244,7 @@ private:
     std::vector<BalanceDb> lateBal_;
 
     std::vector<float> kickBuf_, bodyBuf_, subBuf_, bassL_, bassR_, acidL_, acidR_;
-    std::vector<float> polyL_[kPolyInstances], polyR_[kPolyInstances];
+    std::vector<float> polyL_[kPolyInstances], polyR_[kPolyInstances], pianoL_, pianoR_;
     std::vector<float> roomInL_, roomInR_, plateInL_, plateInR_, hallInL_, hallInR_, roomL_, roomR_, plateL_, plateR_, hallL_, hallR_;
     std::vector<float> drumL_, drumR_, synthL_, synthR_, fxL_, fxR_, fxSub_, fxWetL_, fxWetR_;
 

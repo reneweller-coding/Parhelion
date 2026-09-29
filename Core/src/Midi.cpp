@@ -90,6 +90,7 @@ int midiChannelOf(Part part)
     if (part == Part::Bass) return 1;
     if (part == Part::Acid) return 2;
     if (const int p = polyOf(part); p >= 0) return 3 + p;   // lead 3, counter 4, pluck 5, arp 6, pad 7, stab 8
+    if (part == Part::Piano) return 10;                     // the piano
     if (part == Part::Ghost) return 15;                     // the ghost kick: its own channel, for a host's sidechain
     if (part == Part::Fx) return 13;                        // the effects
     return 9;   // the kick and the kit's lanes: the drum channel

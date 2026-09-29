@@ -60,6 +60,8 @@ enum class Module : int { Compose = 0, Kick, Sub, Perc,
                           Poly,
                           /** The effects (Phosphene's Sfx.h): risers, downlifters, impacts, reverse crashes, sub drops. */
                           Sfx,
+                          /** The physical piano (PLAN 5.8, Piano.h). */
+                          Piano,
                           /** The sidechain's shape (PLAN 7.3): the ghost kick's curve, shared by every bus. */
                           Pump,
                           /** The three rooms (PLAN 5.11): a short room, a plate, a hall, on sends. */
@@ -207,6 +209,29 @@ enum : int { Level, Noise, Resonance, Brightness, ImpactDecay, Vowel, SwellDecay
 /** @brief The first of the per-family preset choices, and how many there are. */
 constexpr int kFirstPreset = PresetRiser;
 constexpr int kNumPresetChoices = PresetAtmosphere - PresetRiser + 1;
+}
+/**
+ * @brief Parameters of the physical piano (PLAN 5.8, Piano.h, PianoDesign.h). The first eight build the instrument and
+ *        are read when a track loads (a new design, computed off the audio thread); the rest act while it plays.
+ */
+namespace piano {
+enum : int { Instrument,   ///< PianoInstrument: Grand, Baby Grand, Upright, Soft (the dull piano of Dok. 5)
+             Hardness,     ///< factor on the hammer felt's stiffness
+             Strike,       ///< the strike point, -1 towards the agraffe .. 1 deeper
+             Unison,       ///< cents between the outer strings of a course
+             Inharm,       ///< factor on the strings' inharmonicity
+             Impedance,    ///< factor on the bridge's admittance
+             Stretch,      ///< factor on the tuning's stretch
+             Condition,    ///< random mistuning of each string, cents
+             Level, Pedal, ///< dB; the sustain pedal 0 .. 1 (the middle: the half pedal)
+             Sympathetic,  ///< gain on the strings ringing along (1: as the physics gives it)
+             Phantom,      ///< gain on the longitudinal modes (the phantom partials)
+             DamperNoise, Mechanics,   ///< the damper felt's noise, the key's thump
+             Width,        ///< the listening points apart, 0 (mono) .. 1 (bass left, treble right)
+             LowCut,       ///< Hz
+             Duck,         ///< dB under the pump
+             RoomSend, PlateSend, HallSend, Count };
+constexpr int kFirstPlayKnob = Level;   ///< the knobs before it change the design
 }
 /**
  * @brief The sidechain (PLAN 7.3, Dok. 7): the curve every bus ducks along when the ghost kick triggers -- the attack,

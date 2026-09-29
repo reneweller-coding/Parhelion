@@ -259,6 +259,20 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
     // The track's own settings (knob sets at its start): the pump's depths, the gate, the hall.
     Rng mr;
     mr.seed(stream("mix"));
+    if (mc.piano) {
+        // The piano (PLAN 5.8): Dok. 5's slightly dull piano most often, an upright or the grand otherwise; the pedal
+        // down, lifted at every change of chord and pressed again an eighth later (legato pedalling: the old chord
+        // does not ring into the new one, the new one rings on).
+        const float u = mr.uniform();
+        knob(p.id(Module::Piano, 0, piano::Instrument), u < 0.6f ? 3.0f : u < 0.85f ? 2.0f : 0.0f);
+        const int pedal = p.id(Module::Piano, 0, piano::Pedal);
+        knob(pedal, 1.0f);
+        for (int bar = 1; bar < plan.bars; ++bar)
+            if (harm.pc(bar, 0) != harm.pc(bar - 1, 0) || harm.pc(bar, 1) != harm.pc(bar - 1, 1)) {
+                ramp(pedal, 4.0 * bar - 0.05, 0.04, 0.0f, -1.0f, GestureShape::Linear);
+                ramp(pedal, 4.0 * bar + 0.5, 0.1, -1.0f, 0.0f, GestureShape::Linear);
+            }
+    }
     knob(p.id(Module::Bass, 0, synth::Duck), prof.bassDuckDb);
     knob(p.id(Module::Acid, 0, synth::Duck), prof.bassDuckDb);
     knob(p.id(Module::Sub, 0, sub::Duck), prof.bassDuckDb + 3.0f);

@@ -24,7 +24,7 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 3 gebaut (29.09.2026).**
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 4a gebaut (29.09.2026).**
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
@@ -135,6 +135,50 @@ gelesen und die Lücke um 1 bis 3 LU unterschätzt). Die Profile (compose/Style.
 - **Tests:** testCorpus (Normierung, Constraints, Exaktheit), testMemo (Hash wie das Werkzeug, auch transponiert;
   Falsch-Positiv-Rate), testMelody (6 Seeds × Uplifting und Dream House: Akkordton auf jedem Schlag, Tonvorrat, Lage E3
   bis C7, keine Transkriptions-Fenster); ctest 22/22. Hörfiles: `out/hoeren_p3`.
+
+**Phase 4a, das Piano (29.09.2026).** Nach 5.8 gebaut (synth/PianoDesign.h, synth/Piano.h), Modul `piano`, Part und
+Stem `piano`, MIDI-Kanal 11, im Leveler eine eigene Spur (Fenster −9 bis −3 dB gegen die Kick).
+- **Datenblatt**: je Taste Länge (Blankdraht-Gesetz L ~ f^−0.9 ab 5.2 cm bei C8, gesättigt an der längsten Saite des
+  Gehäuses: Flügel 1.95 m, Stutzflügel 1.50 m, Klavier 1.22 m), Blankdraht über F2, umsponnen darunter (Chor 1, 2, 3),
+  Spannung aus f0, Kerndurchmesser, B nach Fletcher [M: A0 1.0e−4, C4 4.4e−4, C8 1.8e−2, wie Conklin und Young]; die
+  Stimmung aus B gespreizt (über A4 Grundton auf den zweiten Partialton der Unteroktave, darunter vierter bzw. sechster
+  auf den zweiten bzw. dritten der Oberoktave). Vier Instrumente: Grand, Baby Grand, Upright, Soft (das "leicht dumpfe"
+  Piano von Dok. 5: Klavier, weicher Filz, tieferer Anschlag, früher Abfall des Bodens).
+- **Resonanzboden**: Rayleigh-Ritz über 18 × 18 Sinusprodukte, Energie über den Grundriss des Gehäuses integriert
+  (gerippte orthotrope Fichtenplatte, Rippen verschmiert), Stege als gekrümmte Balken, Zarge als steife Lagerung;
+  Cholesky und QL (tred2/tql2). Selbsttest gegen die geschlossene Lösung der orthotropen Rechteckplatte: 0.000 %.
+  Flügelboden [M]: erste Mode 44 Hz, 44 Moden bis 1.2 kHz; darüber die Punktmobilität der gerippten Platte
+  (Y_inf = 1/(8 sqrt(D m'')) = 9e−4 s/kg) und eine Bank von 36 logarithmisch verteilten Resonatoren. Abstrahlung als
+  Beschleunigung an drei Hörpunkten (Bass, Mitte, Diskant), die Breite mischt sie.
+- **Saiten**: je Partialton der Chor als D + Rang-eins-Matrix, Eigenwerte nach Durand-Kerner, Eigenvektoren
+  geschlossen; die horizontale Polarisation als zweiter Chor mit einem Viertel der Admittanz. Wo ein Partialton auf eine
+  Bodenresonanz trifft, gilt die schwache Kopplung nicht mehr: der Anteil der Brückenverluste ist durch die halbe
+  Abklingrate der Bodenmode begrenzt (der Teilton kann Energie nicht schneller abgeben, als der Boden sie abführt),
+  ebenso die Verschiebung der Frequenz. Diskretisierung mit Halteglied nullter Ordnung; der Hammer (Stulov, Masse und
+  Steifigkeit nach Chaigne und Askenfelt) auf 4 bzw. 8 Unterschritten während des Kontakts; Spannungsmodulation nach
+  Kirchhoff-Carrier je 32 Samples; Längsmoden auf dem Quadrat der Brückenkraft (die lokale Dehnung am Steg; die
+  räumliche Auswahl von Bank und Sujbert Gl. 22 weggelassen); Dämpfer mit Rampe und Halbpedal; Mitschwingen einseitig
+  über die Beschleunigung des Bodens an 16 Stegpunkten, abgestrahlt über eine zweite Kopie des Bodens.
+- **Befund zum Mitschwingen** [M]: die einseitige Kopplung (Bank 2010) erzeugt an exakten Koinzidenzen (Oktaven und
+  Quinten der gespreizten Stimmung) Energie, weil die Rückwirkung der mitschwingenden Saiten auf den Steg fehlt: physikalisch
+  gerechnet lagen sie 19 dB **über** dem Ton. Ein gekoppeltes System würde die Energie des Tons unter ihnen teilen; der
+  Antrieb ist deshalb auf 0.03 skaliert (zusammen etwa 12 dB unter dem losgelassenen Ton mit Pedal), `piano.sympathetic`
+  skaliert von dort. Eine gekoppelte Lösung (Saiten aller freien Tasten in der Chor-Matrix) bleibt als Verbesserung offen.
+- **Messungen** (`parh_pianoprobe --measure`, Selbsttest) [M]: Partialtöne 4 bis 12 von C2 innerhalb 2.6 Cent des
+  steifen Saitenmodells, der zwölfte 15.8 Cent über dem harmonischen; C4 zweistufig (−19.5 dB/s früh, −4.8 dB/s spät);
+  Anschlag 0.2 → 1.0: 22 dB lauter, heller (Schwerpunkt C4 683 → 1192 Hz); Tonhöhenabfall nach Fortissimo A1 0.7 Cent;
+  Dämpfer 67 dB in 0.5 s (mit Pedal 4 dB); Phantompartialtöne C2 −52 dB (0.35) bzw. −32 dB (1.0) des Tons, also
+  quadratisch. Kosten: ein gehaltenes C4 0.5 %, C2 0.7 % eines Kerns, der Boden allein 0.3 %, Pedal unten (87
+  mitschwingende Saiten) 3.4 %; sechs Töne 3.2 % (AVX2, FTZ). Der Vergleich mit Einzelton-Aufnahmen steht noch aus:
+  bisher gegen Literaturwerte (Inharmonizität nach Fletcher/Conklin, Abklingraten nach Weinreich); dafür wären
+  Aufnahmen zu laden.
+- **Im Arrangement**: Dream House schreibt das Motiv für das Piano (Part::Piano, mezzoforte), meist das Soft-Instrument;
+  das Pedal unten, bei jedem Akkordwechsel kurz gehoben (Legato-Pedal als Automation von `piano.pedal`).
+- **Determinismus**: Entscheidungen (Spannung, Dämpfer, Kontaktende, Stimmende, Mitschwingen an/aus) auf einem
+  absoluten 32-Sample-Raster; das Rauschen des Dämpfers je Stimme mit eigenem Strom (ein gemeinsamer verschränkte sich je
+  nach Blockgrenzen — gefunden durch den neuen Blockgrößen-Test mit Piano). Skalar, AVX2 und NEON bitgleich.
+- **Tests**: testPiano (10 Prüfungen), testPianoBlocks (Dream House bei Blockgröße 1, 37, 512), vectest testPiano;
+  ctest 24/24. Hörfiles: `out/hoeren_p4a` (Einzeltöne je Instrument, Dream House Seed 7 und 3 mit Stems).
 
 ## 0. Kurzfassung
 

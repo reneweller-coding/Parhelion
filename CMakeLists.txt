@@ -53,6 +53,7 @@ add_subdirectory(Core)
 if(PARH_BUILD_TOOLS)
     enable_testing()
     add_subdirectory(Tools/render)
+    add_subdirectory(Tools/pianoprobe)
     add_subdirectory(Tests)
 endif()
 

@@ -393,6 +393,35 @@ const ParamDesc kSfxParams[sfx::Count] = {
     { "plate_send",           "Plate Send",    "", 0.0f, 1.0f, 0.1f, Curve::Linear },
 };
 
+const char* const kPianoInstrumentChoices[] = { "Grand", "Baby Grand", "Upright", "Soft" };
+
+/**
+ * The physical piano (PLAN 5.8): the instrument first (read at load), then what acts while it plays. Level -6 dB and a
+ * low cut at 80 Hz keep it off the kick's and the sub's range; the hall carries it (Dok. 5: 2 to 4 s).
+ */
+const ParamDesc kPianoParams[piano::Count] = {
+    { "instrument",   "Instrument",   "",      0.0f,   3.0f,   0.0f, Curve::Choice, kPianoInstrumentChoices },
+    { "hardness",     "Hardness",     "",      0.25f,  4.0f,   1.0f, Curve::Log },
+    { "strike",       "Strike Point", "",     -1.0f,   1.0f,   0.0f, Curve::Linear },
+    { "unison",       "Unison Width", "ct",    0.0f,   6.0f,   1.0f, Curve::Linear },
+    { "inharm",       "Inharmonicity","",      0.25f,  3.0f,   1.0f, Curve::Log },
+    { "impedance",    "Impedance",    "",      0.3f,   3.0f,   1.0f, Curve::Log },
+    { "stretch",      "Stretch",      "",      0.0f,   2.0f,   1.0f, Curve::Linear },
+    { "condition",    "Condition",    "ct",    0.0f,   3.0f,   0.3f, Curve::Linear },
+    { "level",        "Level",        "dB",  -36.0f,   6.0f,  -6.0f, Curve::Linear },
+    { "pedal",        "Pedal",        "",      0.0f,   1.0f,   0.0f, Curve::Linear },
+    { "sympathetic",  "Sympathetic",  "",      0.0f,   2.0f,   1.0f, Curve::Linear },
+    { "phantom",      "Phantom",      "",      0.0f,   3.0f,   1.0f, Curve::Linear },
+    { "damper_noise", "Damper Noise", "",      0.0f,   1.0f,   0.3f, Curve::Linear },
+    { "mechanics",    "Mechanics",    "",      0.0f,   1.0f,   0.3f, Curve::Linear },
+    { "width",        "Width",        "",      0.0f,   1.0f,   0.7f, Curve::Linear },
+    { "low_cut",      "Low Cut",      "Hz",   20.0f, 400.0f,  80.0f, Curve::Log },
+    { "duck",         "Duck",         "dB",    0.0f,  18.0f,   2.0f, Curve::Linear },
+    { "room_send",    "Room Send",    "",      0.0f,   1.0f,   0.05f, Curve::Linear },
+    { "plate_send",   "Plate Send",   "",      0.0f,   1.0f,   0.1f, Curve::Linear },
+    { "hall_send",    "Hall Send",    "",      0.0f,   1.0f,   0.35f, Curve::Linear },
+};
+
 /**
  * The sidechain's curve (PLAN 7.3, Dok. 7): the fastest attack, a short hold, a release of 80 to 150 ms so a bass on the
  * off-beat is back when it plays; the rooms' returns ducked 3 to 5 dB.
@@ -577,6 +606,7 @@ const ModuleSpec kModules[static_cast<int>(Module::Count)] = {
     { "acid",    kSynthParams,   synth::Count,   1 },
     { "poly",    kPolyParams,    poly::Count,    kPolyInstances, kPolyInstanceNames },
     { "sfx",     kSfxParams,     sfx::Count,     1 },
+    { "piano",   kPianoParams,   piano::Count,   1 },
     { "pump",    kPumpParams,    pump::Count,    1 },
     { "sends",   kSendsParams,   sends::Count,   1 },
     { "mix",     kMixParams,     mix::Count,     1 },

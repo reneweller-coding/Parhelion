@@ -13,6 +13,7 @@
 #include "parh/Params.h"
 #include "parh/Vec.h"
 #include "parh/synth/Kit.h"
+#include "parh/synth/Piano.h"
 #include "parh/synth/Poly.h"
 #include "TestSupport.h"
 #include <algorithm>
@@ -244,6 +245,54 @@ void testPolyModels()
           fmt("%d differing samples, energy %.1f", bad, energy));
     check(std::isfinite(maxAbs) && maxAbs < 20.0f, "the models stay bounded under modulated resonance and mode", fmt("max |y| = %.3f", static_cast<double>(maxAbs)));
 }
+
+/**
+ * @brief Vector test (Phase 4a): the physical piano's resonator banks -- the strings, the board and its high bank, the
+ *        sympathetic strings -- on the lanes against the scalar reference: chords struck, released and struck again,
+ *        the pedal moving (half pedal, dampers landing, the strings under raised dampers ringing along), calls of odd
+ *        sizes.
+ */
+void testPiano()
+{
+    section("the piano's resonator banks against the scalar engine");
+    const DenormalGuard guard;
+    auto a = std::make_unique<Piano>(), b = std::make_unique<Piano>();
+    ParamStore ps;
+    std::vector<float> v(static_cast<size_t>(piano::Count));
+    ps.readModule(Module::Piano, 0, v.data());
+    for (Piano* p : { a.get(), b.get() }) {
+        p->prepare(48000.0);
+        p->setSpec(PianoSpec{});
+        p->update(v.data());
+    }
+    int bad = 0;
+    double energy = 0.0;
+    std::vector<float> aL(64), aR(64), bL(64), bR(64);
+    static const int kChords[4][3] = { { 45, 57, 64 }, { 41, 53, 60 }, { 36, 55, 64 }, { 43, 59, 74 } };
+    for (int block = 0; block < 4000; ++block) {
+        if (block % 400 == 0) {
+            v[piano::Pedal] = static_cast<float>((block / 400) % 3) * 0.5f;
+            a->update(v.data());
+            b->update(v.data());
+        }
+        if (block % 250 == 0) {
+            const int* c = kChords[(block / 250) % 4];
+            for (int k = 0; k < 3; ++k) { a->noteOn(c[k], 0.5f + 0.15f * k, 0.3); b->noteOn(c[k], 0.5f + 0.15f * k, 0.3); }
+        }
+        if (block % 250 == 120) {
+            const int* c = kChords[(block / 250) % 4];
+            for (int k = 0; k < 3; ++k) { a->noteOff(c[k]); b->noteOff(c[k]); }
+        }
+        const int n = 5 + block % 40;
+        a->processWith<float>(aL.data(), aR.data(), n);
+        b->processWith<VecF>(bL.data(), bR.data(), n);
+        for (int i = 0; i < n; ++i) {
+            if (!sameBits(aL[static_cast<size_t>(i)], bL[static_cast<size_t>(i)]) || !sameBits(aR[static_cast<size_t>(i)], bR[static_cast<size_t>(i)])) ++bad;
+            energy += static_cast<double>(aL[static_cast<size_t>(i)]) * aL[static_cast<size_t>(i)];
+        }
+    }
+    check(bad == 0 && energy > 0.1, "strings, board, high bank and sympathetic strings identical to scalar", fmt("%d differing samples, energy %.2f", bad, energy));
+}
 } // namespace
 
 int main()
@@ -257,5 +306,6 @@ int main()
     testKit();
     testPoly();
     testPolyModels();
+    testPiano();
     return finish();
 }
