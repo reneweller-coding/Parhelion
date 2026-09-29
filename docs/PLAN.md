@@ -24,7 +24,7 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 und 1 gebaut (29.09.2026).**
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 3 gebaut (29.09.2026).**
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
@@ -95,6 +95,46 @@ gelesen und die Lücke um 1 bis 3 LU unterschätzt). Die Profile (compose/Style.
   1 LU unter dem Drop, der Drop auf das Lautheitsziel (bis ±6 dB).
 - **Tests:** Planer über 5 Stile × 8 Seeds, Harmonik, Determinismus und Neuwürfeln, Leveler; ctest 19/19.
   Hörfiles: `out/hoeren_p2` (je Stil Seed 7, mit MIDI).
+
+**Phase 3, die Melodie (29.09.2026).**
+- **Korpus Stufe A** (compose/Corpus.h, `Tools/corpus/build_corpus.py`): aus den EMP-Packs (500 Melodien, 100 Pianos,
+  108 Acid-Linien, 200 Basslines; 64742, 5566, 9604 und 18277 Töne der Oberstimme [M]) je Rolle Zählungen über diatonische
+  Stufen relativ zur Molltonika (−7 bis +14; Dur zählt über die Parallele), Ordnung 0 bis 2, Einsätze je 16tel, Längen,
+  Accent und Slide. Das Modell interpoliert Ordnung 2 → 1 → 0 nach Witten-Bell; der Sampler zieht exakt unter Constraints
+  je Position (Pachet und Roy 2011: Rückwärtssummen, Vorwärtsziehen), der Selbsttest vergleicht acht Linien mit ihren
+  enumerierten Wahrscheinlichkeiten (Abweichung 0.004).
+- **Befund der Packs** [M]: die EMP-Melodien sind dichte 16tel-Riffs (90 % der 16tel mit Einsatz, Längen fast nur ein
+  16tel), die Pianos Achtel, die Acid-Linien kreisen um Grundton und Oktave und tragen fast keine Velocity-Akzente (8 von
+  516 Schlägen auf der Eins) und wenige Slides. Also: Rhythmus des Anthem-Motivs aus Regeln (Dok. 4), Rhythmus von Riff und
+  Piano aus dem Korpus, Accent und Slide der 303 aus Regeln (Slides nur verteilt nach dem Korpus).
+- **Lead** (compose/Melody.h): Hymne (lange Töne, Kontur als Gewicht: Sprung von Quarte bis Oktave nach dem ersten Ton,
+  dann stufig abwärts, kein dritter gleicher Ton) oder Riff (halbtaktige Zelle, viermal, die zweite und vierte mit neuem
+  Ende); harte Constraints Tonvorrat (Pentatonik als fünf der sieben Stufen), Lage E4 bis etwa D6, Akkordton auf jedem
+  Schlag und am Ende; im harmonisch-Moll der Leitton nur mit der Dur-Dominante (die Tonleiter je Takt nimmt fehlende
+  Akkordtöne auf). Acht Kandidaten für A, vier für B, bewertet nach Umfang, Tonvielfalt, Stufenanteil, Sprung am Anfang,
+  Abstieg zum Ende. **Fassungen**: gefilterte Zellen spielen nur A alle vier Takte (Tease, Fragment in Break und Build),
+  offene die Phrase A A' B A'' (A' behält die passenden Töne, A'' A's Kopf und endet auf der Tonika, wo der Akkord sie
+  hat), die zweite Hälfte des Haupt-Drops eine Oktave höher, falls das Motiv dort unter A6 bleibt. Dream House: das Piano
+  mit dem Piano-Korpus, legato, ohne Oktavsprung.
+- **Counter** antwortet in den Haltetönen des Leads eine Oktave darüber (Akkordtöne abwärts in Achteln, der letzte
+  gehalten), über einem Riff ein gehaltener Terz- oder Quintton. **303** (writeAcid): ein Takt aus dem Acid-Korpus (erster
+  Ton auf dem Grundton), alle vier Takte zwei Töne neu gezogen und ein Akzent verschoben, die Linie folgt dem Akkordgrundton.
+  Nebenbei behoben: Planer und Komponist zogen die Bassfigur getrennt, und Acid hatte in 30 % der Seeds keine 303; jetzt
+  gibt der Plan die Figur vor, und das Acid-Profil besetzt die 303 immer.
+- **Memorisierung** (compose/Memo.h, `Tools/corpus/memorisation.py`): Fenster aus zwei Takten (Einsätze und Intervalle,
+  also transpositionsinvariant; mindestens fünf Töne, drei Tonhöhen) aus jeder Spur jeder der 5462 lesbaren
+  Transkriptionen an jedem Schlag: 144250 Fenster [M], als Bloom-Filter ihrer Hashes im Code (256 KiB, 8 Hashes, im Test
+  0.09 % falsche "vielleicht"). Der Lead wird nach dem Schreiben Takt für Takt geprüft und bei einem Treffer neu gezogen
+  (bis 16 Versuche). Ergebnis über 100 Tracks (5 Stile × 20 Seeds): **Lead 0 Treffer in 5822 Fenstern**, 303, Pluck, Bass
+  und Counter ebenfalls 0; das Arp 5.2 % (388 von 7459) -- gebrochene Dreiklänge auf und ab, wie sie jede Arp-Spur der
+  Transkriptionen enthält; das Arp ist Regelwerk ohne Korpus und kann kein Motiv mitbringen, darum dort Bericht statt
+  Sperre. Zum Vergleich die EMP-Packs selbst [M]: 2.5 % ihrer Melodie-Fenster und 1.9 % ihrer Piano-Fenster sind mit
+  Transkriptionsfenstern identisch, überwiegend ganze 16tel-Riffs aus 30 bis 32 Tönen. Die Packs teilen also Riffs mit
+  bekannten Tracks; umso wichtiger, dass aus ihnen nur Zählungen der Ordnung 2 übernommen werden und die Sperre auf dem
+  Ergebnis sitzt.
+- **Tests:** testCorpus (Normierung, Constraints, Exaktheit), testMemo (Hash wie das Werkzeug, auch transponiert;
+  Falsch-Positiv-Rate), testMelody (6 Seeds × Uplifting und Dream House: Akkordton auf jedem Schlag, Tonvorrat, Lage E3
+  bis C7, keine Transkriptions-Fenster); ctest 22/22. Hörfiles: `out/hoeren_p3`.
 
 ## 0. Kurzfassung
 
@@ -834,9 +874,10 @@ Akzent mit Constraint-Dekodierung (Pachet und Roy 2011), gelernt aus den EMP-Pac
 Basslines, Acid; 2.9) nach Transposition auf A-Moll-Bezug; aus den 5452 Transkriptionen nur Aggregate (Akkordfolgen je
 Takt, harmonischer Rhythmus, Phrasenlängen, Intervall- und Konturverteilungen). Stufe B (Phosphenes kleiner Transformer mit
 eigener Inferenz) erst, wenn Stufe A in der Hörrunde generisch klingt (Risiko 1). **Memorisierung**: jeder generierte
-Takt von Lead, Piano und Arp wird gegen alle Takte der Transkriptionen verglichen (Phosphenes `memorisation.py`, erweitert
+Takt von Lead und Piano wird gegen alle Takte der Transkriptionen verglichen (Phosphenes `memorisation.py`, erweitert
 um transpositionsinvariante Intervall-n-Gramme über zwei Takte); ein Treffer verwirft den Kandidaten. So kommt kein
-bekanntes Motiv aus dem Generator, auch nicht zufällig aus den Regeln.
+bekanntes Motiv aus dem Generator, auch nicht zufällig aus den Regeln. Arp, Pluck, Counter und 303 werden gemessen und
+berichtet (Stand der Umsetzung, Phase 3): gebrochene Dreiklänge gleichen Transkriptionen zwangsläufig.
 
 ### 6.7 Stilprofile
 

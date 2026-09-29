@@ -54,6 +54,7 @@ struct Plan {
     int mainBreakdown = -1;                ///< index of the main breakdown (-1: none)
     int firstLeadBar = -1;                 ///< where the lead is first heard
     bool beatless = false;                 ///< no kick at all (Deep)
+    int bassPattern = 0;                   ///< BassPattern (Acid where the 303 carries the bass)
     std::vector<int> miniBreaks;           ///< bars in which the kick rests (Dok. 6: "Kick raus fuer 1 Takt")
     std::vector<int> vacuums;              ///< bars whose last beat is empty (the bar before a drop, rule 5)
     /** @brief The section of bar @p bar (index), -1 past the end. */

@@ -8,8 +8,18 @@
  * repeated in phrases of eight with the last two bars varied, a leap at the phrase's start and a stepwise descent to its
  * end, new melody only in a breakdown.
  *
- * Phase 2 writes the lead with the rules alone; Phase 3 adds the statistics of the corpus (PLAN 6.6, stage A) and the
- * memorisation check.
+ * **Rules first, statistics second** (PLAN 6.6, stage A). The lead's, the piano's and the 303's pitches are drawn from
+ * the step models of the EMP corpus (Corpus.h) under the rules as hard constraints: the scale (the minor pentatonic's
+ * five where drawn), the register, chord tones on the beats and at the motif's end; the contour of Dok. 4 (the leap up
+ * after the first note, the walk down after it) weights the transitions. Eight candidates for the motif, the best by
+ * the rules (range about an octave, enough different tones, mostly stepwise, no droning).
+ *
+ * **Versions** (PLAN 6.6): where the lead's cell is filtered (the tease in a breakdown, a break, a build) only the motif
+ * A plays, every four bars; where it is on, the phrase A A' B A''. A' keeps A's rhythm and its tones that fit the
+ * chords, A'' keeps A's head and walks to the cadence (the tonic at its end where the chord has it), B is a second
+ * motif, a little higher. The main drop's second half an octave up (not the piano's).
+ *
+ * **Memorisation** (Memo.h): the lead is scanned bar by bar against the transcriptions' windows and drawn again on a hit.
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -27,15 +37,20 @@ struct MelodyContext {
     Score* score = nullptr;
     float humanize = 0.08f;   ///< velocity scatter (compose.humanize)
     Rng* vel = nullptr;       ///< its stream
+    bool piano = false;       ///< the lead is the piano's (Dream House): legato, the piano corpus, no octave up
+    float anthemShare = 0.7f; ///< the chance of the anthem motif (long notes) over the sixteenth riff
     /** @brief Whether the note at @p beat falls into a vacuum (the last beat before a drop): it is not written. */
     bool silent(double beat) const;
     /** @brief Adds a note (dropped in a vacuum), its velocity scattered. */
     void note(double beat, double len, Part part, int pitch, float velocity, int shift = 0, bool accent = false, bool slide = false) const;
 };
 
-/** @brief The lead (Phase 2: rules only). @p seed: the stream `melody`. */
+/** @brief The lead (the motif and its versions, see above). @p seed: the stream `melody`. */
 void writeLead(const MelodyContext& c, uint64_t seed);
-/** @brief The counter: held answers a third or a sixth over the lead's register where the counter cell is on. */
+/**
+ * @brief The counter: answers in the lead's held tones, an octave over them, chord tones walking down (Phosphene); a held
+ *        third or fifth over the riff where the lead has no long notes. Written after the lead.
+ */
 void writeCounter(const MelodyContext& c, uint64_t seed);
 /** @brief The arp: sixteenths (eighths in a slow profile) up, down or up and down over the chord and its octave. */
 void writeArp(const MelodyContext& c, uint64_t seed, bool slow);
@@ -43,5 +58,11 @@ void writeArp(const MelodyContext& c, uint64_t seed, bool slow);
 void writePluck(const MelodyContext& c, uint64_t seed);
 /** @brief The stab: short close chords on the off-beats. */
 void writeStab(const MelodyContext& c, uint64_t seed);
+/**
+ * @brief The 303 (Dok. 5): a bar of sixteen steps, the onsets and pitches from the acid corpus (the first step the
+ *        chord's root), accents and slides by the rules; two steps drawn again every four bars; the line moves with the
+ *        chord's root. @p seed: the stream `bass`.
+ */
+void writeAcid(const MelodyContext& c, uint64_t seed);
 
 } // namespace parh

@@ -85,6 +85,8 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
     mc.score = &sc;
     mc.humanize = p.get(p.id(Module::Compose, 0, compose::Humanize)) * 0.01f;
     mc.vel = &velRng;
+    mc.piano = prof.lead == LeadKind::Piano;
+    mc.anthemShare = mc.piano ? 1.0f : 0.7f;
     auto note = [&](double beat, double len, Part part, int pitch, float v, int shift = 0, bool accent = false, bool slide = false) {
         mc.note(beat, len, part, pitch, v, shift, accent, slide);
     };
@@ -153,49 +155,14 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
     // ------------------------------------------------------------------------------------------ bass
     Rng br;
     br.seed(stream("bass"));
-    const BassPattern bassPat = static_cast<BassPattern>(drawWeighted(prof.bass.data(), kBassPatterns, br.uniform()));
-    // The 303's sequence (Dok. 5): sixteen steps of pitch (scale tones in an octave, an octave switch), gate, accent,
-    // slide; a new variation every four bars, the chord's root every sixteen.
-    struct Step { bool on; int deg; int oct; bool accent; bool slide; };
-    Step seq303[16];
-    const ScaleDef& sc7 = scaleDef(scale);
-    auto draw303 = [&](Rng& r) {
-        for (Step& s : seq303) {
-            s.on = r.uniform() < 0.72f;
-            const float u = r.uniform();
-            s.deg = u < 0.45f ? 0 : r.below(sc7.size);
-            s.oct = r.uniform() < 0.18f ? 1 : 0;
-            s.accent = r.uniform() < 0.3f;
-            s.slide = r.uniform() < 0.22f;
-        }
-        seq303[0].on = true;
-        seq303[0].deg = 0;
-    };
-    draw303(br);
+    const BassPattern bassPat = static_cast<BassPattern>(plan.bassPattern);   // the planner's, which cast the 303
+    writeAcid(mc, stream("bass") ^ 0x333033ull);
     for (int bar = 0; bar < plan.bars; ++bar) {
         const double b0 = 4.0 * bar;
         const int rootPc = harm.pc(bar, 0);
         const int sub = atOrAbove(rootPc, 28), mid = sub + 12;
         const bool subOn = plan.at(bar, Layer::Sub) != LayerState::Off;
         const bool bassOn = plan.at(bar, Layer::Bass) != LayerState::Off;
-        const LayerState acid = plan.at(bar, Layer::Acid);
-        if (acid != LayerState::Off) {
-            if (bar % 4 == 0 && bar > 0) {   // the variation: two steps redrawn
-                for (int k = 0; k < 2; ++k) {
-                    Step& s = seq303[1 + br.below(15)];
-                    s.on = br.uniform() < 0.7f;
-                    s.deg = br.below(sc7.size);
-                    s.accent = br.uniform() < 0.3f;
-                }
-            }
-            for (int s = 0; s < 16; ++s) {
-                const Step& st = seq303[s];
-                if (!st.on) continue;
-                const int pitch = mid + sc7.steps[st.deg] + 12 * st.oct + 12;
-                const double len = st.slide ? 0.3 : 0.18;
-                note(b0 + 0.25 * s, len, Part::Acid, pitch, st.accent ? 1.0f : 0.75f, 0, st.accent, st.slide);
-            }
-        }
         for (int q = 0; q < 4; ++q) {
             const double beat = b0 + q;
             switch (bassPat) {

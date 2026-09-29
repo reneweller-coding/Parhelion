@@ -6,13 +6,18 @@ sibling of [Noctuary](../AmbientSynth) (ambient), Phosphene (psytrance), Ephemer
 A parhelion, a sun dog, is the bright spot of light beside the sun when it shines through ice crystals: a centre and
 its detuned neighbours, which is what the JP-8000's supersaw is.
 
-**State (29.09.2026): Phases 0 and 1.** The frame (copied modules with their origin in every header), the parameter
+**State (29.09.2026): Phases 0 to 3.** The frame (copied modules with their origin in every header), the parameter
 system, the score with sections, the layer matrix and the ghost kick, the deck with kick, sub, mid-bass, 303, a
 twelve-lane kit, six polyphonic voices (Phosphene's JP-8000 supersaw, VA, FM and wavetable, the circuit filters, the
-trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master, and
-a fixed study of 104 bars in the form of the research document (intro, groove, breakdown, build with its snare roll,
-drop, outro). The planner, the melody, the sub-genres, the physical piano and orchestra, the set, the plugin and the
-Quest follow (docs/PLAN.md, section 14).
+trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master.
+Whole tracks in five styles (Uplifting, Progressive, Dream House, Acid, Deep), calibrated against 30 measured reference
+tracks: a planner that writes the form and the layer matrix (the breakdown with its tease and peak, the build, the empty
+beat before the drop), the harmony, the drums, the bass, the pad, the melody -- the lead's motif drawn from statistics
+of royalty-free MIDI packs under the rules as hard constraints (Pachet and Roy's constrained sampling), in its versions
+from the tease to the main drop, and checked bar by bar against 144250 windows of transcriptions of famous tracks so
+that no known motif comes out -- the effects and the automation, and a leveler that sets the drop's loudness and the
+breakdown's distance to it. The physical piano and orchestra, the set, the plugin and the Quest follow (docs/PLAN.md,
+section 14).
 
 The plan, in German, with the reasons for everything: [docs/PLAN.md](docs/PLAN.md). The research it rests on:
 [docs/research](docs/research).
@@ -31,6 +36,9 @@ cd build && ctest -C Release
 build/Tools/render/Release/parh_render --seed 7 --out study.wav --midi study.mid --stems stems
 build/Tools/render/Release/parh_render --seed 7 --set "compose.key=F; compose.bpm=136" --out study_f.wav
 build/Tools/render/Release/parh_render --seed 7 --plan
+build/Tools/render/Release/parh_render --seed 7 --style "Dream House" --out dream.wav --midi dream.mid
+build/Tools/render/Release/parh_render --seed 7 --reroll melody --out other_melody.wav
+build/Tools/render/Release/parh_render --study --out study.wav
 ```
 
 `parh_render` prints the plan (sections and the layer matrix), the loudness of the whole and of every section, and the

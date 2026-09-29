@@ -27,6 +27,10 @@ add_library(ParhelionCore STATIC
     src/compose/Harmony.cpp
     src/compose/Melody.cpp
     src/compose/Composer.cpp
+    src/compose/Corpus.cpp
+    src/compose/CorpusTables.cpp
+    src/compose/Memo.cpp
+    src/compose/MemoFilter.cpp
     src/SetFile.cpp
     src/Deck.cpp
     src/Engine.cpp

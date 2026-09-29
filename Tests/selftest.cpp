@@ -16,7 +16,10 @@
 #include "parh/Score.h"
 #include "parh/Leveler.h"
 #include "parh/compose/Composer.h"
+#include "parh/compose/Corpus.h"
 #include "parh/compose/Harmony.h"
+#include "parh/compose/Melody.h"
+#include "parh/compose/Memo.h"
 #include "parh/compose/Planner.h"
 #include "parh/compose/Study.h"
 #include "parh/mix/TranceGate.h"
@@ -602,6 +605,156 @@ void testLeveler()
           fmt("%.1f dB (window %.0f .. %.0f)", lead, lo, hi));
 }
 
+/**
+ * The corpus model (Corpus.h): every conditional distribution sums to one, the constrained sampler never leaves the
+ * allowed steps, reports an impossible constraint, and draws exactly in proportion to the model (Pachet and Roy): for
+ * three positions of two allowed steps each, the eight lines' frequencies against their enumerated probabilities.
+ */
+void testCorpus()
+{
+    section("the corpus model and the constrained sampler");
+    double worst = 0.0;
+    for (int role = 0; role < kCorpusRoleCount; ++role) {
+        const StepModel& m = corpusModel(static_cast<CorpusRoleId>(role));
+        for (int a = -1; a < kCorpusAlpha; a += 3)
+            for (int b = -1; b < kCorpusAlpha; b += 4) {
+                if (a >= 0 && b < 0) continue;
+                double s = 0.0;
+                for (int c = 0; c < kCorpusAlpha; ++c) s += m.p(a, b, c);
+                worst = std::max(worst, std::fabs(s - 1.0));
+            }
+    }
+    check(worst < 1e-4, "every distribution of every role sums to one", fmt("worst deviation %.1e", worst));
+
+    const StepModel& lead = corpusModel(CorpusRoleId::Lead);
+    Rng r;
+    r.seed(99);
+    int outside = 0, failed = 0;
+    for (int t = 0; t < 200; ++t) {
+        std::vector<std::array<bool, kCorpusAlpha>> allowed(12);
+        for (auto& row : allowed) {
+            row.fill(false);
+            for (int k = 0; k < 3; ++k) row[static_cast<size_t>(r.below(kCorpusAlpha))] = true;
+        }
+        std::vector<int> out;
+        if (!sampleConstrained(lead, 12, allowed, nullptr, r, out)) { ++failed; continue; }
+        for (size_t i = 0; i < out.size(); ++i) if (!allowed[i][static_cast<size_t>(out[i])]) ++outside;
+    }
+    check(outside == 0 && failed == 0, "200 lines under random constraints, every step allowed", fmt("%d outside, %d failed", outside, failed));
+    {
+        std::vector<std::array<bool, kCorpusAlpha>> allowed(4);
+        for (auto& row : allowed) row.fill(true);
+        allowed[2].fill(false);
+        std::vector<int> out;
+        check(!sampleConstrained(lead, 4, allowed, nullptr, r, out), "an impossible constraint is reported, nothing drawn");
+    }
+    // Exactness: the tonic or the fifth at each of three positions.
+    const int s0 = 7, s1 = 11;
+    std::vector<std::array<bool, kCorpusAlpha>> allowed(3);
+    for (auto& row : allowed) { row.fill(false); row[s0] = row[s1] = true; }
+    double pExact[8], total = 0.0;
+    for (int k = 0; k < 8; ++k) {
+        const int x0 = k & 1 ? s1 : s0, x1 = k & 2 ? s1 : s0, x2 = k & 4 ? s1 : s0;
+        pExact[k] = lead.p(-1, -1, x0) * lead.p(-1, x0, x1) * lead.p(x0, x1, x2);
+        total += pExact[k];
+    }
+    int counts[8] = {};
+    const int draws = 40000;
+    for (int t = 0; t < draws; ++t) {
+        std::vector<int> out;
+        sampleConstrained(lead, 3, allowed, nullptr, r, out);
+        counts[(out[0] == s1 ? 1 : 0) + (out[1] == s1 ? 2 : 0) + (out[2] == s1 ? 4 : 0)]++;
+    }
+    double dev = 0.0;
+    for (int k = 0; k < 8; ++k) dev = std::max(dev, std::fabs(counts[k] / static_cast<double>(draws) - pExact[k] / total));
+    check(dev < 0.01, "the sampler draws in proportion to the model", fmt("largest deviation %.4f over the eight lines", dev));
+}
+
+/**
+ * The memorisation gate (Memo.h): the engine's hash is the tool's (the probe window, also transposed), thin windows do
+ * not count, and the Bloom filter answers "maybe" for few windows it does not hold.
+ */
+void testMemo()
+{
+    section("the memorisation gate");
+    std::vector<int> top(64, -1);
+    const int probe[5][2] = { { 0, 60 }, { 4, 62 }, { 8, 63 }, { 12, 60 }, { 16, 65 } };
+    for (const auto& n : probe) top[static_cast<size_t>(n[0])] = n[1];
+    uint64_t h = 0, h5 = 0;
+    const bool ok = memoWindowHash(top, 0, h);
+    for (int& p : top) if (p >= 0) p += 5;
+    memoWindowHash(top, 0, h5);
+    check(ok && h == kMemoProbeHash, "the engine hashes a window as Tools/corpus/memorisation.py does", fmt("%016llx", static_cast<unsigned long long>(h)));
+    check(h5 == h, "in any key");
+    top[16] = -1;
+    uint64_t h4 = 0;
+    check(!memoWindowHash(top, 0, h4), "four notes are too few to count");
+    Rng r;
+    r.seed(7);
+    int maybe = 0;
+    for (int t = 0; t < 20000; ++t) {
+        const uint64_t x = r.next();
+        maybe += memoContains(x);
+    }
+    check(maybe < 100, "few false \"maybe\"s", fmt("%d of 20000 random windows (%.2f %%)", maybe, maybe / 200.0));
+}
+
+/**
+ * The lead (Melody.h) over six seeds of Uplifting and Dream House: every note on a beat a tone of its bar's chord,
+ * every note a tone of the scale or the chord, the register between E3 and C7, no bar starting two bars of a known
+ * track, and the motif back in every phrase of the main drop.
+ */
+void testMelody()
+{
+    section("the lead: rules, register, memorisation");
+    int notes = 0, offChord = 0, offScale = 0, register_ = 0, hits = 0, empty = 0;
+    for (Style st : { Style::Uplifting, Style::DreamHouse }) {
+        const StyleProfile& prof = styleProfile(st);
+        for (uint64_t seed = 1; seed <= 6; ++seed) {
+            Rng kr;
+            kr.seed(seed);
+            int key, scale;
+            drawKey(prof, kr, key, scale);
+            const Plan plan = planTrack(prof, 256, seed);
+            const Harmony h = composeHarmony(plan, prof, key, scale, seed * 7);
+            Score sc;
+            sc.clear(138.0);
+            MelodyContext mc;
+            mc.plan = &plan;
+            mc.harmony = &h;
+            mc.score = &sc;
+            mc.piano = prof.lead == LeadKind::Piano;
+            mc.anthemShare = mc.piano ? 1.0f : 0.7f;
+            writeLead(mc, seed * 131);
+            std::vector<int> top(static_cast<size_t>(plan.bars) * 16, -1);
+            int n = 0;
+            for (const NoteEvent& e : sc.notes) {
+                if (e.part != Part::Lead) continue;
+                ++n;
+                const int bar = std::min(static_cast<int>(e.beat / 4.0), plan.bars - 1);
+                const int pc = e.pitch % 12;
+                const bool chord = pc == h.pc(bar, 0) || pc == h.pc(bar, 1) || pc == h.pc(bar, 2);
+                if (std::fabs(e.beat - std::round(e.beat)) < 1e-9 && !chord) ++offChord;
+                const int rel = ((pc - key - h.shift[static_cast<size_t>(bar)]) % 12 + 12) % 12;
+                bool ok = chord || inScale(scale, rel);
+                if (scale == static_cast<int>(Scale::HarmonicMinor) || scale == static_cast<int>(Scale::MinorPentatonic))
+                    ok = ok || inScale(static_cast<int>(Scale::Aeolian), rel);
+                                if (!ok) ++offScale;
+                if (e.pitch < 52 || e.pitch > 96) ++register_;
+                top[static_cast<size_t>(std::llround(e.beat * 4.0))] = std::max(top[static_cast<size_t>(std::llround(e.beat * 4.0))], e.pitch);
+            }
+            notes += n;
+            if (n == 0) ++empty;
+            if (memoHitsAnyBar(top)) ++hits;
+        }
+    }
+    check(empty == 0, "every track has its lead", fmt("%d notes in 12 tracks", notes));
+    check(offChord == 0, "every note on a beat is a tone of its chord", fmt("%d not", offChord));
+    check(offScale == 0, "every note is a tone of the scale or the chord", fmt("%d not", offScale));
+    check(register_ == 0, "the register between E3 and C7", fmt("%d outside", register_));
+    check(hits == 0, "no two bars of a known track", fmt("%d tracks with a hit", hits));
+}
+
 struct TestSection {
     const char* name;
     std::function<void()> fn;
@@ -624,6 +777,9 @@ const TestSection kSections[] = {
     { "testHarmony", testHarmony },
     { "testComposer", testComposer },
     { "testLeveler", testLeveler },
+    { "testCorpus", testCorpus },
+    { "testMemo", testMemo },
+    { "testMelody", testMelody },
 };
 
 } // namespace

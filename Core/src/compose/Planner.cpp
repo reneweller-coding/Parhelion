@@ -408,7 +408,8 @@ Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed)
     // The cast: which voices the track has (the same for every candidate).
     Cast cast;
     const int bassPattern = drawWeighted(prof.bass.data(), kBassPatterns, r.uniform());
-    cast.acidBass = bassPattern == static_cast<int>(BassPattern::Acid);
+    // The 303 carries the bass where the pattern says so, and always where it is the profile's lead (Acid).
+    cast.acidBass = bassPattern == static_cast<int>(BassPattern::Acid) || prof.lead == LeadKind::Acid;
     cast.lead = prof.lead == LeadKind::Supersaw || prof.lead == LeadKind::Piano;
     cast.pluck = r.uniform() < prof.pluck || prof.lead == LeadKind::PluckArp;
     cast.arp = r.uniform() < prof.arp || prof.lead == LeadKind::PluckArp || prof.lead == LeadKind::Pad;
@@ -435,6 +436,7 @@ Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed)
                            + 4.0 * std::max(0.0, static_cast<double>(introBars) / std::max(1, p.bars) - 0.3);
         if (score < bestScore) { bestScore = score; best = std::move(p); }
     }
+    best.bassPattern = cast.acidBass ? static_cast<int>(BassPattern::Acid) : bassPattern;
     return best;
 }
 
