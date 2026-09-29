@@ -58,6 +58,15 @@ std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, dou
                                      const std::function<bool()>& stop = {});
 
 /**
+ * @brief Every track of a set (Phase 6, the plugin: a set plays at once and its corrections glide in): deck A's and deck
+ *        B's scores levelled as levelScore does, and the teases on deck C given their source's corrections (their marks
+ *        have no target of their own, only the source's peak).
+ * @note After Totality `Core/src/Leveler.cpp` (levelSet) at 4d3c0d2 (29.09.2026).
+ */
+std::vector<LevelReading> levelSet(SetScore& set, const ParamStore& params, double seconds = 20.0,
+                                   const std::function<bool()>& stop = {});
+
+/**
  * @brief The window of part @p part's loudest sample against the kick's, dB; a lane (0 .. 11) by its @p role (PercRole),
  *        a voice (BalPart) by itself.
  */

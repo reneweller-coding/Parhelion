@@ -10,6 +10,7 @@
 #include "parh/synth/Modulation.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <mutex>
 #include <string>
@@ -281,7 +282,56 @@ std::string moduleText(const ParamStore& params, Module module, int instance)
     return out;
 }
 
-int pickPreset(Module module, int instance, const float* style, int role, Rng& rng)
+std::string userPresetText(const ParamStore& params, Module module, int instance)
+{
+    std::string out;
+    const int base = params.base(module, instance);
+    if (base < 0) return out;
+    for (int k = 0; k < ParamStore::moduleCount(module); ++k) {
+        if (presetLeaves(module, k)) continue;
+        const int id = base + k;
+        const std::string& key = params.key(id);
+        char value[32];
+        std::snprintf(value, sizeof value, "%.9g", static_cast<double>(params.get(id)));
+        out += key.substr(key.find('.') + 1) + "=" + value + "\n";
+    }
+    return out;
+}
+
+std::vector<std::pair<int, float>> userPresetKnobs(const ParamStore& params, Module module, int instance, std::string_view text)
+{
+    std::vector<std::pair<int, float>> out;
+    const int base = params.base(module, instance);
+    if (base < 0) return out;
+    const std::string& first = params.key(base);
+    const std::string prefix = first.substr(0, first.find('.') + 1);
+    std::vector<float> values(static_cast<size_t>(ParamStore::moduleCount(module)));
+    for (int k = 0; k < ParamStore::moduleCount(module); ++k) values[static_cast<size_t>(k)] = params.defaultValue(base + k);
+    auto trim = [](std::string_view s) {
+        while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
+        while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r')) s.remove_suffix(1);
+        return s;
+    };
+    while (!text.empty()) {
+        const size_t end = text.find('\n');
+        const std::string_view line = text.substr(0, end);
+        text.remove_prefix(end == std::string_view::npos ? text.size() : end + 1);
+        const size_t eq = line.find('=');
+        if (eq == std::string_view::npos) continue;
+        const int id = params.find(prefix + std::string(trim(line.substr(0, eq))));
+        const int k = id - base;
+        if (id < 0 || k < 0 || k >= ParamStore::moduleCount(module) || presetLeaves(module, k)) continue;
+        const std::string value(trim(line.substr(eq + 1)));
+        char* stop = nullptr;
+        const float v = std::strtof(value.c_str(), &stop);
+        if (stop != value.c_str()) values[static_cast<size_t>(k)] = v;
+    }
+    for (int k = 0; k < ParamStore::moduleCount(module); ++k)
+        if (!presetLeaves(module, k)) out.push_back({ k, values[static_cast<size_t>(k)] });
+    return out;
+}
+
+int pickPreset(Module module, int instance, const float* style, int role, Rng& rng, const Preferences* prefs)
 {
     const std::vector<SoundPreset>& all = factoryPresets(module, instance);
     if (all.empty()) return -1;
@@ -296,7 +346,7 @@ int pickPreset(Module module, int instance, const float* style, int role, Rng& r
         float s = 0.0f;
         for (int k = 0; k < 5; ++k) s += first.style[k] * style[k];
         s = std::max(0.0f, s);
-        w[static_cast<size_t>(g)] = s * s * s;
+        w[static_cast<size_t>(g)] = s * s * s * (prefs != nullptr ? prefs->group(first.group) : 1.0f);
     }
     float total = 0.0f;
     for (float x : w) total += x;
@@ -312,10 +362,7 @@ int pickPreset(Module module, int instance, const float* style, int role, Rng& r
     // The row (the adjective, dark to bright) around the styles' brightness, a bell of a row and a half; the column (the
     // noun) free. Drawn evenly, half the sounds came darker than the style (a Progressive track at a centroid of 220 Hz,
     // its references 420 to 800).
-    static const float kBright[5] = { 0.65f, 0.55f, 0.45f, 0.6f, 0.4f };   // Uplifting, Progressive, Dream House, Acid, Deep
-    float sw = 0.0f, target = 0.0f;
-    for (int k = 0; k < 5; ++k) { sw += std::max(0.0f, style[k]); target += std::max(0.0f, style[k]) * kBright[k]; }
-    target = sw > 0.0f ? 7.0f * target / sw : 3.5f;
+    const float target = 7.0f * styleBrightness(style);
     float rw[8], rs = 0.0f;
     for (int r = 0; r < 8; ++r) {
         const float d = (static_cast<float>(r) - target) / 1.5f;
@@ -329,6 +376,14 @@ int pickPreset(Module module, int instance, const float* style, int role, Rng& r
         if (x < ra) { row = r; break; }
     }
     return g * 64 + row * 8 + std::min(7, static_cast<int>(v * 8.0f));
+}
+
+float styleBrightness(const float* style)
+{
+    static const float kBright[5] = { 0.65f, 0.55f, 0.45f, 0.6f, 0.4f };   // Uplifting, Progressive, Dream House, Acid, Deep
+    float sw = 0.0f, b = 0.0f;
+    for (int k = 0; k < 5; ++k) { sw += std::max(0.0f, style[k]); b += std::max(0.0f, style[k]) * kBright[k]; }
+    return sw > 0.0f ? b / sw : 0.5f;
 }
 
 int bankUnknownKeys(std::string* first)

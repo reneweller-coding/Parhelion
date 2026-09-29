@@ -1,12 +1,13 @@
 # Parhelion
 
-A generator for trance: tracks and DJ sets composed from a seed and synthesised in real time -- in the making. The
-sibling of [Noctuary](../AmbientSynth) (ambient), Phosphene (psytrance), Ephemeris (Berlin School) and Totality (techno).
+A generator for trance: tracks and DJ sets composed from a seed and synthesised in real time. The sibling of [Noctuary](../AmbientSynth) (ambient), Phosphene (psytrance), Ephemeris (Berlin School) and Totality (techno).
 
 A parhelion, a sun dog, is the bright spot of light beside the sun when it shines through ice crystals: a centre and
 its detuned neighbours, which is what the JP-8000's supersaw is.
 
-**State (29.09.2026): Phases 0 to 5b.** The frame (copied modules with their origin in every header), the parameter
+![Parhelion](docs/screenshot.png)
+
+**State (29.09.2026): Phases 0 to 6.** The frame (copied modules with their origin in every header), the parameter
 system, the score with sections, the layer matrix and the ghost kick, the deck with kick, sub, mid-bass, 303, a
 twelve-lane kit, six polyphonic voices (Phosphene's JP-8000 supersaw, VA, FM and wavetable, the circuit filters, the
 trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master.
@@ -33,11 +34,16 @@ by the style, and the choice travels with the track as a program change (the sco
 report). Every melodic voice has a modulation block of its own: a modulation envelope, four LFOs (free or synced) and
 an eight-slot matrix, fed by velocity, key, a random value, the wheel, the pressure and the score's energy, onto the
 targets its model has -- the bow's pressure, speed and place, the choir's vowel and formants, the brass's breath and
-blare, the hammer's and the mallet's hardness, the pitch, the level, the pan. The plugin and the Quest follow
-(docs/PLAN.md, section 14).
+blare, the hammer's and the mallet's hardness, the pitch, the level, the pan. The plugin -- VST3 and standalone, passing
+pluginval at strictness 10 -- has a page per group of synths, each voice with its preset bar (the sixteen groups, the
+user's own presets, and the preset the composer chose for the track that plays), its modulation block, the arrangement
+with its layer matrix and energy curve, a performer's page (mutes, master filter, echo throw, mod wheel, "Breakdown
+now" and "Drop now", which rewrite the playing track from its next 8-bar line), the mixer, the export and the styles
+against their references. The Quest follows (docs/PLAN.md, section 14).
 
-The plan, in German, with the reasons for everything: [docs/PLAN.md](docs/PLAN.md). The research it rests on:
-[docs/research](docs/research).
+The manual, built from the program itself (every parameter, every page):
+[docs/manual/Parhelion-Manual.pdf](docs/manual/Parhelion-Manual.pdf). The plan, in German, with the reasons for
+everything: [docs/PLAN.md](docs/PLAN.md). The research it rests on: [docs/research](docs/research).
 
 ## Build
 
@@ -45,6 +51,19 @@ The plan, in German, with the reasons for everything: [docs/PLAN.md](docs/PLAN.m
 cmake -S . -B build -G "Visual Studio 18 2026" -A x64
 cmake --build build --config Release
 cd build && ctest -C Release
+```
+
+The plugin is built with the rest (`PARH_BUILD_PLUGIN`, on by default; JUCE 9.0.1 from `ThirdParty/JUCE`, the sibling
+Phosphene's checkout, or fetched): `build/Plugin/Parhelion_artefacts/Release/VST3/Parhelion.vst3` and
+`.../Standalone/Parhelion.exe`. ctest loads the VST3 as a host does (`parh_vst3test`) and, where Tracktion's pluginval
+is unpacked into `ThirdParty/pluginval`, validates it at strictness 10.
+
+The manual: `parh_render --dump-params`, the screenshots of every page and `Tools/manual/chapters.txt` make it.
+
+```
+python Tools/manual/make_shots.py
+python Tools/manual/make_manual.py
+python Tools/manual/make_preview.py
 ```
 
 ## Render

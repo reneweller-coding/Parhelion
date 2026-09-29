@@ -54,7 +54,7 @@ void usage()
                 "            [--dj minutes] [--out track.wav] [--midi track.mid] [--stems dir] [--loops dir] [--plan-json f.json]\n"
                 "            [--rate 48000]\n"
                 "            [--block 512] [--bench]\n"
-                "            [--quality desktop|quest] [--plan] [--list] [--version]\n");
+                "            [--quality desktop|quest] [--plan] [--list] [--dump-params f.json] [--version]\n");
     std::printf("units for --reroll:");
     for (const char* u : kUnitNames) std::printf(" %s", u);
     std::printf(" section<n>; in a set track<n>, track<n>.<unit> and set\n");
@@ -142,6 +142,7 @@ int main(int argc, char** argv)
     int block = 512;
     float bpm = 0.0f, minutes = 0.0f;
     bool bench = false, quest = false, planOnly = false, list = false, study = false, seedGiven = false;
+    std::string dump;
     std::string set, out, midi, stems, style, saveSetPath, loadSetPath, loopsDir, planJson;
     double djArg = 0.0;
     Curation curation;
@@ -172,6 +173,7 @@ int main(int argc, char** argv)
         else if (!std::strcmp(a, "--quality")) quest = !std::strcmp(next(), "quest");
         else if (!std::strcmp(a, "--plan")) planOnly = true;
         else if (!std::strcmp(a, "--list")) list = true;
+        else if (!std::strcmp(a, "--dump-params")) dump = next();
         else if (!std::strcmp(a, "--version")) { std::printf("Parhelion %s\n", PARH_VERSION); return 0; }
         else { usage(); return 2; }
     }
@@ -181,6 +183,34 @@ int main(int argc, char** argv)
     if (list) {
         for (int id = 0; id < p.count(); ++id)
             std::printf("%-28s %s\n", p.key(id).c_str(), p.format(id).c_str());
+        return 0;
+    }
+    if (!dump.empty()) {
+        // One object per parameter: the key, the descriptor, the default of this instance (Tools/manual; after Totality's).
+        FILE* f = std::fopen(dump.c_str(), "wb");
+        if (f == nullptr) { std::fprintf(stderr, "cannot write %s\n", dump.c_str()); return 1; }
+        auto quoted = [](const char* s) {
+            std::string o = "\"";
+            for (const char* c = s != nullptr ? s : ""; *c != 0; ++c) { if (*c == '"' || *c == '\\') o += '\\'; o += *c; }
+            return o + "\"";
+        };
+        static const char* const curves[] = { "linear", "log", "int", "choice", "toggle" };
+        std::fprintf(f, "[\n");
+        for (int id = 0; id < p.count(); ++id) {
+            const ParamDesc& d = p.desc(id);
+            std::string choices = "[]";
+            if (d.curve == Curve::Choice && d.choices != nullptr) {
+                choices = "[";
+                for (int c = 0; c <= static_cast<int>(d.maxValue); ++c) choices += (c ? ", " : "") + quoted(d.choices[c]);
+                choices += "]";
+            }
+            std::fprintf(f, "  {\"key\": %s, \"name\": %s, \"unit\": %s, \"min\": %g, \"max\": %g, \"default\": %g, \"curve\": \"%s\", \"choices\": %s}%s\n",
+                         quoted(p.key(id).c_str()).c_str(), quoted(d.name).c_str(), quoted(d.unit).c_str(),
+                         static_cast<double>(d.minValue), static_cast<double>(d.maxValue), static_cast<double>(p.defaultValue(id)),
+                         curves[static_cast<int>(d.curve)], choices.c_str(), id + 1 < p.count() ? "," : "");
+        }
+        std::fprintf(f, "]\n");
+        std::fclose(f);
         return 0;
     }
     std::string error;
@@ -216,7 +246,7 @@ int main(int argc, char** argv)
         // A set (PLAN 6.8): every track levelled on its own before it is placed, then mixed on the decks.
         SetInfo si;
         auto level = [&](Score& s) { if (!bench && !planOnly) levelScore(s, p); };
-        const SetScore setScore = composeSet(p, seed, djMinutes, &curation, &si, level);
+        const SetScore setScore = composeSet(p, seed, djMinutes, &curation, &si, nullptr, level);
         t1 = std::chrono::steady_clock::now();
         const TempoMap& tm = setScore.decks[0].tempo;
         std::printf("Parhelion %s  set of seed %llu, %s, %zu tracks, %zu teases, %.1f min\n", PARH_VERSION,

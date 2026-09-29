@@ -23,7 +23,7 @@ option(PARH_BUILD_TOOLS "Build parh_render and the tests" ON)
 if(ANDROID)
     option(PARH_BUILD_PLUGIN "Build the JUCE plugin (VST3 + Standalone)" OFF)
 else()
-    option(PARH_BUILD_PLUGIN "Build the JUCE plugin (VST3 + Standalone); from Phase 6" OFF)
+    option(PARH_BUILD_PLUGIN "Build the JUCE plugin (VST3 + Standalone)" ON)
 endif()
 set(PARH_JUCE_TAG "9.0.1" CACHE STRING "JUCE git tag to fetch when no local checkout is found")
 option(PARH_AVX2 "Build the x86-64 core with AVX2 + FMA" ON)
@@ -58,7 +58,7 @@ if(PARH_BUILD_TOOLS)
     add_subdirectory(Tests)
 endif()
 
-# The plugin (Phase 5). JUCE from ThirdParty/JUCE, else from the sibling Phosphene's checkout, else fetched. Nothing
+# The plugin (Phase 6). JUCE from ThirdParty/JUCE, else from the sibling Phosphene's checkout, else fetched. Nothing
 # under Core/ includes JUCE.
 if(PARH_BUILD_PLUGIN)
     include(FetchContent)

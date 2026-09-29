@@ -500,7 +500,41 @@ Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed, bool mixable)
     return planTrack(prof, bars, [seed](const std::string& name) { return unitSeed(seed, name); }, mixable);
 }
 
+namespace {
+
+/** @brief The specs cut at @p bar and a breakdown (build, drop) or a drop at once after it, then the outro. */
+void rewriteSpecs(std::vector<Spec>& s, int bar, SectionKind kind)
+{
+    std::vector<Spec> out;
+    bool mainBefore = false;
+    int at = 0;
+    for (const Spec& x : s) {
+        if (at + x.bars <= bar) {
+            out.push_back(x);
+            mainBefore = mainBefore || x.role == Role::MainDrop;
+            at += x.bars;
+            continue;
+        }
+        if (bar - at >= 8) out.push_back({ x.role, bar - at });   // (the section it cuts, up to the line)
+        break;
+    }
+    if (kind == SectionKind::Breakdown) {
+        out.push_back({ mainBefore ? Role::Break2 : Role::Breakdown, mainBefore ? 16 : 32 });
+        out.push_back({ Role::Build, 8 });
+    }
+    out.push_back({ mainBefore ? Role::FinalDrop : Role::MainDrop, 32 });
+    out.push_back({ Role::Outro, 32 });
+    s = out;
+}
+
+} // namespace
+
 Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable)
+{
+    return planTrackRewritten(prof, bars, stream, mixable, -1, SectionKind::Drop);
+}
+
+Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, int rewriteBar, SectionKind rewriteKind)
 {
     const uint64_t formSeed = stream("form");
     Rng r;
@@ -529,6 +563,7 @@ Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, boo
     // Candidates: the nearest to the length asked for, inside the profile's breakdown share.
     Plan best;
     double bestScore = 1e30;
+    int bestC = 0;
     for (int c = 0; c < 8; ++c) {
         Rng cr;
         cr.seed(mixSeed(formSeed, 0x43414E44ull + static_cast<uint64_t>(c)));   // "CAND"
@@ -541,7 +576,17 @@ Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, boo
         const double score = std::fabs(static_cast<double>(p.bars - bars)) / 32.0
                            + 4.0 * std::max(0.0f, share - prof.breakdownHigh) + 4.0 * std::max(0.0f, prof.breakdownLow - share)
                            + 4.0 * std::max(0.0, static_cast<double>(introBars) / std::max(1, p.bars) - 0.3);
-        if (score < bestScore) { bestScore = score; best = std::move(p); }
+        if (score < bestScore) { bestScore = score; best = std::move(p); bestC = c; }
+    }
+    if (rewriteBar >= 0) {
+        // The chosen candidate's specs again (the same draws), cut and continued (planTrackRewritten).
+        Rng cr;
+        cr.seed(mixSeed(formSeed, 0x43414E44ull + static_cast<uint64_t>(bestC)));
+        std::vector<Spec> specs = drawSpecs(prof, form, cr, mixable);
+        fitTo32(specs, mixable ? 32 : 16);
+        rewriteSpecs(specs, rewriteBar, rewriteKind);
+        fitTo32(specs, mixable ? 32 : 16);
+        best = buildPlan(prof, form, specs, cast, stream);
     }
     best.bassPattern = cast.acidBass ? static_cast<int>(BassPattern::Acid) : bassPattern;
     return best;

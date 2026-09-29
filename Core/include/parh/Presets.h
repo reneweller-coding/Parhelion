@@ -31,6 +31,7 @@
 #pragma once
 #include "parh/Dsp.h"
 #include "parh/Params.h"
+#include "parh/Preferences.h"
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -65,11 +66,27 @@ void applyPreset(ParamStore& params, Module module, int instance, const SoundPre
 /** @brief The module's knobs that differ from their defaults, as `key=value` lines (a user preset); presetLeaves() knobs left out. */
 std::string moduleText(const ParamStore& params, Module module, int instance = 0);
 /**
+ * @brief A user preset (the plugin's "Save as user preset"): every knob a preset sets, one `knob=value` a line with the
+ *        key inside the module ("cutoff=2400"), so that it loads into any instance of the module -- a lane's sound into
+ *        another lane. All of them, not only those off their defaults: the kit's lanes have defaults of their own. The
+ *        values to nine digits: they read back exactly.
+ */
+std::string userPresetText(const ParamStore& params, Module module, int instance = 0);
+/**
+ * @brief The values user preset @p text gives every knob a preset sets, by index in the module: its own, the defaults
+ *        for the rest -- the whole sound, as presetKnobs() for a factory preset. Keys the module does not have (another
+ *        version's), keys a preset leaves alone and lines without '=' are skipped.
+ */
+std::vector<std::pair<int, float>> userPresetKnobs(const ParamStore& params, Module module, int instance, std::string_view text);
+/**
  * @brief The composer's choice: a preset of @p module (instance @p instance) for a track of style weights @p style (the
  *        five styles, summing to 1), drawn from @p rng; for a kit lane only among presets made for @p role (-1: any).
+ * @param prefs the player's ratings (compose.use_ratings): a factor on each group's weight, or null
  * @return its index in factoryPresets(), -1 if the module has none
  */
-int pickPreset(Module module, int instance, const float* style, int role, Rng& rng);
+int pickPreset(Module module, int instance, const float* style, int role, Rng& rng, const Preferences* prefs = nullptr);
+/** @brief The brightness a track of style weights @p style chooses its sounds around (0 dark .. 1 bright: the grid's rows). */
+float styleBrightness(const float* style);
 /** @brief How many keys the bank's table names that no module has (the tests); @p first gets the first. */
 int bankUnknownKeys(std::string* first = nullptr);
 /** @brief The bank's index of a module (the trims' table), -1 without a bank. */

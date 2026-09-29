@@ -39,6 +39,7 @@
  */
 #pragma once
 #include "parh/Params.h"
+#include "parh/Preferences.h"
 #include "parh/Score.h"
 #include "parh/SetFile.h"
 #include "parh/compose/Planner.h"
@@ -58,6 +59,9 @@ struct TrackRequest {
     int bars = 0;                            ///< 0: from compose.minutes (or the profile's lengths with compose.auto)
     float energy = -1.0f;                    ///< the set's energy here, 0..1 (-1: a track alone)
     bool mixable = false;                    ///< a set's track: DJ intro and outro of 32 bars at least (planTrack)
+    const Preferences* prefs = nullptr;      ///< the player's ratings (compose.use_ratings): the forms' and the sounds' weights
+    int rewriteBar = -1;                     ///< the performer's "now" (planTrackRewritten): from this bar (an 8-bar line), -1 none
+    SectionKind rewriteKind = SectionKind::Breakdown;   ///< a breakdown (with its build and drop) or a drop at once
 };
 
 /** @brief What a track tells the set, the cues and the displays. */

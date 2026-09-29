@@ -188,6 +188,25 @@ const Section* mainBreakdown(const Score& s, double from, double to)
 
 } // namespace
 
+std::vector<LevelReading> levelSet(SetScore& set, const ParamStore& params, double seconds, const std::function<bool()>& stop)
+{
+    std::vector<LevelReading> out;
+    for (int d = 0; d < 2; ++d) {
+        if (set.decks[d].levels.empty()) continue;
+        const std::vector<LevelReading> r = levelScore(set.decks[d], params, seconds, stop);
+        if (r.empty() && stop && stop()) return {};
+        out.insert(out.end(), r.begin(), r.end());
+    }
+    // The teases: the corrections of their source.
+    for (LevelMark& m : set.decks[2].levels) {
+        if (!std::isnan(m.targetLufs)) continue;
+        for (int d = 0; d < 2; ++d)
+            for (const LevelMark& src : set.decks[d].levels)
+                if (src.peakBeat == m.peakBeat) { m.trimDb = src.trimDb; m.balDb = src.balDb; m.breakDb = src.breakDb; m.buildDb = src.buildDb; }
+    }
+    return out;
+}
+
 void balanceWindow(int part, int role, float& lo, float& hi)
 {
     // The loudest sample against the kick's, dB. The lanes after Totality's research fader levels (closed hat -8, open hat

@@ -1,0 +1,301 @@
+# The prose of the Parhelion manual, one block per chapter (after Totality's Tools/manual/chapters.txt).
+#
+# Everything else in the manual -- the parameter tables and the pictures -- comes from the program itself:
+# `parh_render --dump-params` writes every parameter's description, and the standalone's screenshot mode
+# (PARH_SHOT, PARH_TAB, Tools/manual/make_shots.py) one picture per tab. Only the text that explains *why* lives here.
+#
+# Format: "== Title | module prefixes | screenshot ==" starts a chapter. The module prefixes (space separated, may be
+# empty) are the parameter tables printed under the chapter; the screenshot is the tab's index
+# (docs/screenshots/tab_NN.png) or "-". Every module must belong to a chapter, or the generator refuses to print.
+# Blank lines separate paragraphs; a line indented by four spaces is printed as it stands; "[image path: caption]"
+# shows a picture from docs/; lines starting with '#' are comments.
+
+== About | | - ==
+
+Parhelion composes, mixes and plays trance: tracks of two to fourteen minutes and DJ sets of up to twelve hours, in which
+the tracks follow one another on two decks as a DJ would mix them. Nothing is played back from a recording and no
+neural network makes a sound. The kick, the sub and the rolling bass, the 303, the twelve lanes of the kit, the six
+voices of the supersaw synthesiser -- lead, counter, pluck, arp, pad and stab --, the physically modelled piano, the
+bowed strings, the choir, the brass and the timpani, the risers and impacts are synthesised; the rooms, the plate and
+the hall are simulated; and every section, every note and every move of a knob is decided by the composer.
+
+Five style profiles span the genre: Uplifting (the anthem with its long breakdown, and, now and then, an orchestra --
+Cinematic), Progressive (the plateau that rises in layers), Dream House (the piano motif over a bass that never
+stops), Acid (the 303 carrying bass and melody, its filter the drama) and Deep (the pad as the instrument, a grain
+cloud over it). Any two can be blended. Every recipe was fitted against measurements of thirty reference tracks: their
+tempo and length, the share and length of their breakdowns, how far the drop rises over the breakdown, their loudness
+and its range, their spectral balance and their width.
+
+The same seed always gives the same track. A track is a seed, a style, a length and a handful of rerolls, which is
+what a set file stores and what you can hand to someone else. The standalone and the plugin play what the offline
+renderer plays, sample for sample, whatever the block size.
+
+A parhelion is a sun dog: the bright spot beside the sun, on the halo of ice crystals, that shines with the sun's own
+light. In trance the drop is the sun; everything before it is the halo.
+
+== Quick start | | - ==
+
+The standalone plays by itself: press Play. Compose writes a new track with the knobs as they stand, New seed draws a
+fresh one. The status line tells what plays: its style and form, its tempo, its key with the Camelot label a DJ mixes
+by, and its length. While a track begins to play, Parhelion measures it in the background: each voice is set against
+the kick in a window of its own, every breakdown against the drop by the distance the style's references keep, every
+build a little under the drop, and the drop to the style's loudness. The status says "levelling" until the
+corrections have glided in.
+
+For a set, move Set min above zero: Parhelion then writes a set of that many minutes -- a dramaturgy of energy and
+tempo, tracks in neighbouring keys on the Camelot wheel, the incoming track's intro under the outgoing track's outro,
+the bass swapped on the mixer's isolator, the next track's hook teased on the third deck.
+
+In a DAW, Parhelion is an instrument plugin that follows the host's transport: it plays when the host plays, jumps
+when the host jumps, and plays at the host's tempo (a set's own tempo drift is the standalone's and the export's). Its
+output is a finished stereo mix, its loudest 20 seconds at the style's loudness (-8 to -10 LUFS, as the references) and
+its true peak under -1 dBTP.
+
+A reroll draws one part of the track again and leaves the rest as it was: the form, the layer matrix, the energy, the
+harmony, the motif, the lead, the bass, the 303, the arp, the pluck, the piano, the orchestra, the drums, the effects,
+the sounds. In a set the rerolls act on the track under the playhead, and "reroll the whole track" or "reroll the
+set's plan" draw more at once (the Arrange page).
+
+== The track and the set | compose set djfx | 0 ==
+
+A track has one of five forms, and each style draws its own. The Anthem is Uplifting's: intro, groove, a short break
+and a first drop, the main breakdown of 32 to 64 bars with its tease, its peak and its build, the main drop, and now
+and then a second break and a final drop, the outro. The Dream is Dream House's, shorter, and the bass never leaves,
+not even in the breakdown. The Acid form has no long breakdown: one to three pauses of the kick of eight bars each,
+between grooves, and the main drop; its drama is the 303's filter. The Plateau is Progressive's: grooves and plateaus
+that add a layer at a time, short breaks between them, a breakdown of 24 or 32 bars. The Drift is Deep's, a long
+groove and plateau before the breakdown and the main drop. Every section is a multiple of eight bars and the whole a
+multiple of thirty-two; every 8-bar block changes something against the one before it; the bar before a drop empties
+-- the last beat, the last two, the whole bar, or the kick alone on four -- so that the drop lands.
+
+The harmony: a key the profile favours (the roots from D to A most often), one of five progressions (i-VI-III-VII and
+its relatives; the major keys through their relative minors), the harmonic rhythm of the section, the VII in the two
+bars before every drop and its resolution on i. Acid stays on its chord and moves a fourth or a fifth every 16 bars;
+the Cinematic tracks lift by a third after the second breakdown.
+
+The melody is written from rules and from counts. The anthem's motif is long notes: a leap of a fourth to an octave
+after the first note, then down by steps, a chord tone on every beat, phrased A A' B A''; filtered sections hear only
+A, the main drop's second half an octave higher. The riff, the pluck's rhythm, the piano's line and the 303's bar are
+drawn from note statistics of order two, never from a melody itself, and every lead is checked two bars at a time
+against a fingerprint of 144 250 windows of known trance tracks and drawn again on a match.
+
+Style picks the profile; Morph To and Morph blend it with a second one. With Auto the tempo and the key are drawn from
+the profile; without it the knobs decide. Length is the track's, rounded to whole 32-bar blocks. Humanize is the
+spread of the velocities and the timing. Composer's Sounds lets the composer choose a preset per synth for every track
+(the next chapter); Favor Ratings weighs what you rated (the Arrange page).
+
+A set is a length in minutes and a dramaturgy -- Warm-up, Peak, Closing, Sunrise (from the deep end up into the light)
+and Journey (a long arc with two peaks) --, which draws the energy and the tempo of every track (the tempo moves by
+at most two BPM a track). Styles: Stay keeps the style of the knobs, Wander walks the ladder Deep, Dream House,
+Progressive, Uplifting, Acid with the energy. The keys walk the Camelot wheel: the same key, a fifth, the relative
+major or minor -- from major back to minor more often, trance lives in minor --, now and then an energy boost by one
+or two semitones. Every track of a set can be mixed: an intro and an outro of 32 bars or more, with a beat, never
+beatless.
+
+The blend lays the incoming track's intro over the outgoing track's outro, 32 or 64 bars (Blend). The bass goes over
+on the isolator in one move, 16 bars before the incoming groove, never before the incoming bass; the DJ's hand works
+the faders and the filters. On deck C the next track's hook is teased, filtered, over the end of the one playing.
+Track Time is how long each track is heard on its own. The mixer's effects (djfx) are an echo and a hall that the
+breaks and the Perform page's throw send into.
+
+== Sounds and presets | | - ==
+
+Every synth has 1024 factory presets: the kick, the sub, the kit (by role), the bass, the 303, each of the six voices
+of the supersaw synthesiser (lead, counter, pluck, arp, pad, stab), the piano, the strings, the choir, the brass, the
+timpani, the effects and the grain cloud -- 18 banks, 18 432 sounds. Each bank has sixteen groups -- "Anthem Supersaw",
+"Classic 303", "Gated Pad", "Concert Grand" -- and each group sixty-four presets on an eight by eight grid: the
+rows an adjective from dark to bright, the columns a noun of the group's own, so the name tells where on the grid a
+sound lies. A preset is the sound with its modulation, not the mix: levels, sends, the pump and the notes stay where
+the mix and the composer put them. Each preset's loudness against the default sound was measured, and the composer
+trims it by that amount.
+
+For every track the composer chooses a preset per synth (Composer's Sounds, compose.pick_sounds): a group by how well
+it suits the track's style -- the weights cubed, so that an Uplifting lead is mostly a supersaw --, a lane of the kit
+only among the groups made for its role, and in the group a row around the style's brightness (Uplifting brighter,
+Deep darker) and a column at random. The style then holds a few knobs in its own range. Reroll sounds draws other
+presets and leaves the notes as they are.
+
+The knobs show what plays. When a track begins -- in a set, when the next track starts on its deck -- its presets are
+put on the knobs, and each voice's preset bar names the preset the composer chose; the Arrange page lists them for the
+whole track. Turn a knob and the sound follows from there; choose another preset from the menu, or step through them
+with the arrows, and it plays at once. In a blend each deck keeps its own track's sounds.
+
+Save as user preset (the last item of the menu) keeps a sound of your own: every knob a preset sets, as it stands,
+goes under a name into Documents/Parhelion/Presets/<synth>, one "knob=value" a line, and appears in the menu under
+User. The twelve lanes of the kit share their folder, so a lane's sound loads into any lane. A user preset is the
+whole sound, as a factory preset is: a knob its file does not name (one edited out by hand) goes back to its default.
+
+Every voice has the same modulation block: a modulation envelope, four LFOs (free or in time with the beat) and a
+matrix of eight slots, each a source, a destination and an amount. The sources: the envelope, the LFOs, velocity, the
+key, a random value per note, the mod wheel, channel pressure and the energy of the score, so that a voice can open
+with the track (the synthesisers add their filter envelope). The
+destinations are the engine's own: pitch, pulse width, wavetable position, FM index, cutoff, resonance, drive and
+detune for the synthesisers; hammer hardness for the piano; bow pressure, speed and position for the strings; vowel,
+formant, tension and breath for the choir; breath and brassiness for the brass; hardness, strike position and decay for
+the timpani; vibrato, level and pan for all of them. Most presets use a few slots; what the mod wheel does is the
+preset's.
+
+== Arrange | | 1 ==
+
+The arrangement across the whole length: in a track its sections by name, and under them a lane per layer -- kick,
+sub, bass, 303, the hats, the clap, the ride, the percussion, the crash, pluck, arp, pad, lead, counter, stab, effects
+--, bright where the layer plays open, dim where it plays filtered. Over them the energy curve the composer wrote. In
+a set the tracks lie on decks A and B, their bass swaps marked, and the teases on deck C. A click jumps there. The
+line above names the style, the form, the tempo, the key, the progression, the bass figure, the main drop and, where
+there is one, the orchestra and the key change; the line below the preset of every synth.
+
+The row of rerolls acts on the track under the playhead; each part is drawn from a stream of its own, so a reroll of
+the matrix keeps the harmony and the sounds, a reroll of the energy redraws the curve the pads' opening and the 303
+follow, and a reroll of the motif writes another hook for the same form.
+
+The + and - beside the status line rate the track under the playhead. The ratings are kept in
+Documents/Parhelion/ratings.tsv with the track's form and the groups of its presets; with Favor Ratings (the Set page)
+the composer draws the forms and preset groups you liked more often and the ones you did not seldom -- none is ever
+ruled out. A saved set does not carry the ratings: it plays back the same only with Favor Ratings off.
+
+== Low End | kick sub bass acid pump | 2 ==
+
+The low end is one system. The kick is tuned to the key (or its fifth, or its flat seventh); it has three engines (a
+swept sine, a resonator, a modelled 909) and a top layer, and its drive and clip run at four times the rate. The sub
+bass is a sine under the bass line, ducked by every kick and, with Kick Lock, locked to its phase, so that the two
+never cancel each other.
+
+The mid bass and the 303 share one synthesiser with ten filter models (the Moog ladder, the 303's diode ladder, the
+Prophet's SSM2040, the Juno's IR3109, the SEM, the MS-20's Korg35 and more). The bass plays one of the trance figures
+-- the off-beat eighths, the rolling sixteenths, the gallop, the walking line, the drone --; the 303 plays its bar with
+accents and slides, and in Acid its cutoff, resonance, envelope and decay climb over phrases of 16, 32 or 64 bars and
+fall back at their end.
+
+The pump is trance's sidechain: a ghost kick, silent and on a track of its own, ducks each voice by its own depth in
+dB, with the attack, hold and release here, and the returns of the rooms by Return Duck. It gives the pads and the
+leads their breathing without a compressor; in a breakdown the composer lets it go and ramps it back in for the drop.
+
+== Drums | perc mix | 3 ==
+
+Twelve lanes, each a small drum synthesiser: a role (the closed, rolling and open hats, the ride, the clap and its
+ghost, the snare, the rim, the shaker, toms, congas, noise, the crash, the tambourine), an engine (noise, metal -- the
+909's six square waves --, modal, tone, FM), a filter and a shape. They run side by side in the lanes of the processor's vector registers.
+The snare plays the roll into the drop, from quarters to thirty-seconds; the crash marks the drops.
+
+The mix module holds the buses: the hats and the percussion with their level and low pass, the drum bus's saturation,
+the group low cut the builds draw up, and the synth bus's level -- the fader the energy curve moves.
+
+== Synths | lead counter pluck arp pad stab | 4 ==
+
+Six voices of one synthesiser, each with its own role and bank: the lead, the counter-melody, the pluck, the arp,
+the pad and the stab. Two oscillators -- the supersaw after Adam Szabo's measurements of the Roland JP-8000 (seven
+saws, the detune curve and the mix of the original), virtual analogue, FM or a wavetable --, a filter from the same ten
+models, an amplitude and a filter envelope, the trance gate (the classic patterns and their sixteenth-note masks), a
+tempo delay, sends into the room, the plate and the hall, and the modulation block. The page shows one voice at a
+time; the voice buttons switch between them.
+
+The lead plays the motif; the counter answers in the lead's held notes an octave above; the pluck plays the chords in
+syncopated sixteenths; the arp breaks them up; the pad holds them, gated in the drops and opening over the breakdown;
+the stab hits them. Which voices play in which block is the layer matrix's.
+
+== Keys | piano cloud | 5 ==
+
+The piano is a physical model, not a sample: for every key a string of the length, tension and stiffness of a real
+instrument (four of them: Grand, Baby Grand, Upright and Soft, the slightly muffled piano of Dream House), one to three
+strings per note, a felt hammer, a soundboard solved as a ribbed orthotropic plate, the damper, the pedal and the
+sympathetic strings. Its stretched tuning comes from the strings' stiffness. In Dream House it plays the motif, the
+pedal down and lifted at every chord change.
+
+The grain cloud hears the pad, the pluck and the piano and scatters them in grains into the plate -- Deep's haze and
+Dream House's breath.
+
+== Orchestra | strings choir brass timpani | 6 ==
+
+The Cinematic tracks of Uplifting (and some of Dream House and Deep) bring an orchestra, all of it modelled. The
+strings: six players a note, each a modal string under a bow with the friction of rosin, their own intonation,
+attack and vibrato, in the body of a violin, viola, cello or double bass by register. The choir: a glottal source with
+the tension of the voice, five formants per singer on the vowels a, o and u, breath and vibrato. The brass: a lip that
+buzzes into a bore and its bell, brighter with more breath. The timpani: the modes of a kettle drum under a felt mallet.
+
+The strings enter with the main breakdown's tease and take the melody at its peak; the choir sings at the peak and in
+the second half of the main drop; at every drop the brass play a braam (the root low, its fifth, the octave) and the
+timpani strike, after a roll in the two bars before it.
+
+== Effects | sfx sends | 7 ==
+
+The effects are synthesised as well: the riser and the sweep of the build, the reverse crash and the impact on the
+drop, the downlifter after it, the sub drop, swells, zaps and atmospheres, each from its own group of presets.
+
+The sends: a room, a plate and a long hall, which every voice sends into by its own knobs (the hats into the room and
+the percussion into the plate by the knobs here), each with a low cut at its input and its return ducked by the pump.
+The composer draws the hall long in a breakdown and short in a drop.
+
+== Mixer and Master | master deck | 8 ==
+
+The meters: each deck after its mixer channel, the output, and the loudness of the last 400 ms. Under them the mix
+buses (the Drums chapter), the pump (the Low End chapter) and the master: the glue compressor, a tilt of the highs
+against the lows, the side under Mono Below made mono, the level, a clipper at four times the rate and a true-peak
+limiter at the ceiling.
+
+A deck's channel is a DJ mixer's: the fader, a three-band isolator (200 Hz and 2.5 kHz, each band from a kill to +6
+dB), a filter that is a low pass to the left and a high pass to the right, and the send into the mixer's effects. In a
+set the composer moves them as a DJ would; in the plugin they are yours too.
+
+== Perform | perform | 9 ==
+
+As at a mixer. Seven mutes -- kick, bass, hats, percussion, lead, the other synths, pads --: a muted group's notes stop
+and its tails ring out. The master filter takes the whole mix, the echo throw sends it into the mixer's echo, and the
+mod wheel drives every voice's modulation matrix where its preset listens to it. Each deck has its kills and its
+fader.
+
+Breakdown now and Drop now rewrite the playing track from its next 8-bar line (or the one after it, where that is
+less than six seconds away): into a breakdown with its build and a drop after it, or into the drop at once, after a
+beat of silence. Everything before that line stays as it was, and the track plays on without a gap. A set is not
+rewritten -- its next blend would have to move with it.
+
+Every control can be learned from a MIDI controller: click learn, move the controller (a right click forgets it). By
+default controller 74 moves the filter, controller 11 the throw and the mod wheel the wheel; channel pressure is the
+matrices' pressure; the keys from middle C up (C to F#) toggle the seven mutes. The bindings are saved with the
+project.
+
+The perform controls are live only: an export or parh_render plays the track as it was composed.
+
+== Export and cues | cue | 10 ==
+
+The export renders what plays at 48 kHz: a 24-bit WAV with cue markers (the bass's entry, the breakdowns, the drops,
+the main drop, the outro; in a set every track and its bass swap) and the same cues as JSON beside it
+(<name>.wav.cues.json), for DJ software that does not read the WAV's markers, and a rekordbox collection beside it
+(<name>.wav.rekordbox.xml: the beat grid, following a set's tempo bar by bar, every cue a memory cue and the first
+eight hot cues; import it in rekordbox under Preferences > Advanced > rekordbox xml); the MIDI file with the tempo map,
+a channel per part and each voice's preset as its name and program change; on request the stems -- a WAV per part --
+and the DJ loops of a track: eight seamless bars each of its intro, its main drop and its outro. A .parhset file holds
+the seed, the lengths, the rerolls and every changed knob.
+
+The OSC cues tell a visualiser what the score knows, at the moment it is heard: the beat and the tempo, the bar, the
+section's name, what the layer matrix changes, the key. They go to this machine at the port given, or to
+PARH_CUE_HOST.
+
+    /parh/beat i f      beat number, tempo
+    /parh/bar i         bar number
+    /parh/block s       the section's name ("Breakdown", "Drop", a set's track)
+    /parh/op s          the layer matrix's change ("add lead", "filter pluck", "remove kick")
+    /parh/key s         the key as a Camelot label ("8A")
+
+== Style | | 11 ==
+
+Where the knobs' profile stands among the five styles, on six axes: the tempo, the density of the drums, how much the
+lead carries, the share of the breakdowns, the length of the breakdown's reverb and the brightness of the palette the
+composer chooses its presets from. The markers are the five profiles; the bar is the profile of the knobs, with its
+morph. Under them the references' medians per style, as they were measured: tempo, length, integrated loudness and
+the loudest 20 seconds, the loudness range, the breakdown's share and its distance to the drop, the rise into the
+drop, the spectral centroid and the width above 200 Hz.
+
+== The command line | | - ==
+
+parh_render composes and renders without a window, the same samples the plugin plays:
+
+    parh_render --seed 7 --out track.wav --midi track.mid --stems stems --loops loops
+    parh_render --style Acid --seed 3 --minutes 7 --out acid.wav --plan-json acid.json
+    parh_render --dj 120 --seed 7 --set "set.dramaturgy=Sunrise; set.journey=Wander" --out set.wav
+    parh_render --seed 7 --reroll motif --out other_hook.wav
+    parh_render --list                  every parameter with its value
+    parh_render --bench --quality quest how fast, at the headset's quality
+
+Tools/calibrate.py renders every style and measures its tracks exactly as the references were measured; the
+evaluation (Tools/eval_report.py) adds the section boundaries it hears against the planned ones, the key it hears
+against the planned one, and the rise into each drop.

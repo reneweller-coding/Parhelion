@@ -41,6 +41,7 @@ enum class Progression : int { Anthem = 0, Circling, Lift, Melancholy, Tension, 
 constexpr int kProgressions = static_cast<int>(Progression::Count);
 /** @brief The degrees of each progression (four chords; Lift repeats its last). */
 extern const int kProgressionDegrees[kProgressions][4];
+extern const char* const kFormTemplateNames[kFormTemplates];   ///< "Anthem", "Dream", "Acid", "Plateau", "Drift"
 extern const char* const kProgressionNames[kProgressions];   ///< "i-VI-III-VII", ...
 
 /** @brief The bass figures of Dok. 3. */

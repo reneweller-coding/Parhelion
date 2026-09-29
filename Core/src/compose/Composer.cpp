@@ -38,7 +38,9 @@ bool contains(const std::vector<int>& v, int x) { return std::find(v.begin(), v.
 
 Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, const Curation* cur, const std::string& unit, TrackInfo* info)
 {
-    const StyleProfile prof = req.profile != nullptr ? *req.profile : profileOf(p);
+    StyleProfile prof = req.profile != nullptr ? *req.profile : profileOf(p);
+    if (req.prefs != nullptr)   // the player's ratings on the forms (Preferences.h)
+        for (int i = 0; i < kFormTemplates; ++i) prof.forms[static_cast<size_t>(i)] *= req.prefs->form[i];
     const UnitStream stream = [&](const std::string& name) { return unitSeed(seed, name, cur != nullptr ? cur->count(unit + name) : 0); };
     // (The energy draws on its own stream: the pad's opening follows it, -0.4 + 0.07 per point.)
     auto padOpen = [](float e) { return -0.4f + 0.07f * e; };
@@ -59,7 +61,8 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
     if (autoKnobs) minutes = prof.minutesLow + (prof.minutesHigh - prof.minutesLow) * fr.uniform();
     const int askBars = req.bars > 0 ? req.bars : std::max(64, static_cast<int>(std::lround(minutes * bpm / 4.0)));
 
-    const Plan plan = planTrack(prof, askBars, stream, req.mixable);
+    const Plan plan = req.rewriteBar >= 0 ? planTrackRewritten(prof, askBars, stream, req.mixable, req.rewriteBar, req.rewriteKind)
+                                          : planTrack(prof, askBars, stream, req.mixable);
     const Harmony harm = composeHarmony(plan, prof, key, scale, stream("harmony"));
 
     Score sc;
@@ -359,7 +362,7 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         for (int l = 0; l < kPercLanes; ++l) picks.push_back({ Module::Perc, l, perc::Level });
         for (const Pick& k : picks) {
             const int role = k.m == Module::Perc ? p.getInt(p.id(Module::Perc, k.instance, perc::Role)) : -1;
-            const int index = pickPreset(k.m, k.instance, prof.mix.data(), role, ps);   // (drawn either way: the stream stays put)
+            const int index = pickPreset(k.m, k.instance, prof.mix.data(), role, ps, req.prefs);   // (drawn either way: the stream stays put)
             if (!pickSounds || index < 0) continue;
             const SoundPreset& sp = factoryPresets(k.m, k.m == Module::Perc ? 0 : k.instance)[static_cast<size_t>(index)];
             sc.sounds.push_back(SoundPick{ 0.0, static_cast<int>(k.m), k.instance, index });

@@ -15,6 +15,7 @@ const int kProgressionDegrees[kProgressions][4] = {
     { 0, 3, 5, 6 },   // i-iv-VI-VII: melancholic, the piano's
     { 0, 5, 6, 4 },   // i-VI-VII-v: the minor dominant, Cinematic
 };
+const char* const kFormTemplateNames[kFormTemplates] = { "Anthem", "Dream", "Acid", "Plateau", "Drift" };
 const char* const kProgressionNames[kProgressions] = { "i-VI-III-VII", "i-VII-VI-VII", "VI-VII-i", "i-iv-VI-VII", "i-VI-VII-v" };
 const char* const kBassPatternNames[kBassPatterns] = { "Off-beat", "Rolling", "Gallop", "Walking", "303", "Drone" };
 

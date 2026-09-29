@@ -10,6 +10,7 @@
 #include "parh/Dsp.h"
 #include "parh/compose/Style.h"
 #include <algorithm>
+#include <limits>
 #include <cmath>
 #include <set>
 
@@ -59,6 +60,7 @@ void appendShifted(Score& dst, const Score& src, double offset)
     for (KnobSet k : src.knobs) { k.beat += offset; dst.knobs.push_back(k); }
     for (SoundPick s : src.sounds) { s.beat += offset; dst.sounds.push_back(s); }
     for (Section s : src.sections) { s.beat += offset; dst.sections.push_back(s); }
+    for (LayerBlock b : src.layers) { b.beat += offset; dst.layers.push_back(b); }
 }
 
 Gesture stepOf(const ParamStore& p, int id, double beat, float value)
@@ -145,7 +147,7 @@ float setLadder(Dramaturgy d, float t, float e)
     }
 }
 
-SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Curation* cur, SetInfo* info,
+SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Curation* cur, SetInfo* info, const Preferences* prefs,
                     const std::function<void(Score&)>& prepare, const std::function<bool()>& stop)
 {
     const Dramaturgy dram = static_cast<Dramaturgy>(p.getInt(p.id(Module::Set, 0, set::Dramaturgy)));
@@ -200,6 +202,7 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
         req.bars = std::max(96, static_cast<int>(std::lround(trackMinutes * bpm / 4.0 / 32.0)) * 32);
         req.energy = e;
         req.mixable = true;
+        req.prefs = prefs;
         SetTrack st;
         st.energy = e;
         st.seed = trackSeed;
@@ -250,6 +253,7 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
         deckScore.knobs.insert(deckScore.knobs.end(), shifted.knobs.begin(), shifted.knobs.end());
         deckScore.sounds.insert(deckScore.sounds.end(), shifted.sounds.begin(), shifted.sounds.end());
         deckScore.sections.insert(deckScore.sections.end(), shifted.sections.begin(), shifted.sections.end());
+        deckScore.layers.insert(deckScore.layers.end(), shifted.layers.begin(), shifted.layers.end());   // (the plugin's arrange view)
         deckScore.keyRoot = scores[i].keyRoot;
         deckScore.scale = scores[i].scale;
         std::vector<Gesture> g = shifted.gestures;
@@ -309,6 +313,13 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
             for (NoteEvent note : notes) { note.beat = note.beat - hook + from + pass * 8.0 * kBar; c.notes.push_back(note); }
         for (KnobSet k : scores[i].knobs) { k.beat = from; c.knobs.push_back(k); }
         for (SoundPick s : scores[i].sounds) { s.beat = from; c.sounds.push_back(s); }
+        if (!scores[i].levels.empty()) {
+            LevelMark m;
+            m.beat = from;
+            m.peakBeat = in.start + scores[i].levels.front().peakBeat;   // (the source's mark on its deck, levelSet finds it)
+            m.targetLufs = std::numeric_limits<float>::quiet_NaN();
+            c.levels.push_back(m);
+        }
         std::vector<Gesture> g;
         const int fader = p.id(Module::Deck, 2, deck::Fader), low = p.id(Module::Deck, 2, deck::Low);
         const int filter = p.id(Module::Deck, 2, deck::Filter);

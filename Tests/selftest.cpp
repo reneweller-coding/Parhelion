@@ -1628,6 +1628,109 @@ void testPresetBank()
     }
 }
 
+
+
+/**
+ * User presets (Phase 6, userPresetText/userPresetKnobs): a sound saved from one kit lane loads into another exactly --
+ * every knob a preset sets as it was, a knob the text does not name back at its default, the lane's own knobs (its
+ * level, its pattern: presetLeaves) untouched -- and a voice's text into another voice of the same module.
+ */
+void testUserPreset()
+{
+    section("user presets");
+    auto a = std::make_unique<ParamStore>();
+    auto b = std::make_unique<ParamStore>();
+    int exact = 0, total = 0, leftAlone = 0, leaves = 0;
+    std::string bad;
+    const struct { Module m; int from, to, preset; } cases[] = { { Module::Perc, 2, 7, 300 }, { Module::Poly, 0, 3, 77 }, { Module::Bass, 0, 0, 512 } };
+    for (const auto& c : cases) {
+        applyPreset(*a, c.m, c.from, factoryPresets(c.m, c.from)[static_cast<size_t>(c.preset)]);
+        const std::string text = userPresetText(*a, c.m, c.from);
+        // The target full of other values first: a knob the text leaves out must go back to its default.
+        applyPreset(*b, c.m, c.to, factoryPresets(c.m, c.to)[static_cast<size_t>((c.preset + 101) % kPresetsPerBank)]);
+        std::vector<float> before(static_cast<size_t>(ParamStore::moduleCount(c.m)));
+        for (int k = 0; k < ParamStore::moduleCount(c.m); ++k) {
+            // (A preset leaves these alone; set one to a value of its own, to see it kept.)
+            if (presetLeaves(c.m, k)) b->set(b->id(c.m, c.to, k), b->desc(b->id(c.m, c.to, k)).maxValue);
+            before[static_cast<size_t>(k)] = b->get(b->id(c.m, c.to, k));
+        }
+        for (const auto& [k, v] : userPresetKnobs(*b, c.m, c.to, text)) b->set(b->id(c.m, c.to, k), v);
+        for (int k = 0; k < ParamStore::moduleCount(c.m); ++k) {
+            const float got = b->get(b->id(c.m, c.to, k));
+            if (presetLeaves(c.m, k)) {
+                ++leaves;
+                leftAlone += got == before[static_cast<size_t>(k)];
+                continue;
+            }
+            ++total;
+            const float want = a->get(a->id(c.m, c.from, k));
+            if (got == want) ++exact;
+            else if (bad.empty()) bad = fmt("; first: %s %g, not %g", b->key(b->id(c.m, c.to, k)).c_str(), got, want);
+        }
+    }
+    check(exact == total, "a user preset saved from one lane or voice loads into another, knob for knob", fmt("%d of %d%s", exact, total, bad.c_str()));
+    check(leftAlone == leaves, "and leaves the knobs a preset leaves alone", fmt("%d of %d", leftAlone, leaves));
+}
+
+/**
+ * The performer's "Breakdown now" and "Drop now" (Phase 6, planTrackRewritten): from an 8-bar line the plan turns to a
+ * breakdown (its build, a drop) or to a drop at once -- the vacuum in the bar before it --, the whole a multiple of 32
+ * bars; and every note before the line is what it was (the drums, the bass, the pad, the pluck, the arp: the voices
+ * whose notes do not reach ahead -- the lead's second motif and the riser do), before a drop at once up to its eight
+ * bars of approach (the harmony's turnaround VI-VII-i before every drop, PLAN 6.5: the drop arrives prepared).
+ */
+void testRewrite()
+{
+    section("breakdown now, drop now");
+    auto p = std::make_unique<ParamStore>();
+    p->parseText("compose.style=Uplifting");
+    int shaped = 0, kept = 0, total = 0;
+    std::string bad;
+    for (uint64_t seed : { 3ull, 8ull }) {
+        const Score base = composeTrack(*p, seed);
+        for (SectionKind kind : { SectionKind::Breakdown, SectionKind::Drop }) {
+            const int bar = 64;
+            TrackRequest req;
+            req.rewriteBar = bar;
+            req.rewriteKind = kind;
+            const Score re = composeTrack(*p, seed, req);
+            ++total;
+            // The form from the line on.
+            int at = -1;
+            for (size_t i = 0; i < re.sections.size(); ++i) if (re.sections[i].beat == 4.0 * bar) at = static_cast<int>(i);
+            bool ok = at >= 0 && re.sections[static_cast<size_t>(at)].kind == kind && static_cast<int>(re.lengthBeats / 4.0) % 32 == 0;
+            if (ok && kind == SectionKind::Breakdown)
+                ok = static_cast<size_t>(at) + 2 < re.sections.size() && re.sections[static_cast<size_t>(at) + 1].kind == SectionKind::Build
+                  && re.sections[static_cast<size_t>(at) + 2].kind == SectionKind::Drop;
+            if (ok && kind == SectionKind::Drop) {
+                bool quiet = true;   // the vacuum: no kick on the bar's last beat before the drop
+                for (const NoteEvent& n : re.notes) if (n.part == Part::Kick && n.beat >= 4.0 * bar - 1.0 && n.beat < 4.0 * bar) quiet = false;
+                ok = quiet;
+            }
+            shaped += ok;
+            // The notes before the line (and its last beat, the vacuum's).
+            const double upTo = kind == SectionKind::Drop ? 4.0 * (bar - 8) : 4.0 * bar - 4.0;
+            auto before = [&](const Score& s) {
+                std::vector<std::tuple<double, int, int, float>> out;
+                for (const NoteEvent& n : s.notes) {
+                    if (n.beat >= upTo) continue;
+                    if (n.part == Part::Lead || n.part == Part::Counter || n.part == Part::Piano || n.part == Part::Strings
+                        || n.part == Part::Choir || n.part == Part::Brass || n.part == Part::Timpani || n.part == Part::Fx) continue;
+                    out.push_back({ n.beat, static_cast<int>(n.part), n.pitch, n.velocity });
+                }
+                return out;
+            };
+            const bool same = before(base) == before(re);
+            kept += same;
+            if (!ok || !same) bad += fmt(" seed %llu %s:%s%s", static_cast<unsigned long long>(seed), kind == SectionKind::Drop ? "drop" : "breakdown",
+                                         ok ? "" : " form", same ? "" : " notes");
+        }
+    }
+    check(shaped == total, "from the line: the breakdown with its build and drop, or the drop at once after its vacuum",
+          fmt("%d of %d%s", shaped, total, bad.c_str()));
+    check(kept == total, "every note before the line as it was (before a drop at once: before its approach)", fmt("%d of %d", kept, total));
+}
+
 /**
  * The sub-genres (PLAN 6.7, Phase 4c): each profile brings its own voice -- Acid the 303 with its four curves rising
  * to the filter's peaks, Deep the pad drifting and the granular cloud, Dream House the piano, Uplifting the orchestra
@@ -1790,6 +1893,8 @@ const TestSection kSections[] = {
     { "testOrchestraBlocks", testOrchestraBlocks },
     { "testModulation", testModulation },
     { "testPresetBank", testPresetBank },
+    { "testUserPreset", testUserPreset },
+    { "testRewrite", testRewrite },
     { "testSubGenres", testSubGenres },
     { "testSet", testSet },
 };

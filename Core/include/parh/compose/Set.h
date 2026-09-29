@@ -84,7 +84,8 @@ struct SetInfo {
  * @param stop     asked before every track: true breaks off with what is composed
  */
 SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Curation* curation = nullptr, SetInfo* info = nullptr,
-                    const std::function<void(Score&)>& prepare = {}, const std::function<bool()>& stop = {});
+                    const Preferences* prefs = nullptr, const std::function<void(Score&)>& prepare = {},
+                    const std::function<bool()>& stop = {});
 
 /** @brief The energy of dramaturgy @p d at @p t (0..1 of the set). */
 float setEnergy(Dramaturgy d, float t);

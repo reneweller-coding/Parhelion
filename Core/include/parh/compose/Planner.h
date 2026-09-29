@@ -99,6 +99,15 @@ uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls = 0);
  */
 Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable = false);
 
+/**
+ * @brief The performer's "Breakdown now" and "Drop now" (PLAN 9, Perform; Phase 6): the plan of planTrack as it was --
+ *        the same form, cast and lengths up to bar @p bar (an 8-bar line) --, and from there a breakdown (its build and
+ *        a drop after it) or a drop at once, then the outro. A drop after the main drop is the final drop, a breakdown
+ *        after it the second break. The units' streams are the plan's own, so everything before @p bar stays as it was --
+ *        but a drop's approach: the harmony turns towards it over the eight bars before (VI-VII-i, PLAN 6.5).
+ */
+Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, int bar, SectionKind kind);
+
 /** @brief Plans a track from a track's seed without rerolls (as composeTrack does). */
 Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed, bool mixable = false);
 

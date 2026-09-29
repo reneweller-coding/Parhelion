@@ -24,7 +24,7 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 5b gebaut (29.09.2026); als nächstes 6, das Plugin.**
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 6 gebaut (29.09.2026); als nächstes 7, die Quest.**
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
@@ -341,11 +341,62 @@ Stem, Balance-Spur (Fenster [I]) und MIDI-Spur; Messwerkzeug `parh_orchprobe` (`
   Progressive-Track auf einen Schwerpunkt von 220 Hz (Referenzen 420 bis 800). Dazu der Befund der Drop-Messung: im
   Breakdown ohne Sub senkt das Pad seinen Hochpass auf 70 Hz und spielt seinen Grundton eine Oktave tiefer (die
   Tiefmitten eines Progressive-Tracks 0.126, im Bereich; der Tiefband-Anstieg in den Drop +32 dB, noch über den +20 der
-  Referenzen). Runde 6 der Kalibrierung, mit den Presets, folgt im nächsten Stand.
+  Referenzen).
+- **Runde 6 der Kalibrierung, mit den Presets** [M, drei Seeds je Stil, 21 Maße mit `drop_rise` und `drop_rise_low`]:
+  Uplifting 14, Progressive 13, Dream House 8, Acid 14, Deep 11 von 21 auf allen Spuren im Bereich
+  (`out/calib_run6.txt`). Besser: Uplifting steigt jetzt auch tief im Bereich in den Drop (+11.7 bis +14.1 dB, Referenzen
+  +4.5 bis +16.1), breit +3.5 bis +3.7 (+1.3 bis +8.5). Offen für die Nachkalibrierung in 8: Progressive steigt tief in
+  zwei von drei Seeds zu stark (+33 und +43 dB gegen höchstens +20: der Breakdown bleibt unter 150 Hz leer), Dream House
+  hat zu dünne Tiefmitten (0.07 bis 0.13 gegen 0.14 bis 0.31) und steigt tief zu wenig (+9 gegen +11 bis +17), Deeps
+  Lautheitsumfang bleibt klein (LRA 4.9 bis 5.7 gegen 7.6 bis 12), der Lautheitsumfang aller Stile liegt eher unten.
 - **Tests**: testModulation (40 von 40 Zielen verändern den Klang; Uplifting mit Orchester und Dream House mit Piano,
   jede Matrix belegt, bei 1, 37 und 512 bitgleich), testPresetBank (18 × 1024, eindeutige Namen, jeder Knopf existiert,
   jede der 14 Rollen hat Gruppen, eine Stichprobe von 144 Presets endlich, hörbar, innerhalb von 24 dB des Standardklangs;
   mit PARH_BANK_TRIMS alle 18 432 gemessen, auf 16 Kernen), testComposer (die Tonart auf den Knöpfen); ctest 30/30.
+
+**Phase 6, das Plugin (29.09.2026).** Nach 9 und 14 gebaut; die Oberfläche aus Totality (4d3c0d2, Herkunftsnotiz in
+jedem Kopf; umbenannt Totality → Parhelion, TOT_ → PARH_, tot_ → parh_, der Plugin-Code Parh), jede Seite für
+Parhelion neu belegt.
+- **Zwölf Seiten**: Set (Compose, Set, DJ-Effekte), Arrange, Low End (Kick, Sub, Bass, 303, Pump), Drums (zwölf Lanes und
+  die Busse), Synths (die sechs Poly-Stimmen mit Namen), Keys (Piano, Wolke), Orchestra (Streicher, Chor, Blech, Pauken),
+  Effects (FX, Sends), Mixer (Meter, Busse, Glue, Master, Pump, drei Kanäle), Perform, Export, Style. Jede Stimme mit
+  ihrem Modulationsblock als Gruppen (Mod-Hüllkurve, LFO 1 bis 4, Matrix je zwei Slots: vier Slots in einer Box brachen
+  das Ziel eines Slots von seiner Quelle weg). Farben der Nacht (Palette in EditorTheme), das Logo als Nebensonne
+  (`Deploy/make_icon.py`).
+- **Das laufende Preset je Synth** (Wunsch des Nutzers): jede Stimme hat ihre Presetleiste (die 16 Gruppen als Untermenüs
+  zu 64, Pfeile, "this track: Radiant Searchlight (Trance Gate Lead)"), die Arrange-Seite nennt in zwei Zeilen die
+  Presets aller Synths des Tracks unter dem Abspielkopf; im Set die des Decks, dessen Knöpfe gelten, vor der ersten Note
+  die des Tracks unter dem Kopf. **Nutzer-Presets** (nach Phosphene): "Save as user preset..." schreibt alle Knöpfe, die
+  ein Preset setzt, als `knob=value` mit dem Schlüssel im Modul nach Documents/Parhelion/Presets/<synth> (die Kit-Lanes
+  teilen "perc"), das Untermenü User lädt sie als ganzen Klang (`userPresetText`, `userPresetKnobs` in Core). Alle, nicht
+  nur die vom Standard abweichenden: die Lanes haben eigene Standardwerte, und testUserPreset fand so 9 von 185 Knöpfen
+  falsch, als ein Klang von Lane 3 nach Lane 8 ging.
+- **Arrange**: die Layer-Matrix als Zeilen je Layer (offen hell, gefiltert matt), darüber die Energiekurve (im Set je
+  Track und Deck-Farbe: eine durchgehende Linie kreuzte die Tracks des anderen Decks), die Zeile mit Stil, Form, Tempo,
+  Tonart und Camelot, Progression, Bassfigur, Haupt-Drop, Orchester und Tonartwechsel; die fünfzehn Würfel-Knöpfe, im
+  Set dazu der ganze Track und der Plan. Bewertung + und − mit Form und Preset-Gruppen (Preferences nach Core
+  verschoben, `compose.use_ratings`).
+- **Perform**: sieben Mutes (Kick, Bass, Hats, Perc, Lead, Synths, Pads; Tasten C3 bis F#3), Masterfilter (CC 74),
+  Echo-Wurf (CC 11), das Modrad (CC 1, Quelle jeder Matrix), Kanaldruck; **Breakdown now** und **Drop now**: der
+  Planer schreibt den laufenden Track ab der nächsten 8-Takt-Linie um (die übernächste, wo die nächste unter sechs
+  Sekunden entfernt ist, damit der Komponist fertig wird): `planTrackRewritten` schneidet den Plan dort und setzt einen
+  Breakdown (32 Takte, als zweiter nach dem Haupt-Drop 16) mit Build und Drop oder den Drop sofort (mit seinem Vakuum),
+  das Ganze wieder ein Vielfaches von 32; geladen wird er, wo die Engine steht, mit den Pegelkorrekturen des alten.
+  Selbsttest testRewrite: die Form ab der Linie und jede Note davor wie zuvor (2 Seeds × beide Arten). Ein Set wird
+  nicht umgeschrieben (sein nächster Blend müsste mitwandern).
+- **Style**: das Profil der Knöpfe auf sechs Achsen (Tempo, Drum-Dichte, Lead, Breakdown-Anteil, Hall im Breakdown,
+  Palette nach `styleBrightness`) mit den fünf Profilen als Marken, daneben die Mediane der Referenzen je Stil.
+- **Handbuch** (`Tools/manual`, nach Totality): `parh_render --dump-params` schreibt alle 1670 Parameter als JSON,
+  `make_shots.py` fotografiert die zwölf Seiten im Standalone (Seed 4242 im Haupt-Drop, ganzes Fenster), die Prosa in
+  `chapters.txt` (englisch, 16 Kapitel; jedes Modul muss einem Kapitel gehören, sonst druckt der Generator nicht),
+  `make_manual.py` schreibt `docs/manual/Parhelion-Manual.html` und das PDF (Edge, kopflos). Dabei korrigiert: Texte aus
+  Totality auf Export- und Mixer-Seite (Kick-outs, 4- und 8-Takt-Loops, Lautheitsziel), die Stilseite (Knöpfe in voller
+  Höhe, Tabellenkopf).
+- **Build**: `PARH_BUILD_PLUGIN` jetzt an (wie Totality), ein Baum `build` für Werkzeuge, Tests und Plugin.
+- **Prüfsteine** [M]: pluginval Strenge 10 bestanden (alle Gruppen, auch Fuzz); `parh_vst3test` 32 von 32 (der Host lädt
+  das VST3, Transport, Tempo, Sprung, Zustand byteweise zurück, zweite Instanz, Editor; CC 74 greift den Filter, das
+  Modrad das Rad, Kanaldruck den Druck); testUserPreset (ein Klang von Lane 3 nach Lane 8, vom Lead zum Arp,
+  185 von 185 Knöpfen genau); Selbsttest 125, ctest 34/34.
 
 ## 0. Kurzfassung
 
