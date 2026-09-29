@@ -53,9 +53,48 @@ Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 und 1 gebaut (29.09.2026).**
 - **Zwei Fehler auf dem Weg**, beide mit Test abgesichert: Totalitys Plate *addiert* in den Ausgang (ungeleert lief er
   über und riss den Master auf NaN), und das Gate rechnete seine Phase ab Spannenanfang statt ab absolutem Sample
   (nicht bitgleich bei anderen Blockgrößen, sobald eine Note mitten in einer Rasterzelle lag).
-- **Offen aus Phase 1:** die Referenzmessung (Liste freigeben, 13.4) und damit die Kalibrierung von Kick, Pegeln und
-  Pump-Tiefen; die Startpegel sind [I] (Pad −17, Lead −9, Mid-Bass −1, Sub −4 dB, Hall-Return 0 dB). Hörfiles:
-  `out/hoeren_p1`.
+- **Offen aus Phase 1:** die Startpegel sind [I] (Pad −17, Lead −9, Mid-Bass −1, Sub −4 dB, Hall-Return 0 dB); sie
+  gleicht seit Phase 2 der Leveler je Track aus. Hörfiles: `out/hoeren_p1`.
+
+**Referenzmessung (29.09.2026).** 30 Aufnahmen über YouTube (`Tools/fetch_refs.py` sucht die Extended-/Original-
+Fassung über Titel und Länge, `Tools/ref_lock.txt` hält die gewählten Uploads fest; Audio in `%TEMP%\parhelion_refs`),
+gemessen mit `Tools/analyze_ref.py` (Statistiken in `Tools/ref_stats.json`). Befunde [M], die das Dokument korrigieren:
+
+| Größe | Uplifting | Progressive | Dream House | Acid | Deep | Dok. |
+|---|---|---|---|---|---|---|
+| Tempo (Median) | 138,1 | 135,5 | 137,5 | 134,1 | 131,1 | Deep 90–120 |
+| Länge (min) | 8,6 | 8,2 | 6,9 | 7,5 | 8,7 | – |
+| Breakdown-Anteil (Takte ohne Tiefband) | 14 % | 13 % | 0 % | 10 % | 15 % | 20–100 % |
+| Haupt-Breakdown (Takte) | 39 | 28 | – | 24 | 39 | 64–96 |
+| Breakdown → Drop (lauteste 3 s) | 2,1 LU | 3,3 | – | 2,9 | 3,2 | 4–8 LU |
+| Intro ohne Kick (Takte) | 0 | 25 | 38 | 1 | 7 | – |
+| lauteste 20 s | −7,8 | −8,2 | −10,0 | −9,6 | −8,6 | −7 bis −11 |
+
+Dream House behält den Bass durchgehend (Children, Fable: kein Takt ohne Tiefband außer dem Piano-Intro von 60 bis 70
+Takten); Deep/Chill-Trance läuft mit Club-Tempo. Die Messung der Lücke zählt die ersten 3 s eines Breakdowns nicht mit,
+weil ffmpegs Kurzzeitwert die 3 s *davor* mittelt (der erste Lauf hatte so den Drop als lauteste Stelle des Breakdowns
+gelesen und die Lücke um 1 bis 3 LU unterschätzt). Die Profile (compose/Style.cpp) tragen diese Werte.
+
+**Phase 2, Form und Energie (29.09.2026).**
+- **Planer** (compose/Planner.h): fünf Formgrammatiken (Anthem, Dream, Acid mit Kick-Pausen, Plateau, Drift), acht
+  Kandidaten je Track, der nächste an Länge und Breakdown-Anteil gewinnt; Gesamtlänge auf 32 Takte über Outro oder ersten
+  Groove (nie das Intro); Breakdown mit Intro, Tease, Peak; Build mit Kick, Roll, Riser; Layer-Matrix je 8 Takte mit
+  Regel 1 (jeder Block ändert etwas); Mini-Breaks; leerer letzter Schlag vor jedem Drop.
+- **Harmonik** (compose/Harmony.h): Tonart nach Profil (Grundtöne D bis A bevorzugt), die fünf Progressionen, Dur über
+  die parallelen Funktionen, harmonischer Rhythmus je Sektion, VII in den zwei Takten vor jedem Drop und Auflösung auf i,
+  Acid statisch mit Quart-/Quintwechsel alle 16 Takte, Cinematic-Terzrückung nach dem zweiten Breakdown.
+- **Komponist** (compose/Composer.h): alle Stimmen aus Plan und Harmonie (Bassfiguren Offbeat, Rolling, Gallop, Walking,
+  Drone, 303-Sequenz mit Accent und Slide; Hats 16tel oder Achtel; Percussion als Shaker oder Conga mit Tambourine;
+  Snare-Roll von Vierteln bis 32teln), Melodik-Regeln (compose/Melody.h: Lead-Motiv mit Sprung und Abstieg in A A' B A'',
+  Pluck-Rhythmen, Arp, Stab, Counter), Effekte (Phosphenes Sfx: Riser, Reverse-Crash, Impact, Downlifter, Sub-Drop,
+  Sweep), Automation (gefilterte Zellen, Pad-Filter im Breakdown, Hall je Sektion, Pump aus/an mit Rampe, Hochpass im
+  Build, Delay-Throw vor dem Breakdown, Gate im Drop, 303-Filterwellen), Neuwürfeln je Einheit (`--reroll melody`),
+  `.parhset`.
+- **Leveler** (Leveler.h, nach Totality): Balance jeder Stimme gegen die Kick (Fenster [I]), Breakdown gegen Drop auf
+  den gemessenen Abstand des Profils (Korrektur auf Synths, Räume, Effekte in allen Breakdowns), jeder Build mindestens
+  1 LU unter dem Drop, der Drop auf das Lautheitsziel (bis ±6 dB).
+- **Tests:** Planer über 5 Stile × 8 Seeds, Harmonik, Determinismus und Neuwürfeln, Leveler; ctest 19/19.
+  Hörfiles: `out/hoeren_p2` (je Stil Seed 7, mit MIDI).
 
 ## 0. Kurzfassung
 

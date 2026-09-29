@@ -39,6 +39,8 @@ enum class Part : int { Kick = 0, Sub,
                         Lead, Counter, Pluck, Arp, Pad, Stab,
                         /** The ghost kick: silent, it only ducks (PLAN 7.3). */
                         Ghost,
+                        /** The effects (Sfx.h): the type is the pitch (kSfxBaseNote + type). */
+                        Fx,
                         Count };
 constexpr int kNumParts = static_cast<int>(Part::Count);   ///< number of parts
 extern const char* const kPartNames[kNumParts];            ///< "kick", "sub", "perc1" .. "perc12", "bass", "acid", "lead", ...
@@ -133,7 +135,7 @@ struct LayerBlock {
  * @brief The parts the Leveler sets against the kick (Totality's Phase 18), each by its own correction: the kit's twelve
  *        lanes (0 .. 11, each by its role), the tonal voices and the rooms' returns.
  */
-enum class BalPart : int { Bass = 12, Acid, Lead, Counter, Pluck, Arp, Pad, Stab, Room, Count };
+enum class BalPart : int { Bass = 12, Acid, Lead, Counter, Pluck, Arp, Pad, Stab, Room, Fx, Count };
 constexpr int kBalLanes = 12;   ///< the kit's lanes come first
 constexpr int kBalParts = static_cast<int>(BalPart::Count);   ///< lanes and voices
 /** @brief A correction per part, dB (0: none). */
@@ -151,6 +153,9 @@ struct LevelMark {
     float trimDb = 0.0f;        ///< the correction (levelScore); 0 until measured
     BalanceDb balDb{};          ///< Phase 18: the parts' corrections against the kick (levelScore); 0 until measured
     std::array<float, 5> styleMix{};   ///< the track's styles, for the parts' windows; 0: Uplifting's
+    float gapLu = 2.0f;         ///< the main breakdown's loudest 3 s under the drop's, LU (the style's, Leveler.h)
+    float breakDb = 0.0f;       ///< the correction of the synths, rooms and effects in every breakdown and break (levelScore)
+    float buildDb = 0.0f;       ///< the correction of the synths, effects and percussion in every build: under the drop (levelScore)
 };
 
 /**

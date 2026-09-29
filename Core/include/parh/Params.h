@@ -58,6 +58,8 @@ enum class Module : int { Compose = 0, Kick, Sub, Perc,
                           Bass, Acid,
                           /** The polyphonic voices (Phosphene's Poly.h): lead, counter, pluck, arp, pad, stab. */
                           Poly,
+                          /** The effects (Phosphene's Sfx.h): risers, downlifters, impacts, reverse crashes, sub drops. */
+                          Sfx,
                           /** The sidechain's shape (PLAN 7.3): the ghost kick's curve, shared by every bus. */
                           Pump,
                           /** The three rooms (PLAN 5.11): a short room, a plate, a hall, on sends. */
@@ -181,6 +183,31 @@ extern const char* const kModDestNames[];     ///< ModDest
  *        FilterModel from Moog to Wasp.
  */
 constexpr int kVoiceFilterModels = 10;
+/** @brief Parameters of the effect generator (module Sfx, prefix "sfx"). */
+namespace sfx {
+enum : int { Level, Noise, Resonance, Brightness, ImpactDecay, Vowel, SwellDecay, Width, RoomSend, HallSend, Duck,
+             // 19.09.2026, round "fx-psychedelia". Appended.
+             SubLevel,     ///< dB: the sub drop against sfx.level (Sfx.h; it plays mono and ducks under the kick)
+             SubDuck,      ///< 0..1: how deep the kick ducks the sub drop
+             // 20.09.2026, round "wandering-fx" (Sfx.h): a directed pan trajectory plus a reverb-send
+             // trajectory over an event's own length, drawn from its own seed. Off by default, so older
+             // sets render unchanged.
+             Wander,       ///< toggle: an event's pan sweeps from one side to the other and its content
+                           ///< crosses from dry to the hall's send over its length, instead of the
+                           ///< oscillating auto-pan and the constant hall_send fraction
+             WanderSend,   ///< 0..1: how far the crossfade reaches by the event's own tail (x = 1)
+             // 24.09.2026, the user: "Im SFX-Fenster ist nach wie vor keine Auswahl fuer das Preset". One per
+             // family of the effect bank (Sfx.h, SfxPreset): 0 = Auto, the composer's draw per event as before;
+             // n = every event of that family plays bank preset n (Sfx::trigger). Appended; Auto everywhere is
+             // the composer's own draw, sample for sample.
+             PresetRiser, PresetDownlifter, PresetImpact, PresetSweep, PresetFormantShot, PresetReverseSwell,
+             PresetZap, PresetSquelch, PresetBubble, PresetReverseCrash, PresetAtmosphere,
+             PlateSend,   ///< 25.09.2026: the effects' send into the plate (the throw rides it; the hall is the far room now)
+             Count };
+/** @brief The first of the per-family preset choices, and how many there are. */
+constexpr int kFirstPreset = PresetRiser;
+constexpr int kNumPresetChoices = PresetAtmosphere - PresetRiser + 1;
+}
 /**
  * @brief The sidechain (PLAN 7.3, Dok. 7): the curve every bus ducks along when the ghost kick triggers -- the attack,
  *        the hold and the release of Ducker.h -- and the depth of the rooms' returns. The depths of the voices are

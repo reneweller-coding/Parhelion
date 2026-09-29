@@ -40,6 +40,9 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
         polyDuck_[i].prepare(sampleRate);
     }
     retDuck_.prepare(sampleRate);
+    sfx_.prepare(sampleRate);
+    fxDuck_.prepare(sampleRate);
+    subDropDuck_.prepare(sampleRate);
     room_.prepare(sampleRate);
     hall_.prepare(sampleRate);
     plate_.prepare(sampleRate);
@@ -51,7 +54,7 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
     const size_t n = static_cast<size_t>(kRaster);
     for (std::vector<float>* b : { &kickBuf_, &bodyBuf_, &subBuf_, &bassL_, &bassR_, &acidL_, &acidR_, &roomInL_, &roomInR_,
                                    &plateInL_, &plateInR_, &hallInL_, &hallInR_, &roomL_, &roomR_, &plateL_, &plateR_, &hallL_,
-                                   &hallR_, &drumL_, &drumR_, &synthL_, &synthR_ })
+                                   &hallR_, &drumL_, &drumR_, &synthL_, &synthR_, &fxL_, &fxR_, &fxSub_, &fxWetL_, &fxWetR_ })
         b->assign(n, 0.0f);
     for (int i = 0; i < kPolyInstances; ++i) { polyL_[i].assign(n, 0.0f); polyR_[i].assign(n, 0.0f); }
     clear();
@@ -122,6 +125,11 @@ void Deck::load(const Score& score)
             mixerSteps_.push_back(static_cast<int64_t>(std::ceil(score_.tempo.secondsAt(g.beat) * sampleRate_)));
     }
     std::sort(mixerSteps_.begin(), mixerSteps_.end());
+    breaks_.clear();
+    builds_.clear();
+    for (const Section& s : score_.sections)
+        if (s.kind == SectionKind::Breakdown || s.kind == SectionKind::Break) breaks_.push_back({ s.beat, s.beat + s.length });
+        else if (s.kind == SectionKind::Build) builds_.push_back({ s.beat, s.beat + s.length });
     mixerSteps_.erase(std::unique(mixerSteps_.begin(), mixerSteps_.end()), mixerSteps_.end());
     // Where it plays: around its notes, merged.
     const int64_t lead = static_cast<int64_t>(kLeadSeconds * sampleRate_), tail = static_cast<int64_t>(kTailSeconds * sampleRate_);
@@ -176,6 +184,9 @@ void Deck::seek(int64_t sample)
         lastDuck_[i] = 1.0f;
     }
     retDuck_.reset();
+    sfx_.reset();
+    fxDuck_.reset();
+    subDropDuck_.reset();
     room_.reset();
     hall_.reset();
     plate_.reset();
@@ -307,13 +318,34 @@ void Deck::updateCell(int64_t sample)
         polyDuck_[i].set(1.0f - dbToGain(-v[poly::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
     }
     retDuck_.set(1.0f - dbToGain(-pump[pump::ReturnDuck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    readPlayed(Module::Sfx, 0, v);
+    sfx_.update(v, keyRoot_);
+    sfx_.setScale(scale_);
+    fxSends_ = Sends{ v[sfx::RoomSend], v[sfx::PlateSend], v[sfx::HallSend] };
+    fxDuck_.set(1.0f - dbToGain(-v[sfx::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    subDropDuck_.set(v[sfx::SubDuck], 0.5f, 60.0f, 90.0f);
 
     const float fs = static_cast<float>(sampleRate_);
     readPlayed(Module::Mix, 0, v);
     hatsGain_ = dbToGain(v[mix::HatsLevel]);
     percGain_ = dbToGain(v[mix::PercLevel]);
-    synthTarget_ = dbToGain(v[mix::SynthLevel]);
-    if (snapFaders_) { synthGain_ = synthTarget_; snapFaders_ = false; }
+    // The Leveler's correction of the breakdowns (LevelMark::breakDb) on the synths and the effects, where one plays.
+    float breakGain = 1.0f;
+    for (const auto& b : breaks_) if (beat >= b.first && beat < b.second) {
+        size_t k = 0;
+        for (size_t i = 0; i < score_.levels.size(); ++i) if (score_.levels[i].beat <= beat) k = i;
+        if (k < score_.levels.size()) breakGain = dbToGain(score_.levels[k].breakDb);
+    }
+    percBuild_ = 1.0f;
+    for (const auto& b : builds_) if (beat >= b.first && beat < b.second) {
+        size_t k = 0;
+        for (size_t i = 0; i < score_.levels.size(); ++i) if (score_.levels[i].beat <= beat) k = i;
+        if (k < score_.levels.size()) { breakGain = dbToGain(score_.levels[k].buildDb); percBuild_ = breakGain; }
+    }
+    synthTarget_ = dbToGain(v[mix::SynthLevel]) * breakGain;
+    fxTarget_ = breakGain;
+    percGain_ *= percBuild_;
+    if (snapFaders_) { synthGain_ = synthTarget_; fxGain_ = fxTarget_; snapFaders_ = false; }
     for (Svf& f : hatsLp_) f.setQ(std::min(v[mix::HatsCut], 0.45f * fs), 0.7071f, fs);
     for (Svf& f : percLp_) f.setQ(std::min(v[mix::PercCut], 0.45f * fs), 0.7071f, fs);
     drumSat_ = v[mix::DrumSat];
@@ -383,7 +415,16 @@ void Deck::dispatch(const Ev& e)
         acid_.kick(e.late);
         for (Ducker& d : polyDuck_) d.trigger(e.late);
         retDuck_.trigger(e.late);
+        fxDuck_.trigger(e.late);
+        subDropDuck_.trigger(e.late);
         return;
+    case Part::Fx: {
+        if (e.on == 0) return;
+        const int type = e.pitch - kSfxBaseNote;
+        if (type < 0 || type >= kNumSfxTypes) return;
+        sfx_.trigger(static_cast<SfxType>(type), e.gate, e.velocity, e.late, e.shift);   // the shift names the bank preset
+        return;
+    }
     case Part::Kick: {
         if (muted(perform::MuteKick)) return;
         kick_.trigger(e.velocity, e.late);
@@ -455,6 +496,7 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
     { PARH_PROF(Kit); kit_.processLanes(n); }
     { PARH_PROF(Bass); bass_.process(bassL_.data(), bassR_.data(), n); acid_.process(acidL_.data(), acidR_.data(), n); }
     { PARH_PROF(Poly); for (int i = 0; i < kPolyInstances; ++i) poly_[i].process(polyL_[i].data(), polyR_[i].data(), n); }
+    sfx_.processSplit(fxL_.data(), fxR_.data(), fxSub_.data(), fxWetL_.data(), fxWetR_.data(), n);
     PARH_PROF_BEGIN(Buses);
 
     const float* ll = kit_.laneL();
@@ -464,6 +506,7 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
         const size_t k = static_cast<size_t>(i);
         for (int p = 0; p < kBalParts; ++p) balGain_[p] += (balTarget_[p] - balGain_[p]) * trimCoef_;
         synthGain_ += (synthTarget_ - synthGain_) * 0.002f;   // the fader glides (a few ms), no zipper on a ride
+        fxGain_ += (fxTarget_ - fxGain_) * 0.002f;
         const auto most = [](float& m, float a, float b) { m = std::max(m, std::max(std::fabs(a), std::fabs(b))); };
         // The mono synths, after their own ducks.
         const float gb = balGain_[static_cast<int>(BalPart::Bass)], ga = balGain_[static_cast<int>(BalPart::Acid)];
@@ -517,6 +560,19 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
         roomInR_[k] = rr + busH[1][i] * hatsSend_ + bassR_[k] * bassSends_.room + acidR_[k] * acidSends_.room;
         plateInL_[k] = pl + busP[0][i] * percSend_ + bassL_[k] * bassSends_.plate + acidL_[k] * acidSends_.plate;
         plateInR_[k] = pr + busP[1][i] * percSend_ + bassR_[k] * bassSends_.plate + acidR_[k] * acidSends_.plate;
+        // The effects: sends before their duck, the wandering share straight into the hall; the sub drop under the kick.
+        {
+            const float gf = balGain_[static_cast<int>(BalPart::Fx)] * fxGain_;
+            const float fl = fxL_[k] * gf, fr = fxR_[k] * gf;
+            rl += fl * fxSends_.room; rr += fr * fxSends_.room;
+            pl += fl * fxSends_.plate; pr += fr * fxSends_.plate;
+            hl += fl * fxSends_.hall + fxWetL_[k] * gf; hr += fr * fxSends_.hall + fxWetR_[k] * gf;
+            const float d = fxDuck_.next();
+            const float sub = fxSub_[k] * gf * subDropDuck_.next();
+            fxL_[k] = fl * d + sub;
+            fxR_[k] = fr * d + sub;
+            if (watch_) most(partPeak_[static_cast<int>(BalPart::Fx)], fxL_[k], fxR_[k]);
+        }
         hallInL_[k] = hl;
         hallInR_[k] = hr;
         // The drum bus: a gentle saturation, two stages mixed in.
@@ -568,14 +624,15 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
             put(kStemRoom, roomL_[k], roomR_[k]);
             put(kStemPlate, plateL_[k], plateR_[k]);
             put(kStemHall, hallL_[k], hallR_[k]);
+            put(kStemFx, fxL_[k], fxR_[k]);
         }
     }
 
     PARH_PROF_BEGIN(TrackBus);
     for (int i = 0; i < n; ++i) {
         const size_t k = static_cast<size_t>(i);
-        float l = drumL_[k] + subBuf_[k] + bassL_[k] + acidL_[k] + synthL_[k] + roomL_[k] + plateL_[k] + hallL_[k];
-        float r = drumR_[k] + subBuf_[k] + bassR_[k] + acidR_[k] + synthR_[k] + roomR_[k] + plateR_[k] + hallR_[k];
+        float l = drumL_[k] + subBuf_[k] + bassL_[k] + acidL_[k] + synthL_[k] + roomL_[k] + plateL_[k] + hallL_[k] + fxL_[k];
+        float r = drumR_[k] + subBuf_[k] + bassR_[k] + acidR_[k] + synthR_[k] + roomR_[k] + plateR_[k] + hallR_[k] + fxR_[k];
         if (groupHpOn_) {
             float lp, bp, hp;
             groupHp_[0][0].tick(l, lp, bp, hp); groupHp_[0][1].tick(hp, lp, bp, l);

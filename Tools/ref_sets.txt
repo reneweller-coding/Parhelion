@@ -1,0 +1,35 @@
+# Reference recordings for the calibration (PLAN 13.4). Only statistics of them are kept (Tools/ref_stats.json); the
+# audio is fetched into %TEMP%\parhelion_refs and stays outside the repository.
+# profile | artist - title | tempo and key if known, or - | YouTube search (search:...) or URL
+# The titles of Dok. 2 and 3 per profile, and additions (+, PLAN 13.4). tools/fetch_refs.py resolves a search to the
+# upload whose length fits an extended or original mix and writes what it chose to Tools/ref_lock.txt.
+uplifting   | Andy Blueman - Time To Rest                   | - | search:Andy Blueman Time To Rest Original Mix
+uplifting   | Andy Blueman - Florescence                    | - | search:Andy Blueman Florescence Original Mix
+uplifting   | + Aly & Fila - Khepera                        | - | search:Aly & Fila Khepera Original Mix
+uplifting   | + Armin van Buuren - Communication            | - | search:Armin van Buuren Communication original 1999
+uplifting   | + Tiesto - Adagio For Strings                 | - | search:Tiesto Adagio For Strings original mix
+uplifting   | + Solarstone - Seven Cities                   | - | search:Solarstone Seven Cities original mix
+uplifting   | + Sean Tyas - Lift                            | - | search:Sean Tyas Lift original mix
+progressive | Sasha - Xpander                               | - | search:Sasha Xpander original
+progressive | + BT - Flaming June                           | - | search:BT Flaming June original mix
+progressive | + L.S.G. - Netherworld                        | - | search:LSG Netherworld original
+progressive | + Paul van Dyk - For An Angel                 | - | search:Paul van Dyk For An Angel original 1994
+progressive | + Eric Prydz - Opus                           | - | search:Eric Prydz Opus original mix
+progressive | + Hybrid - Finished Symphony                  | - | search:Hybrid Finished Symphony
+dream       | Robert Miles - Children (Dream Version)       | - | search:Robert Miles Children Dream Version
+dream       | Robert Miles - Fable (Dream Version)          | - | search:Robert Miles Fable Dream Version
+dream       | Zhi-Vago - Celebrate (The Love)               | - | search:Zhi-Vago Celebrate The Love
+dream       | + Nylon Moon - Sky Plus                       | - | search:Nylon Moon Sky Plus
+dream       | + DJ Dado - X-Files                           | - | search:DJ Dado X-Files theme 1996
+dream       | + BBE - Seven Days And One Week               | - | search:BBE Seven Days And One Week original
+acid        | Hardfloor - Acperience 1                      | - | search:Hardfloor Acperience 1
+acid        | Hardfloor - Lost In The Silver Box            | - | search:Hardfloor Lost In The Silver Box
+acid        | + Union Jack - Two Full Moons And A Trout     | - | search:Union Jack Two Full Moons And A Trout
+acid        | + Emmanuel Top - Acid Phase                   | - | search:Emmanuel Top Acid Phase
+acid        | + Jam & Spoon - Stella                        | - | search:Jam and Spoon Stella 1992 R&S
+acid        | + Kai Tracid - Trance & Acid                  | - | search:Kai Tracid Trance & Acid
+deep        | Chicane - Offshore                            | - | search:Chicane Offshore original 1996
+deep        | Chicane - Saltwater                           | - | search:Chicane Saltwater original mix
+deep        | Delerium - Silence (Sanctuary Mix)            | - | search:Delerium Silence Sanctuary Mix
+deep        | Energy 52 - Cafe Del Mar                      | - | search:Energy 52 Cafe Del Mar original
+deep        | + Solarstone - Late Summer Fields             | - | search:Solarstone Late Summer Fields

@@ -361,6 +361,39 @@ const ParamDesc kPolyParams[poly::Count] = {
 };
 
 /**
+ * The effects (PLAN 5.10): Phosphene's table; sfx.duck is in dB here (the ghost kick's depth on the effects).
+ */
+const ParamDesc kSfxParams[sfx::Count] = {
+    { "level",        "Level",         "dB", -36.0f,   6.0f,  -3.0f, Curve::Linear },
+    { "noise",        "Noise",         "",     0.0f,   1.0f,   0.6f, Curve::Linear },
+    { "resonance",    "Resonance",     "",     0.0f,   1.0f,   0.5f, Curve::Linear },
+    { "brightness",   "Brightness",    "",     0.0f,   1.0f,   0.5f, Curve::Linear },
+    { "impact_decay", "Impact Decay",  "ms",  200.0f, 4000.0f, 1400.0f, Curve::Log },
+    { "vowel",        "Vowel",         "",     0.0f,   1.0f,   0.3f, Curve::Linear },
+    { "swell_decay",  "Swell Decay",   "ms",  200.0f, 6000.0f, 1500.0f, Curve::Log },
+    { "width",        "Width",         "",     0.0f,   1.0f,   0.7f, Curve::Linear },
+    { "room_send",    "Room Send",     "",     0.0f,   1.0f,   0.0f, Curve::Linear },
+    { "hall_send",    "Hall Send",     "",     0.0f,   1.0f,   0.35f, Curve::Linear },
+    { "duck",         "Duck",          "dB",   0.0f,  18.0f,   2.0f, Curve::Linear },
+    { "sub_level",    "Sub Drop",      "dB", -36.0f,   6.0f, -14.0f, Curve::Linear },
+    { "sub_duck",     "Sub Duck",      "",     0.0f,   1.0f,   1.0f, Curve::Linear },
+    { "wander",       "Wander",        "",     0.0f,   1.0f,   0.0f, Curve::Toggle },
+    { "wander_send",  "Wander Send",   "",     0.0f,   1.0f,   0.85f, Curve::Linear },
+    { "preset_riser",         "Riser",         "", 0.0f, 256.0f, 0.0f, Curve::Int },
+    { "preset_downlifter",    "Downlifter",    "", 0.0f, 128.0f, 0.0f, Curve::Int },
+    { "preset_impact",        "Impact",        "", 0.0f, 128.0f, 0.0f, Curve::Int },
+    { "preset_sweep",         "Sweep",         "", 0.0f, 256.0f, 0.0f, Curve::Int },
+    { "preset_formant_shot",  "Formant Shot",  "", 0.0f,  96.0f, 0.0f, Curve::Int },
+    { "preset_reverse_swell", "Reverse Swell", "", 0.0f, 256.0f, 0.0f, Curve::Int },
+    { "preset_zap",           "Zap",           "", 0.0f,  96.0f, 0.0f, Curve::Int },
+    { "preset_squelch",       "Squelch",       "", 0.0f, 128.0f, 0.0f, Curve::Int },
+    { "preset_bubble",        "Bubble",        "", 0.0f,  64.0f, 0.0f, Curve::Int },
+    { "preset_reverse_crash", "Reverse Crash", "", 0.0f, 128.0f, 0.0f, Curve::Int },
+    { "preset_atmosphere",    "Atmosphere",    "", 0.0f, 512.0f, 0.0f, Curve::Int },
+    { "plate_send",           "Plate Send",    "", 0.0f, 1.0f, 0.1f, Curve::Linear },
+};
+
+/**
  * The sidechain's curve (PLAN 7.3, Dok. 7): the fastest attack, a short hold, a release of 80 to 150 ms so a bass on the
  * off-beat is back when it plays; the rooms' returns ducked 3 to 5 dB.
  */
@@ -543,6 +576,7 @@ const ModuleSpec kModules[static_cast<int>(Module::Count)] = {
     { "bass",    kSynthParams,   synth::Count,   1 },
     { "acid",    kSynthParams,   synth::Count,   1 },
     { "poly",    kPolyParams,    poly::Count,    kPolyInstances, kPolyInstanceNames },
+    { "sfx",     kSfxParams,     sfx::Count,     1 },
     { "pump",    kPumpParams,    pump::Count,    1 },
     { "sends",   kSendsParams,   sends::Count,   1 },
     { "mix",     kMixParams,     mix::Count,     1 },

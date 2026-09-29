@@ -12,7 +12,7 @@ namespace parh {
 
 const char* const kPartNames[kNumParts] = {
     "kick", "sub", "perc1", "perc2", "perc3", "perc4", "perc5", "perc6", "perc7", "perc8", "perc9", "perc10", "perc11",
-    "perc12", "bass", "acid", "lead", "counter", "pluck", "arp", "pad", "stab", "ghost",
+    "perc12", "bass", "acid", "lead", "counter", "pluck", "arp", "pad", "stab", "ghost", "fx",
 };
 
 const char* const kSectionNames[] = { "Intro", "Groove", "Break", "Breakdown", "Build", "Drop", "Outro" };
@@ -66,7 +66,7 @@ float Score::knobAt(int param, double beat) const
 
 const char* const kBalPartNames[kBalParts] = { "perc1", "perc2", "perc3", "perc4", "perc5", "perc6", "perc7", "perc8", "perc9",
                                                "perc10", "perc11", "perc12", "bass", "acid", "lead", "counter", "pluck", "arp",
-                                               "pad", "stab", "room" };
+                                               "pad", "stab", "room", "fx" };
 
 BalanceDb Score::balanceAt(double beat) const
 {

@@ -4,21 +4,26 @@
  *        the stems, the loudness of every section.
  *
  * Usage:
- *   parh_render [--seed N] [--bpm B] [--set "key=value; ..."] [--out track.wav] [--midi track.mid] [--stems dir]
+ *   parh_render [--seed N] [--style S] [--bpm B] [--minutes M] [--set "key=value; ..."] [--reroll unit]
+ *               [--save-set f.parhset] [--load-set f.parhset] [--study]
+ *               [--out track.wav] [--midi track.mid] [--stems dir]
  *               [--rate 48000] [--block 512] [--bench] [--quality desktop|quest] [--plan] [--list] [--version]
  *
- * Until the planner of Phase 2 the track is the study (compose/Study.h). Without --out nothing is written and the render
- * only measures: the loudness of the whole and of every section, and the distance between the breakdown's and the drop's
- * loudest three seconds (PLAN 2.7, rule 3: 4 to 8 LU).
+ * A track is composed from its seed (compose/Composer.h); --study renders the fixed study of Phase 1 instead. Without
+ * --out nothing is written and the render only measures: the loudness of the whole and of every section, and the
+ * distance between the main breakdown's and the drop's loudest three seconds (the references: 0.5 to 4 LU).
  *
  * @note The frame (arguments, stems, the measurement, the timing) follows Totality `Tools/render/main.cpp` at 4d3c0d2
  *       (29.09.2026).
  */
 #include "parh/Engine.h"
+#include "parh/Leveler.h"
 #include "parh/Loudness.h"
 #include "parh/Midi.h"
 #include "parh/Profile.h"
 #include "parh/WavWriter.h"
+#include "parh/SetFile.h"
+#include "parh/compose/Composer.h"
 #include "parh/compose/Study.h"
 #include <chrono>
 #include <cmath>
@@ -36,9 +41,10 @@ namespace {
 
 void usage()
 {
-    std::printf("parh_render [--seed N] [--bpm B] [--set \"key=value; ...\"] [--out track.wav] [--midi track.mid]\n"
-                "            [--stems dir] [--rate 48000] [--block 512] [--bench] [--quality desktop|quest] [--plan] [--list]\n"
-                "            [--version]\n");
+    std::printf("parh_render [--seed N] [--style Uplifting|Progressive|Dream House|Acid|Deep] [--bpm B] [--minutes M]\n"
+                "            [--set \"key=value; ...\"] [--reroll unit] [--save-set f.parhset] [--load-set f.parhset] [--study]\n"
+                "            [--out track.wav] [--midi track.mid] [--stems dir] [--rate 48000] [--block 512] [--bench]\n"
+                "            [--quality desktop|quest] [--plan] [--list] [--version]\n");
 }
 
 /** @brief Prints the plan: the sections and the layer matrix, one row per element, one column per 8-bar block. */
@@ -68,16 +74,23 @@ int main(int argc, char** argv)
     uint64_t seed = 1;
     double rate = 48000.0;
     int block = 512;
-    float bpm = 0.0f;
-    bool bench = false, quest = false, planOnly = false, list = false;
-    std::string set, out, midi, stems;
+    float bpm = 0.0f, minutes = 0.0f;
+    bool bench = false, quest = false, planOnly = false, list = false, study = false, seedGiven = false;
+    std::string set, out, midi, stems, style, saveSetPath, loadSetPath;
+    Curation curation;
     for (int i = 1; i < argc; ++i) {
         const char* a = argv[i];
         auto next = [&]() -> const char* {
             if (i + 1 >= argc) { usage(); std::exit(2); }
             return argv[++i];
         };
-        if (!std::strcmp(a, "--seed")) seed = std::strtoull(next(), nullptr, 10);
+        if (!std::strcmp(a, "--seed")) { seed = std::strtoull(next(), nullptr, 10); seedGiven = true; }
+        else if (!std::strcmp(a, "--style")) style = next();
+        else if (!std::strcmp(a, "--minutes")) minutes = static_cast<float>(std::atof(next()));
+        else if (!std::strcmp(a, "--reroll")) curation.reroll(next());
+        else if (!std::strcmp(a, "--save-set")) saveSetPath = next();
+        else if (!std::strcmp(a, "--load-set")) loadSetPath = next();
+        else if (!std::strcmp(a, "--study")) study = true;
         else if (!std::strcmp(a, "--bpm")) bpm = static_cast<float>(std::atof(next()));
         else if (!std::strcmp(a, "--set")) { set += next(); set += ";"; }
         else if (!std::strcmp(a, "--out")) out = next();
@@ -101,15 +114,51 @@ int main(int argc, char** argv)
         return 0;
     }
     std::string error;
-    if (bpm > 0.0f) p.set(p.id(Module::Compose, 0, compose::Bpm), bpm);
+    if (!loadSetPath.empty()) {
+        SetFile sf;
+        if (!loadSet(loadSetPath.c_str(), sf, p, &error)) { std::fprintf(stderr, "--load-set: %s\n", error.c_str()); return 2; }
+        if (!seedGiven) seed = sf.seed;
+        for (const auto& [u, n] : sf.curation.rerolls) curation.rerolls[u] += n;
+    }
+    if (!style.empty()) set += "compose.style=" + style + ";";
+    if (bpm > 0.0f || minutes > 0.0f) set += "compose.auto=0;";
+    if (bpm > 0.0f) set += "compose.bpm=" + std::to_string(bpm) + ";";
+    if (minutes > 0.0f) set += "compose.minutes=" + std::to_string(minutes) + ";";
     if (!set.empty() && !p.parseText(set, &error)) { std::fprintf(stderr, "--set: %s\n", error.c_str()); return 2; }
+    if (!saveSetPath.empty()) {
+        SetFile sf;
+        sf.seed = seed;
+        sf.curation = curation;
+        if (!saveSet(saveSetPath.c_str(), sf, p)) { std::fprintf(stderr, "cannot write %s\n", saveSetPath.c_str()); return 1; }
+    }
 
     const auto t0 = std::chrono::steady_clock::now();
-    const Score score = composeStudy(p, seed);
+    TrackInfo info;
+    Score score = study ? composeStudy(p, seed) : composeTrack(p, seed, TrackRequest{}, &curation, std::string(), &info);
+    // The Leveler (PLAN 7.5): the balance against the kick, the breakdown against the drop, the loudness.
+    if (!bench && !planOnly) {
+        const std::vector<LevelReading> lr = levelScore(score, p);
+        for (const LevelReading& r : lr) {
+            std::printf("level: the drop %.1f LUFS -> target %.1f, trim %+.1f dB (after %.1f); breakdown under the drop %.1f -> %.1f LU"
+                        " (%+.1f dB); builds %+.1f dB\n", r.measured, r.target, r.trim, r.after, r.gapBefore, r.gapAfter, r.breakDb, r.buildDb);
+            std::string bal = "balance against the kick (dB, correction):";
+            for (int k = 0; k < kBalParts; ++k)
+                if (!std::isnan(r.found[static_cast<size_t>(k)]))
+                    bal += " " + std::string(kBalPartNames[k]) + " " + std::to_string(static_cast<int>(std::lround(r.found[static_cast<size_t>(k)])))
+                         + (r.bal[static_cast<size_t>(k)] != 0.0f ? "(" + std::to_string(static_cast<int>(std::lround(r.bal[static_cast<size_t>(k)]))) + ")" : "");
+            std::printf("%s\n", bal.c_str());
+        }
+    }
     const auto t1 = std::chrono::steady_clock::now();
     std::printf("Parhelion %s  seed %llu  %.1f BPM  %s %s  %.0f bars (%.1f min)\n", PARH_VERSION, static_cast<unsigned long long>(seed),
                 score.tempo.bpmAt(0.0), kKeyNames[score.keyRoot], kScaleNames[score.scale], score.lengthBeats / 4.0,
                 score.tempo.secondsAt(score.lengthBeats) / 60.0);
+    if (!study)
+        std::printf("%s, %s form; %s, bass %s; %s; main drop at bar %d, breakdown at bar %d, the lead from bar %d%s\n",
+                    info.style.c_str(), info.form == FormTemplate::Anthem ? "anthem" : info.form == FormTemplate::Dream ? "dream"
+                    : info.form == FormTemplate::Acid ? "acid" : info.form == FormTemplate::Plateau ? "plateau" : "drift",
+                    info.progression.c_str(), info.bass.c_str(), info.camelot.c_str(), info.mainDropBar, info.breakdownBar,
+                    info.firstLeadBar, info.keyChangeBar >= 0 ? (", key change at bar " + std::to_string(info.keyChangeBar)).c_str() : "");
     printPlan(score);
     if (!midi.empty()) {
         if (!writeMidiFile(score, midi.c_str(), "Parhelion", &p)) { std::fprintf(stderr, "cannot write %s\n", midi.c_str()); return 1; }
@@ -212,7 +261,7 @@ int main(int argc, char** argv)
             if (k == SectionKind::Drop) drop = std::max(drop, s.shortTermMax);
         }
         if (breakdown > -199.0 && drop > -199.0)
-            std::printf("breakdown -> drop: %.1f LU (PLAN 2.7: 4 to 8)\n", drop - breakdown);
+            std::printf("breakdown -> drop: %.1f LU (the references: 0.5 to 4, median 1.9)\n", drop - breakdown);
     }
     if (!out.empty()) std::printf("WAV: %s\n", out.c_str());
     return 0;

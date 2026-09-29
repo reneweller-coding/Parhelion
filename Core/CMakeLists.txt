@@ -6,6 +6,7 @@ add_library(ParhelionCore STATIC
     src/WavWriter.cpp
     src/Halfband.cpp
     src/Loudness.cpp
+    src/Leveler.cpp
     src/fx/Dynamics.cpp
     src/fx/Reverb.cpp
     src/fx/Plate.cpp
@@ -15,10 +16,18 @@ add_library(ParhelionCore STATIC
     src/synth/Kit.cpp
     src/synth/Synth.cpp
     src/synth/Poly.cpp
+    src/synth/Sfx.cpp
+    src/synth/SfxBankTables.cpp
     src/synth/WaveTable.cpp
     src/synth/WaveTableFile.cpp
     src/compose/GestureEngine.cpp
     src/compose/Study.cpp
+    src/compose/Style.cpp
+    src/compose/Planner.cpp
+    src/compose/Harmony.cpp
+    src/compose/Melody.cpp
+    src/compose/Composer.cpp
+    src/SetFile.cpp
     src/Deck.cpp
     src/Engine.cpp
     src/Cue.cpp

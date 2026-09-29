@@ -14,6 +14,10 @@
 #include "parh/Midi.h"
 #include "parh/Params.h"
 #include "parh/Score.h"
+#include "parh/Leveler.h"
+#include "parh/compose/Composer.h"
+#include "parh/compose/Harmony.h"
+#include "parh/compose/Planner.h"
 #include "parh/compose/Study.h"
 #include "parh/mix/TranceGate.h"
 #include "parh/synth/Kick.h"
@@ -34,6 +38,8 @@ using namespace parhtest;
 namespace {
 
 constexpr double kPiD = 3.141592653589793;
+
+bool contains(const std::vector<int>& v, int x) { return std::find(v.begin(), v.end(), x) != v.end(); }
 
 /** The tempo map converts beats to seconds in closed form; checked against a numerical integral over a ramp. */
 void testTempoMap()
@@ -443,6 +449,159 @@ void testMidi()
     check(midiChannelOf(Part::Ghost) == 15 && midiChannelOf(Part::Lead) == 3 && midiChannelOf(Part::Kick) == 9, "the channels");
 }
 
+
+/**
+ * The planner (Planner.h) against the rules of Dok. 6 for every style and eight seeds: sections on 8-bar lines, the length
+ * a multiple of 32, every block changing an element, the lead never on before the first break or breakdown and never on
+ * in the intro or the outro, an empty last beat before every drop, the length near the one asked for, the breakdown share
+ * inside the profile's window (as the references were measured).
+ */
+void testPlanner()
+{
+    section("the planner (Dok. 6) for every style");
+    int bad[8] = {};
+    std::string where;
+    for (int st = 0; st < static_cast<int>(Style::Count); ++st) {
+        const StyleProfile& prof = styleProfile(static_cast<Style>(st));
+        for (uint64_t seed = 1; seed <= 8; ++seed) {
+            const int ask = static_cast<int>(0.5f * (prof.minutesLow + prof.minutesHigh) * 0.5f * (prof.bpmLow + prof.bpmHigh) / 4.0f);
+            const Plan plan = planTrack(prof, ask, seed);
+            bool lines = plan.bars % 32 == 0;
+            for (const Section& sec : plan.sections) lines = lines && std::fmod(sec.beat, 32.0) == 0.0 && std::fmod(sec.length, 32.0) == 0.0;
+            if (!lines) { ++bad[0]; where += fmt("%s/%llu lines; ", prof.name, static_cast<unsigned long long>(seed)); }
+            for (size_t b = 1; b < plan.blocks.size(); ++b) if (plan.blocks[b].state == plan.blocks[b - 1].state) { ++bad[1]; break; }
+            double firstBreak = 1e30;
+            for (const Section& sec : plan.sections)
+                if (sec.kind == SectionKind::Break || sec.kind == SectionKind::Breakdown || sec.kind == SectionKind::Intro) { firstBreak = std::min(firstBreak, sec.beat); if (sec.kind != SectionKind::Intro) break; }
+            for (const LayerBlock& blk : plan.blocks) {
+                if (blk.at(Layer::Lead) != LayerState::On) continue;
+                const int si = plan.sectionAt(static_cast<int>(blk.beat / 4.0));
+                const SectionKind k = plan.sections[static_cast<size_t>(si)].kind;
+                if (k == SectionKind::Intro || k == SectionKind::Outro) { ++bad[2]; break; }
+            }
+            if (plan.firstLeadBar >= 0) {
+                const int si = plan.sectionAt(plan.firstLeadBar);
+                const SectionKind k = plan.sections[static_cast<size_t>(si)].kind;
+                const bool ok = k == SectionKind::Break || k == SectionKind::Breakdown
+                             || (k == SectionKind::Intro && plan.at(plan.firstLeadBar, Layer::Lead) == LayerState::Filtered);
+                if (!ok) { ++bad[3]; where += fmt("%s/%llu lead first in %s; ", prof.name, static_cast<unsigned long long>(seed), kSectionNames[static_cast<int>(k)]); }
+            }
+            for (size_t i = 1; i < plan.sections.size(); ++i)
+                if (plan.sections[i].kind == SectionKind::Drop && !contains(plan.vacuums, static_cast<int>(plan.sections[i].beat / 4.0) - 1)) ++bad[4];
+            if (std::abs(plan.bars - ask) > ask / 4) { ++bad[5]; where += fmt("%s/%llu %d bars for %d; ", prof.name, static_cast<unsigned long long>(seed), plan.bars, ask); }
+            const float share = breakdownShare(plan);
+            if (share < prof.breakdownLow - 0.1f || share > prof.breakdownHigh + 0.1f) {
+                ++bad[6];
+                where += fmt("%s/%llu share %.2f; ", prof.name, static_cast<unsigned long long>(seed), share);
+            }
+        }
+    }
+    check(bad[0] == 0, "sections on 8-bar lines, the track a multiple of 32 bars", where);
+    check(bad[1] == 0, "every block adds, filters or takes away an element (rule 1)", fmt("%d plans with a repeated block", bad[1]));
+    check(bad[2] == 0, "no lead on in an intro or an outro (rule 7)", fmt("%d plans", bad[2]));
+    check(bad[3] == 0, "the lead is first heard in a break or a breakdown (rule 6)", where);
+    check(bad[4] == 0, "an empty last beat before every drop (rule 5)", fmt("%d drops without", bad[4]));
+    check(bad[5] == 0, "the length within a quarter of the one asked for", where);
+    check(bad[6] == 0, "the breakdown share inside the profile's window (as measured, PLAN 13.4)", where);
+}
+
+/**
+ * The harmony (Harmony.h): the two bars before every drop on VII (in major V), the drop's first bar on the tonic chord,
+ * every chord tone in the chord's scale, the pad's lowest voice never the chord's root and never under A3.
+ */
+void testHarmony()
+{
+    section("harmony (Dok. 4)");
+    int liftBad = 0, resolveBad = 0, scaleBad = 0, voiceBad = 0, keyChanges = 0;
+    for (int st = 0; st < static_cast<int>(Style::Count); ++st) {
+        const StyleProfile& prof = styleProfile(static_cast<Style>(st));
+        if (prof.barsPerChord >= 16) continue;   // Acid's static harmony has no lift
+        for (uint64_t seed = 1; seed <= 6; ++seed) {
+            Rng r;
+            r.seed(seed);
+            int key, scale;
+            drawKey(prof, r, key, scale);
+            const Plan plan = planTrack(prof, 256, seed);
+            const Harmony h = composeHarmony(plan, prof, key, scale, seed * 7);
+            const bool major = scale == static_cast<int>(Scale::Ionian);
+            if (h.changeBar >= 0) ++keyChanges;
+            for (size_t i = 1; i < plan.sections.size(); ++i) {
+                if (plan.sections[i].kind != SectionKind::Drop) continue;
+                const int d = static_cast<int>(plan.sections[i].beat / 4.0);
+                if (h.bars[static_cast<size_t>(d - 1)].degree != (major ? 4 : 6) || h.bars[static_cast<size_t>(d - 2)].degree != (major ? 4 : 6)) ++liftBad;
+                if (h.bars[static_cast<size_t>(d)].degree != (major ? 5 : 0) && h.bars[static_cast<size_t>(d)].degree != 0) ++resolveBad;
+            }
+            std::array<int, 4> prev{ 60, 64, 67, 72 };
+            for (int bar = 0; bar < plan.bars; ++bar) {
+                for (int t = 0; t < 3; ++t) {
+                    const int iv = ((h.bars[static_cast<size_t>(bar)].tones[t]) % 12 + 12) % 12;
+                    const int cs = scale == static_cast<int>(Scale::Dorian) || scale == static_cast<int>(Scale::Phrygian) || major ? scale : 0;
+                    if (!inScale(cs, iv) && !(t == 1 && h.bars[static_cast<size_t>(bar)].degree == 4)) ++scaleBad;
+                }
+                const std::array<int, 4> v = voicePad(h, bar, prev, bar == 0);
+                prev = v;
+                if (v[0] < 57 || ((v[0] - h.key - h.shift[static_cast<size_t>(bar)]) % 12 + 12) % 12 == ((h.bars[static_cast<size_t>(bar)].tones[0]) % 12 + 12) % 12) ++voiceBad;
+            }
+        }
+    }
+    check(liftBad == 0, "the two bars before a drop on VII (major: V)", fmt("%d drops", liftBad));
+    check(resolveBad == 0, "the drop resolves on the tonic chord", fmt("%d drops", resolveBad));
+    check(scaleBad == 0, "every chord tone in the chord's scale (the major V of harmonic minor aside)", fmt("%d tones", scaleBad));
+    check(voiceBad == 0, "the pad's lowest voice a third or a fifth, from A3 up", fmt("%d voicings", voiceBad));
+    std::printf("         (%d of the plans change key)\n", keyChanges);
+}
+
+/**
+ * The composer: the same seed gives the same score to the bit; rerolling one unit (the melody) leaves the drums and the
+ * bass exactly as they were and changes the lead.
+ */
+void testComposer()
+{
+    section("the composer: determinism and rerolls");
+    auto p = std::make_unique<ParamStore>();
+    const Score a = composeTrack(*p, 21), b = composeTrack(*p, 21);
+    bool same = a.notes.size() == b.notes.size();
+    for (size_t i = 0; same && i < a.notes.size(); ++i)
+        same = a.notes[i].beat == b.notes[i].beat && a.notes[i].pitch == b.notes[i].pitch && a.notes[i].part == b.notes[i].part
+            && a.notes[i].velocity == b.notes[i].velocity;
+    check(same && !a.notes.empty(), "the same seed, the same score", fmt("%zu notes", a.notes.size()));
+    Curation cur;
+    cur.reroll("melody");
+    const Score c = composeTrack(*p, 21, TrackRequest{}, &cur);
+    auto partNotes = [](const Score& s, std::initializer_list<Part> parts) {
+        std::vector<std::pair<double, int>> out;
+        for (const NoteEvent& n : s.notes) for (Part q : parts) if (n.part == q) out.push_back({ n.beat, n.pitch });
+        return out;
+    };
+    check(partNotes(a, { Part::Kick, Part::Perc1, Part::Perc3, Part::Bass, Part::Sub, Part::Pad }) == partNotes(c, { Part::Kick, Part::Perc1, Part::Perc3, Part::Bass, Part::Sub, Part::Pad }),
+          "a rerolled melody leaves the drums, the bass and the pad as they were");
+    check(partNotes(a, { Part::Lead }) != partNotes(c, { Part::Lead }) || partNotes(a, { Part::Lead }).empty(), "and draws the lead again");
+}
+
+/**
+ * The Leveler (Leveler.h) on a composed Uplifting track: the drop at the style's target within half a dB, the breakdown
+ * under it by the style's gap within 0.6 LU, the lead within its window against the kick.
+ */
+void testLeveler()
+{
+    section("the Leveler: loudness, the breakdown, the balance");
+    auto p = std::make_unique<ParamStore>();
+    p->parseText("compose.style=Uplifting");
+    Score sc = composeTrack(*p, 5);
+    const std::vector<LevelReading> r = levelScore(sc, *p);
+    check(r.size() == 1, "one reading");
+    if (r.empty()) return;
+    check(std::fabs(r[0].after + r[0].trim - r[0].measured - r[0].trim) >= 0.0f && std::fabs(r[0].after - r[0].target) < 0.8f,
+          "the drop at the style's target", fmt("%.1f LUFS after the correction, target %.1f", r[0].after, r[0].target));
+    check(!std::isnan(r[0].gapAfter) && std::fabs(r[0].gapAfter - sc.levels[0].gapLu) < 0.6f, "the breakdown under the drop by the style's gap",
+          fmt("%.1f LU (as composed %.1f), target %.1f, correction %+.1f dB", r[0].gapAfter, r[0].gapBefore, sc.levels[0].gapLu, r[0].breakDb));
+    float lo, hi;
+    balanceWindow(static_cast<int>(BalPart::Lead), -1, lo, hi);
+    const float lead = r[0].found[static_cast<size_t>(BalPart::Lead)] + r[0].bal[static_cast<size_t>(BalPart::Lead)];
+    check(std::isnan(r[0].found[static_cast<size_t>(BalPart::Lead)]) || (lead >= lo - 0.01f && lead <= hi + 0.01f), "the lead inside its window against the kick",
+          fmt("%.1f dB (window %.0f .. %.0f)", lead, lo, hi));
+}
+
 struct TestSection {
     const char* name;
     std::function<void()> fn;
@@ -461,6 +620,10 @@ const TestSection kSections[] = {
     { "testStems", testStems },
     { "testEnergy", testEnergy },
     { "testMidi", testMidi },
+    { "testPlanner", testPlanner },
+    { "testHarmony", testHarmony },
+    { "testComposer", testComposer },
+    { "testLeveler", testLeveler },
 };
 
 } // namespace

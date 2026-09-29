@@ -49,6 +49,7 @@
 #include "parh/synth/Kick.h"
 #include "parh/synth/Kit.h"
 #include "parh/synth/Poly.h"
+#include "parh/synth/Sfx.h"
 #include "parh/synth/SubBass.h"
 #include "parh/synth/Synth.h"
 #include <cstdint>
@@ -62,7 +63,7 @@ class Deck {
 public:
     /** @brief The stems, in the order Engine::setStems() takes them. */
     enum Stem : int { kStemKick = 0, kStemSub, kStemBass, kStemAcid, kStemHats, kStemPerc, kStemLead, kStemCounter, kStemPluck,
-                      kStemArp, kStemPad, kStemStab, kStemRoom, kStemPlate, kStemHall, kStems };
+                      kStemArp, kStemPad, kStemStab, kStemRoom, kStemPlate, kStemHall, kStemFx, kStems };
     static constexpr int kRaster = 32;   ///< the engine's parameter raster, samples
     static constexpr int64_t kNever = std::numeric_limits<int64_t>::max();
 
@@ -187,6 +188,9 @@ private:
     Poly poly_[kPolyInstances];
     TranceGate gate_[kPolyInstances];
     Ducker polyDuck_[kPolyInstances], retDuck_;
+    Sfx sfx_;                  ///< the effects (PLAN 5.10)
+    Ducker fxDuck_, subDropDuck_;   ///< the effects' pump and the sub drop's own (sfx.sub_duck)
+    Sends fxSends_;
     int keyRoot_ = 9, scale_ = 0;
     double beat_ = 0.0, beatsPerSample_ = 0.0;   ///< the beat at the cell's first sample and its step (the gates, the poly clock)
     int64_t cellSample_ = 0;                     ///< the cell's first sample: a span that starts inside a cell counts from it
@@ -209,7 +213,10 @@ private:
 
     // Buses, sends, rooms.
     Svf hatsLp_[2], percLp_[2];
-    float hatsGain_ = 1.0f, percGain_ = 1.0f, synthGain_ = 1.0f, synthTarget_ = 1.0f;
+    float hatsGain_ = 1.0f, percGain_ = 1.0f, synthGain_ = 1.0f, synthTarget_ = 1.0f, fxGain_ = 1.0f, fxTarget_ = 1.0f;
+    std::vector<std::pair<double, double>> breaks_;   ///< the beats of the breakdowns and breaks (LevelMark::breakDb)
+    std::vector<std::pair<double, double>> builds_;   ///< the beats of the builds (LevelMark::buildDb)
+    float percBuild_ = 1.0f;                          ///< the build's correction on the percussion bus
     bool snapFaders_ = true;   ///< after a seek the faders start where the score has them, not gliding there
     bool laneIsHat_[kPercLanes] = {};
     float hatsSend_ = 0.0f, percSend_ = 0.0f;
@@ -233,7 +240,7 @@ private:
     std::vector<float> kickBuf_, bodyBuf_, subBuf_, bassL_, bassR_, acidL_, acidR_;
     std::vector<float> polyL_[kPolyInstances], polyR_[kPolyInstances];
     std::vector<float> roomInL_, roomInR_, plateInL_, plateInR_, hallInL_, hallInR_, roomL_, roomR_, plateL_, plateR_, hallL_, hallR_;
-    std::vector<float> drumL_, drumR_, synthL_, synthR_;
+    std::vector<float> drumL_, drumR_, synthL_, synthR_, fxL_, fxR_, fxSub_, fxWetL_, fxWetR_;
 
     // The stems' own copies of the linear stages (render() with stems), and the gains of the nonlinear ones.
     struct StemBus { Svf hp[2][2]; float tilt[2] = {}; };
