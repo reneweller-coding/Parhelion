@@ -329,6 +329,26 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         }
         if (s.kind == SectionKind::Groove && prevS.kind == SectionKind::Intro && sweep) fx(SfxType::Sweep, s.beat - 16.0, 16.0, 0.6f);
     }
+    // The intro's atmosphere (30.09.2026): one Atmosphere under the whole intro (a beatless opening and the DJ intro after
+    // it are one span) -- it swells in, holds and leaves over its last quarter as the groove comes (Sfx.cpp) -- and a
+    // reverse swell into some of its 16-bar lines. On a stream of its own beside the effects' ("ATMO"), so the draws above
+    // stay what they were.
+    {
+        Rng ar;
+        ar.seed(mixSeed(stream("fx"), 0x41544D4Full));   // "ATMO"
+        double from = -1.0, to = -1.0;
+        for (const Section& s : plan.sections) {
+            if (s.kind != SectionKind::Intro) break;
+            if (from < 0.0) from = s.beat;
+            to = s.beat + s.length;
+        }
+        const float level = 0.35f + 0.15f * ar.uniform();   // (round 7: at 0.55 .. 0.75 the intros lay 3 to 5 dB over the references)
+        if (to > from && plan.at(static_cast<int>(from / 4.0), Layer::Fx) != LayerState::Off) {
+            fx(SfxType::Atmosphere, from, to - from, level);
+            for (double b = from + 64.0; b < to - 1e-9; b += 64.0)
+                if (ar.uniform() < 0.6f) fx(SfxType::ReverseSwell, b - 8.0, 8.0, 0.45f);
+        }
+    }
 
     // ------------------------------------------------------------------------------------------ automation
     auto off = [&](int id, float target) { return p.toNormalised(id, target) - p.toNormalised(id, p.get(id)); };
@@ -457,8 +477,10 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
             const bool open = (s.kind == SectionKind::Breakdown || s.kind == SectionKind::Break) && plan.at(bar, Layer::Sub) == LayerState::Off;
             step(padHp, s.beat, open ? off(padHp, 70.0f) : 0.0f);
         }
-        // The pad's filter: filtered in a groove (its cell says so), opening through a breakdown and its build.
-        if (s.kind == SectionKind::Breakdown) ramp(padCut, s.beat, s.length, padOpen(s.energyFrom), padOpen(s.energyTo));
+        // The pad's filter: filtered in a groove (its cell says so), opening through a breakdown and its build -- and
+        // through the intro (30.09.2026: the atmosphere; a beatless opening and the DJ intro after it one ramp, below).
+        if (s.kind == SectionKind::Intro) { /* (the intro's ramp after this loop) */ }
+        else if (s.kind == SectionKind::Breakdown) ramp(padCut, s.beat, s.length, padOpen(s.energyFrom), padOpen(s.energyTo));
         else if (s.kind == SectionKind::Build) ramp(padCut, s.beat, s.length, padOpen(s.energyFrom), padOpen(s.energyTo), GestureShape::EaseIn);
         else step(padCut, s.beat, plan.at(bar, Layer::Pad) == LayerState::Filtered ? -0.25f : 0.0f);
         // The fader: a breakdown sits under the drop (Dok. 6, rule 3, as measured: PLAN 13.4); the Leveler refines it.
@@ -497,6 +519,16 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         }
     }
     (void)pad;
+    // The intro's pad: from dark to the groove's filtered colour over the whole intro span, easing in.
+    {
+        double from = -1.0, to = -1.0;
+        for (const Section& s : plan.sections) {
+            if (s.kind != SectionKind::Intro) break;
+            if (from < 0.0) from = s.beat;
+            to = s.beat + s.length;
+        }
+        if (to > from) ramp(padCut, from, to - from, -0.55f, -0.3f, GestureShape::EaseIn);
+    }
     // The 303's four curves (PLAN 5.3, Dok. 5): cutoff, resonance, envelope amount and decay rise over a phrase of 16,
     // 32 or 64 bars and jump back at its end; how far they rise follows the planner's energy, so the filter's peaks are
     // the track's (Dok. 6: "die Hoehepunkte eines Acid-Tracks sind die Filterpeaks"). A phrase never crosses a drop:
@@ -533,7 +565,11 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         dr2.seed(mixSeed(stream("sounds"), 0x44524946ull));   // "DRIF"
         const int wave = dr2.uniform() < 0.5f ? 8 : 16;
         float lastCut = 0.0f, lastPan = 0.0f;
-        for (int bar = 0; bar < plan.bars; bar += wave) {
+        // From the intro's end: the intro's pad is the atmosphere's, opening under the ramp above (30.09.2026: the drift
+        // from bar 1 opened it at once, and Deep's intros lay 9 dB over the references' sustained sound).
+        int introEnd = 0;
+        for (const Section& s : plan.sections) { if (s.kind != SectionKind::Intro) break; introEnd = static_cast<int>((s.beat + s.length) / 4.0); }
+        for (int bar = introEnd; bar < plan.bars; bar += wave) {
             const float c = 0.12f * dr2.bipolar(), q = 0.25f * dr2.bipolar();
             ramp(cut, 4.0 * bar, 4.0 * wave, lastCut, c);
             ramp(pan, 4.0 * bar, 4.0 * wave, lastPan, q);

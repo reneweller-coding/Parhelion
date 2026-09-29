@@ -42,7 +42,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from scipy import signal
+from scipy import ndimage, signal
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -145,6 +145,22 @@ def db(x):
     return 10.0 * math.log10(max(float(x), 1e-30))
 
 
+def sustained(seg, sr):
+    """The sustained part's energy per frame between 200 Hz and 5 kHz, and the frames' times (30.09.2026).
+
+    Harmonic-percussive separation by median filtering (Fitzgerald 2010): along time the sustained partials survive,
+    along frequency the broadband hits; the soft mask H^2 / (H^2 + P^2) keeps the pads, the chords, the atmosphere and
+    the tails, and leaves the kick, the hats and the claps out.
+    """
+    f, tt, z = signal.stft(seg, fs=sr, nperseg=2048, noverlap=2048 - 512)
+    s = np.abs(z) ** 2
+    h = ndimage.median_filter(s, size=(1, 17))
+    q = ndimage.median_filter(s, size=(17, 1))
+    mask = h * h / (h * h + q * q + 1e-30)
+    band = (f >= 200.0) & (f <= 5000.0)
+    return (s[band] * mask[band]).sum(axis=0), tt
+
+
 def measure(path, bpm_hint=None):
     x = decode(path, SR)
     dur = len(x) / SR
@@ -222,6 +238,20 @@ def measure(path, bpm_hint=None):
     drop_start = (off + d0 * bar) / SR
     drop_len = min(32, nbars) * bar / SR
     r["drop_at"] = round(d0 / max(nbars, 1), 3)
+
+    # The intro's atmosphere (30.09.2026, the user: "Fangen typische Trance-Songs nicht eher mit einer Atmosphaere oder
+    # einem Pad an?"): the sustained energy (pads, chords, atmosphere, tails; sustained()) between 200 Hz and 5 kHz in
+    # bars 1 .. 16 and 17 .. 32, against the drop's, in dB -- and the share of the first 32 bars' bars whose sustained
+    # energy lies no more than 30 dB under the drop's (where anything sustained is heard at all).
+    if nbars >= 64:
+        e_drop, _ = sustained(x[int(off + d0 * bar):int(off + (d0 + 32) * bar)], SR)
+        e_in, t_in = sustained(x[int(off):int(off + 32 * bar)], SR)
+        ref_e = float(np.mean(e_drop)) + 1e-30
+        bar_s = bar / SR
+        per_bar = np.array([np.mean(e_in[(t_in >= b * bar_s) & (t_in < (b + 1) * bar_s)]) for b in range(32)])
+        r["intro_sus1"] = round(db(np.mean(per_bar[:16]) / ref_e), 1)
+        r["intro_sus2"] = round(db(np.mean(per_bar[16:]) / ref_e), 1)
+        r["intro_sus_bars"] = round(float(np.mean(per_bar / ref_e > 10 ** (-30 / 10))), 3)
 
     # Balance and width in the drop.
     st2 = decode(path, SR_FULL, mono=False, start=drop_start, dur=drop_len)
@@ -302,7 +332,8 @@ def measure(path, bpm_hint=None):
     return r
 
 
-COLS = [("bpm", 6), ("minutes", 5), ("lufs", 6), ("loud20", 6), ("intro_bars", 4), ("outro_bars", 4), ("breakdown_share", 6), ("breakdown_bars", 4),
+COLS = [("bpm", 6), ("minutes", 5), ("lufs", 6), ("loud20", 6), ("intro_bars", 4), ("intro_sus1", 6), ("intro_sus2", 6),
+        ("outro_bars", 4), ("breakdown_share", 6), ("breakdown_bars", 4),
         ("gap_lu", 5), ("kick_hz", 5), ("pump_mid", 6), ("bass_offbeat", 5), ("b20_60", 6),
         ("b60_150", 6), ("b2k_5k", 6), ("b5k_16k", 6), ("side_hi_db", 6), ("key", 4)]
 

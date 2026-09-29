@@ -428,6 +428,31 @@ NEON-Shim) bitgleich.
   vektorisierbar, 0,5 und 0,4 %), das Tempo-Delay einer Stimme ohne Send in Ruhe, die Kit-Lanes (ihr Rauschen muss jedes
   Sample laufen).
 
+**Arrangement-Runde (30.09.2026, auf Hinweis des Nutzers: "Der Anfang ist noch ziemlich langweilig ... Fangen typische
+Trance-Songs nicht eher mit einer Atmosphäre oder einem Pad an?").** Der Nutzer hielt die Streicher für die einzigen
+Flächen: die sechs Stimmen (Lead, Counter, Pluck, Arp, Pad, Stab) lagen im Synths-Tab hinter einer Auswahl -- jetzt
+sechs Knöpfe (die Kit-Lanes ebenso).
+- **Gezählt** [M, 10 Tracks je Stil, Anteil der 8-Takt-Blöcke]: der Stab spielte in 0 bis 5 %, das Arp in Uplifting,
+  Acid und Dream House in 9 bis 14 %, das Pad im Intro in 0 % (Uplifting) bis 22 % (Progressive); die Effekte nur in
+  den Builds. Das Intro folgte wörtlich Dok. 6 (Kick allein, Hats, Bass, Open Hat, Percussion, gefilterter Pluck).
+- **Gemessen** (analyze_ref.py, neu `intro_sus1`, `intro_sus2`): der gehaltene Anteil (Trennung nach Fitzgerald 2010,
+  Medianfilter über Zeit und Frequenz) zwischen 200 Hz und 5 kHz in Takt 1 bis 16 und 17 bis 32, gegen den Drop. Die
+  Referenzen [M, Median]: Uplifting −11,7 / −7,0 dB, Progressive −8,1 / −3,5, Dream House −6,7 / −2,8, Acid −7,7 / −2,3,
+  Deep −10,8 / −6,5 -- auch die DJ-Intros mit Kick tragen Atmosphäre. Parhelion vorher: −17 bis −36 dB in den Intros mit
+  Kick, +0,5 dB in den Beatless-Anfängen (das Pad offen).
+- **Geändert**: im Intro das Pad gefiltert ab Takt 1, über das Intro sich öffnend (eine Rampe über Beatless-Anfang und
+  DJ-Intro), die Atmosphere der Effekte über das ganze Intro (sie schwillt an, hält, geht im letzten Viertel), Reverse
+  Swells in einige 16-Takt-Linien, in der zweiten Intro-Hälfte der gefilterte Arp; der Beatless-Anfang mit gefiltertem
+  statt offenem Pad; Deeps Pad-Drift erst nach dem Intro. Der Stab in jedem zweiten Block des ersten Drops und ab dem
+  zweiten des Haupt-Drops; Stab und Arp häufiger besetzt (Uplifting Arp 0,5 → 0,7, Stab 0,3 → 0,55; Acid Arp 0,1 → 0,3,
+  Stab 0,3 → 0,5; Dream House Arp 0,45; Progressive Stab 0,4; Deep Stab 0,1); der Beatless-Anfang allein stehender
+  Tracks in Uplifting 0,25, Acid 0,2 (im Set beginnt jeder Track mit der Kick).
+- **Kalibrierung Runde 7 und 8** [M, 23 Maße]: Intros jetzt im Bereich der Referenzen, meist nahe ihrem Median (Uplifting
+  −10,9 / −10,9 / −6,6 dB in Takt 1 bis 16), einzelne Tracks 0,2 bis 1 dB über der lautesten Referenz (Dream House, Deep
+  in Takt 17 bis 32: dort öffnet sein driftendes Pad) -- Feinarbeit für 8. Die übrigen Maße wie zuvor: Uplifting 14,
+  Progressive 14, Dream House 9, Acid 14, Deep 13 von 23. Stab jetzt 12 bis 13 % der Blöcke in Uplifting und Acid, Arp
+  15 bis 16 %; Pad und Atmosphäre in jedem Intro.
+
 ## 0. Kurzfassung
 
 Ein Instrument, das aus einem Seed, einem Stilprofil und einer Set-Dramaturgie Trance komponiert und in Echtzeit

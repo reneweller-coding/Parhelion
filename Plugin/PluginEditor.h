@@ -75,7 +75,12 @@ private:
     ParhelionProcessor& proc_;
     std::vector<std::pair<parh::Module, int>> groups_;
     int instances_;
-    juce::ComboBox instance_;
+    /**
+     * @brief The instances as a row of buttons (30.09.2026: behind a menu the six synth voices -- lead, counter, pluck,
+     *        arp, pad, stab -- were easy to miss; the user took the strings for the only pads).
+     */
+    juce::OwnedArray<juce::TextButton> instanceButtons_;
+    int selected_ = 0;   ///< the instance shown
     juce::OwnedArray<juce::Component> controls_;
     juce::OwnedArray<juce::Label> labels_;
     /** @brief A control of the page: its name above it, large or not (EditorTheme.h, layoutOf). */

@@ -243,11 +243,21 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
     const Layer bassLayer = c.acidBass ? Layer::Acid : Layer::Bass;
     switch (role) {
     case Role::AmbientIntro:
-        set(a, Layer::Pad, S::On);
+        // The pad filtered, opening over the intro (the composer's ramp), and the atmosphere (30.09.2026: open, the pad
+        // of a beatless opening lay 7 dB over the references' sustained sound, measured as analyze_ref.py's intro_sus).
+        set(a, Layer::Pad, S::Filtered);
+        set(a, Layer::Fx, S::On);
         if (c.lead && k >= n / 2 && n >= 2) set(a, Layer::Lead, S::Filtered);   // the piano's motif hinted (Dream House)
         else if (c.arp) set(a, Layer::Arp, S::Filtered);
         break;
     case Role::Intro: {
+        // The atmosphere over it all (30.09.2026, the user: "Fangen typische Trance-Songs nicht eher mit einer Atmosphaere
+        // oder einem Pad an?"): the pad filtered from the first bar, opening over the intro, and the effects' atmosphere
+        // -- the references' intros carry sustained sound 7 to 12 dB under their drop's from the first bar on (intro_sus
+        // in analyze_ref.py), Parhelion's had none. In the intro's second half the arp's hint as well.
+        set(a, Layer::Pad, S::Filtered);
+        set(a, Layer::Fx, S::On);
+        if (c.arp && n >= 2 && k >= n / 2) set(a, Layer::Arp, S::Filtered);
         // Dok. 6: kick alone, hats, bass, open hat, percussion, the filtered pluck; spread over the intro's blocks (the
         // percussion now and then before the open hat: PLAN 6.3's "Streuung").
         Layer order[] = { Layer::Kick, Layer::ClosedHat, bassLayer, Layer::OpenHat, Layer::Perc, Layer::Pluck };
@@ -302,7 +312,9 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
         if (c.ride && (main || k >= 1 + v.dropRideLate)) set(a, Layer::Ride, S::On);
         if (c.arp && (role == Role::FinalDrop || k >= (main ? 1 : 2) + v.dropArpLate)) set(a, Layer::Arp, S::On);
         if (c.counter && main && k >= (v.counterEarly ? std::max(1, n / 4) : n / 2)) set(a, Layer::Counter, S::On);
-        if (c.stab && (role == Role::FinalDrop || (main && k % 2 == v.stabParity))) set(a, Layer::Stab, S::On);
+        // The stab: the offbeat chords of the drops (30.09.2026: it sounded in 0 to 5 % of the blocks) -- the first drop
+        // on every other block, the main drop from its second block on, the final drop throughout.
+        if (c.stab && (role == Role::FinalDrop || (main && k >= 1) || (!main && k % 2 == v.stabParity))) set(a, Layer::Stab, S::On);
         if (!c.lead && c.acidBass) set(a, Layer::Acid, S::On);
         break;
     }

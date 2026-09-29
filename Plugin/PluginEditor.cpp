@@ -155,11 +155,21 @@ ParamPage::ParamPage(ParhelionProcessor& p, std::vector<std::pair<Module, int>> 
     : proc_(p), groups_(std::move(groups)), instances_(instances)
 {
     if (instances_ > 1) {
-        for (int i = 0; i < instances_; ++i)
-            instance_.addItem(i < static_cast<int>(names.size()) ? names[static_cast<size_t>(i)] : juce::String(i + 1), i + 1);
-        instance_.setSelectedId(1, juce::dontSendNotification);
-        instance_.onChange = [this] { build(); resized(); repaint(); };
-        addAndMakeVisible(instance_);
+        for (int i = 0; i < instances_; ++i) {
+            auto* b = instanceButtons_.add(new juce::TextButton(i < static_cast<int>(names.size()) ? names[static_cast<size_t>(i)] : juce::String(i + 1)));
+            b->setClickingTogglesState(true);
+            b->setRadioGroupId(0x5041);   // "PA"
+            b->setColour(juce::TextButton::buttonOnColourId, parhui::colour::amber.withAlpha(0.45f));
+            b->setToggleState(i == 0, juce::dontSendNotification);
+            b->onClick = [this, i] {
+                if (selected_ == i) return;
+                selected_ = i;
+                build();
+                resized();
+                repaint();
+            };
+            addAndMakeVisible(b);
+        }
     }
     build();
 }
@@ -172,7 +182,7 @@ void ParamPage::build()
     controls_.clear();
     labels_.clear();
     boxes_.clear();
-    const int inst = instances_ > 1 ? instance_.getSelectedId() - 1 : 0;
+    const int inst = instances_ > 1 ? selected_ : 0;
     ParamStore& s = proc_.store();
     // A control's name in its box, without the box's title in front.
     auto shortName = [](const juce::String& name, const juce::String& title) {
@@ -371,7 +381,8 @@ void ParamPage::resized()
     auto area = getLocalBounds().reduced(10);
     if (instances_ > 1) {
         auto top = area.removeFromTop(26);
-        instance_.setBounds(top.removeFromLeft(160));
+        const int w = std::min(96, top.getWidth() / std::max(1, instances_));
+        for (auto* b : instanceButtons_) b->setBounds(top.removeFromLeft(w).reduced(2, 0));
     }
     area.removeFromTop(6);
     layoutBoxes(area, true);

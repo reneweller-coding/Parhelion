@@ -33,7 +33,7 @@ STYLES = {"Uplifting": "uplifting", "Progressive": "progressive", "Dream House":
 # from their lossy transcodes (a joint-stereo codec's side channel).
 MEASURES = ["bpm", "minutes", "lufs", "lra", "loud20", "breakdown_share", "breakdown_bars", "gap_lu", "b20_60", "b60_150",
             "b150_400", "b400_2k", "b2k_5k", "b5k_16k", "centroid", "side_hi_db", "correlation", "pump_mid",
-            "bass_offbeat", "drop_rise", "drop_rise_low"]
+            "bass_offbeat", "drop_rise", "drop_rise_low", "intro_sus1", "intro_sus2"]
 
 
 def render(style, seed, out, force):
