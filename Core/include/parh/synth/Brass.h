@@ -49,7 +49,10 @@ public:
     void noteOn(int pitch, float velocity, bool unused, double late);
     void noteOff(int pitch);
     void reset();
-    void setPlayers(int n) { players_ = n < 1 ? 1 : (n > kBrassPlayers ? kBrassPlayers : n); }
+    /** @brief Players on a note (1 .. kBrassPlayers, at most the quality's limit): the knob, through update(). */
+    void setPlayers(int n) { players_ = n < 1 ? 1 : (n > playerLimit_ ? playerLimit_ : n); }
+    /** @brief The quality's limit on the players (Deck::setQuest), as StringSection::setPlayerLimit. */
+    void setPlayerLimit(int n) { playerLimit_ = n < 1 ? 1 : (n > kBrassPlayers ? kBrassPlayers : n); }
     void process(float* L, float* R, int n);
     int activePlayers() const;
     /** @brief The deck's shared modulation sources (Modulation.h). */
@@ -86,6 +89,7 @@ private:
     double sr_ = 48000.0;
     uint64_t seed_ = 1;
     int players_ = 3;
+    int playerLimit_ = kBrassPlayers;   ///< setPlayerLimit()
     uint32_t counter_ = 0;
     float level_ = 1.0f, pressure_ = 1.0f, brassiness_ = 0.35f, attackMs_ = 40.0f, releaseMs_ = 150.0f, vibratoCents_ = 6.0f;
     float width_ = 0.6f, lowCutHz_ = 50.0f;

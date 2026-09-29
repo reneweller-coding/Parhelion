@@ -1148,6 +1148,34 @@ void testOrchestra()
     ParamStore ps;
     std::vector<float> v(64);
     {
+        // The Quest's share (Deck::setQuest) is a limit on the knobs: the knob's players come through update() and
+        // stop at it. (Until 29.09.2026 the knob overwrote the Quest's three at the next cell.)
+        auto s = std::make_unique<StringSection>();
+        auto c = std::make_unique<Choir>();
+        auto b = std::make_unique<Brass>();
+        s->prepare(48000.0, 7);
+        c->prepare(48000.0, 7);
+        b->prepare(48000.0, 7);
+        s->setPlayerLimit(3);
+        c->setSingerLimit(3);
+        b->setPlayerLimit(2);
+        ps.readModule(Module::Strings, 0, v.data());
+        v[strings::Players] = 6.0f;
+        s->update(v.data());
+        ps.readModule(Module::Choir, 0, v.data());
+        v[choir::Singers] = 6.0f;
+        c->update(v.data());
+        ps.readModule(Module::Brass, 0, v.data());
+        v[brass::Players] = 4.0f;
+        b->update(v.data());
+        s->noteOn(60, 0.7f, false, 0.0);
+        c->noteOn(60, 0.7f, false, 0.0);
+        b->noteOn(60, 0.7f, false, 0.0);
+        check(s->activeLanes() == 3 && c->activeSingers() == 3 && b->activePlayers() == 2,
+              "the Quest's limit holds against the knobs (players, singers)",
+              fmt("strings %d, choir %d, brass %d", s->activeLanes(), c->activeSingers(), b->activePlayers()));
+    }
+    {
         auto s = std::make_unique<StringSection>();
         s->prepare(48000.0, 7);
         ps.readModule(Module::Strings, 0, v.data());

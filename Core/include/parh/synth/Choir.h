@@ -41,7 +41,10 @@ public:
     void noteOn(int pitch, float velocity, bool unused, double late);
     void noteOff(int pitch);
     void reset();
-    void setSingers(int n) { singers_ = n < 1 ? 1 : (n > kChoirSingers ? kChoirSingers : n); }
+    /** @brief Singers on a note (1 .. kChoirSingers, at most the quality's limit): the knob, through update(). */
+    void setSingers(int n) { singers_ = n < 1 ? 1 : (n > singerLimit_ ? singerLimit_ : n); }
+    /** @brief The quality's limit on the singers (Deck::setQuest), as StringSection::setPlayerLimit. */
+    void setSingerLimit(int n) { singerLimit_ = n < 1 ? 1 : (n > kChoirSingers ? kChoirSingers : n); }
     /** @brief Renders @p n samples, replacing @p L and @p R (scalar: nothing to split into lanes). */
     void process(float* L, float* R, int n);
     int activeSingers() const;
@@ -94,6 +97,7 @@ private:
     double sr_ = 48000.0;
     uint64_t seed_ = 1;
     int singers_ = kChoirSingers;
+    int singerLimit_ = kChoirSingers;   ///< setSingerLimit()
     uint32_t counter_ = 0;
     LfShape lf_[kLfTable];
     float level_ = 1.0f, vowel_ = 0.0f, vibrato_ = 1.0f, breath_ = 0.25f, tension_ = 0.4f, attackMs_ = 250.0f, releaseMs_ = 400.0f;

@@ -88,10 +88,10 @@ void Deck::setQuest(bool on)
         poly_[i].setQuality(on ? (pad ? 5 : 3) : kPolyUnison, on ? (pad ? 6 : 4) : kPolyVoices);
     }
     piano_.setVoiceLimit(on ? 10 : Piano::kVoices);
-    // The orchestra's share: half the players and singers.
-    strings_.setPlayers(on ? 3 : kStringPlayers);
-    choir_.setSingers(on ? 3 : kChoirSingers);
-    brass_.setPlayers(on ? 2 : 3);
+    // The orchestra's share: half the players and singers -- as limits on the knobs (the next cell hands them over).
+    strings_.setPlayerLimit(on ? 3 : kStringPlayers);
+    choir_.setSingerLimit(on ? 3 : kChoirSingers);
+    brass_.setPlayerLimit(on ? 2 : kBrassPlayers);
 }
 
 void Deck::clear()

@@ -67,8 +67,14 @@ public:
     void noteOff(int pitch);
     /** @brief Silence. */
     void reset();
-    /** @brief Players on a note (1 .. kStringPlayers). */
-    void setPlayers(int n) { players_ = n < 1 ? 1 : (n > kStringPlayers ? kStringPlayers : n); }
+    /** @brief Players on a note (1 .. kStringPlayers, at most the quality's limit): the knob, through update(). */
+    void setPlayers(int n) { players_ = n < 1 ? 1 : (n > playerLimit_ ? playerLimit_ : n); }
+    /**
+     * @brief The quality's limit on the players (Deck::setQuest; the Quest's three). Until 29.09.2026 the Quest set the
+     *        players themselves, and the knob's value from update() overwrote them at the next cell: the Quest played
+     *        all six. It takes effect with the next update().
+     */
+    void setPlayerLimit(int n) { playerLimit_ = n < 1 ? 1 : (n > kStringPlayers ? kStringPlayers : n); }
     /** @brief Renders @p n samples, replacing @p L and @p R. */
     void process(float* L, float* R, int n);
     /** @brief With a chosen lane type (float: the scalar reference), for the vector tests. */
@@ -92,6 +98,7 @@ private:
     double sr_ = 48000.0;
     uint64_t seed_ = 1;
     int players_ = kStringPlayers;
+    int playerLimit_ = kStringPlayers;   ///< setPlayerLimit()
     int64_t pos_ = 0;
     uint32_t counter_ = 0;
     // Knobs.
