@@ -10,22 +10,28 @@
 
 namespace parh {
 
-bool MelodyContext::silent(double beat) const
+bool MelodyContext::silent(double beat, Part part) const
 {
-    for (int b : plan->vacuums)
-        if (beat >= 4.0 * b + 3.0 - 1e-9 && beat < 4.0 * (b + 1)) return true;
+    for (const Vacuum& v : plan->vacuums) {
+        if (beat < 4.0 * v.bar + v.from - 1e-9 || beat >= 4.0 * (v.bar + 1)) continue;
+        const bool kick = part == Part::Kick || part == Part::Ghost;
+        return !(v.kickOn4 && kick && std::fabs(beat - (4.0 * v.bar + 3.0)) < 1e-9);
+    }
     return false;
 }
 
 void MelodyContext::note(double beat, double len, Part part, int pitch, float velocity, int shift, bool accent, bool slide) const
 {
-    if (silent(beat)) return;
+    if (silent(beat, part)) return;
     // A note that would ring into a vacuum ends where it starts.
-    for (int b : plan->vacuums) {
-        const double v0 = 4.0 * b + 3.0;
+    for (const Vacuum& vac : plan->vacuums) {
+        const double v0 = 4.0 * vac.bar + vac.from;
         if (beat < v0 && beat + len > v0) len = std::max(0.05, v0 - beat);
     }
-    const float v = vel != nullptr ? clampv(velocity * (1.0f + humanize * vel->bipolar()), 0.05f, 1.0f) : velocity;
+    const uint64_t h = mixSeed(mixSeed(velSeed, static_cast<uint64_t>(std::llround(beat * 960.0))),
+                               static_cast<uint64_t>(static_cast<int>(part) * 128 + std::clamp(pitch, 0, 127)));
+    const float u = static_cast<float>((h >> 40) * (1.0 / 16777216.0)) * 2.0f - 1.0f;
+    const float v = humanize > 0.0f ? clampv(velocity * (1.0f + humanize * u), 0.05f, 1.0f) : velocity;
     score->notes.push_back(NoteEvent{ beat, len, part, std::clamp(pitch, 0, 127), v, shift, accent, slide });
 }
 
@@ -131,13 +137,14 @@ const std::vector<std::vector<int>> kAnthemRhythms = {
     { 0, 3, 6, 10, 12, 16, 19, 22, 26 },           // the syncopated call
 };
 
-/** @brief The lead once, from @p seed (writeLead draws again on a memorisation hit). */
-void writeLeadOnce(const MelodyContext& c, uint64_t seed)
+/** @brief The lead once, from its two streams (writeLead draws again on a memorisation hit). */
+void writeLeadOnce(const MelodyContext& c, uint64_t motifSeed, uint64_t leadSeed)
 {
     const Plan& plan = *c.plan;
     const Harmony& h = *c.harmony;
-    Rng r;
-    r.seed(seed);
+    Rng r, rl;   // the motif's, the versions'
+    r.seed(motifSeed);
+    rl.seed(leadSeed);
     const StepModel& model = corpusModel(c.piano ? CorpusRoleId::Piano : CorpusRoleId::Lead);
     const StepFrame f = frameOf(h);
     // The kind: the anthem motif (long notes) or the sixteenth riff of the EMP melodies; the piano plays its corpus's
@@ -179,7 +186,7 @@ void writeLeadOnce(const MelodyContext& c, uint64_t seed)
     };
     // The steps under the constraints; @p fixed: a step per note that stays (-1: drawn), @p lift: the range moved up,
     // @p cadence: the last note on the tonic where the chord has it.
-    auto drawSteps = [&](Motif& m, int bar, const std::vector<int>& fixed, int lift, bool cadence, int ceiling = 127) {
+    auto drawSteps = [&](Rng& g, Motif& m, int bar, const std::vector<int>& fixed, int lift, bool cadence, int ceiling = 127) {
         const int n = static_cast<int>(m.on.size());
         std::vector<std::array<bool, kCorpusAlpha>> allowed(static_cast<size_t>(n));
         for (int k = 0; k < n; ++k) {
@@ -208,7 +215,7 @@ void writeLeadOnce(const MelodyContext& c, uint64_t seed)
             if (std::abs(d) <= 2) return d < 0 ? 1.6 : d == 0 ? 0.25 : 1.0;
             return std::abs(d) <= 4 ? 0.5 : 0.1;
         };
-        return sampleConstrained(model, n, allowed, shape, r, m.steps);
+        return sampleConstrained(model, n, allowed, shape, g, m.steps);
     };
     // A motif's notes at @p bar that fit its chords (-1 where a tone on a beat has lost its chord).
     auto fitting = [&](const Motif& m, int bar) {
@@ -248,8 +255,8 @@ void writeLeadOnce(const MelodyContext& c, uint64_t seed)
         for (int k = 0; k < tries; ++k) {
             Motif m;
             drawRhythm(m);
-            if (!drawSteps(m, bar, {}, lift, false)) continue;
-            if (riff && !drawSteps(m, bar, repeatCells(m, bar), lift, false)) continue;
+            if (!drawSteps(r, m, bar, {}, lift, false)) continue;
+            if (riff && !drawSteps(r, m, bar, repeatCells(m, bar), lift, false)) continue;
             const double s = motifScore(m, anthem);
             if (s > bestScore) { bestScore = s; out = m; }
         }
@@ -301,13 +308,13 @@ void writeLeadOnce(const MelodyContext& c, uint64_t seed)
             std::vector<int> fixed = fitting(a, bar);
             for (size_t k = a.steps.size() / 2; k < fixed.size(); ++k) fixed[k] = -1;
             Motif v = a;
-            if (drawSteps(v, bar, fixed, 0, true, ceiling)) m = v;
+            if (drawSteps(rl, v, bar, fixed, 0, true, ceiling)) m = v;
         } else {
             // A, A' and B: the tones that fit this bar's chords stay, the others are drawn again.
             const std::vector<int> fixed = fitting(m, bar);
             if (std::find(fixed.begin(), fixed.end(), -1) != fixed.end()) {
                 Motif v = m;
-                if (drawSteps(v, bar, fixed, isB ? 2 : 0, false, ceiling)) m = v;
+                if (drawSteps(rl, v, bar, fixed, isB ? 2 : 0, false, ceiling)) m = v;
             }
         }
         auto pitchOf = [&](size_t k) {
@@ -342,11 +349,12 @@ std::vector<int> topVoice(const Score& sc, size_t from, Part part, int bars)
 
 } // namespace
 
-void writeLead(const MelodyContext& c, uint64_t seed)
+void writeLead(const MelodyContext& c, uint64_t motif, uint64_t lead)
 {
     const size_t n0 = c.score->notes.size();
     for (int attempt = 0; attempt < 16; ++attempt) {
-        writeLeadOnce(c, attempt == 0 ? seed : mixSeed(seed, static_cast<uint64_t>(attempt)));
+        writeLeadOnce(c, attempt == 0 ? motif : mixSeed(motif, static_cast<uint64_t>(attempt)),
+                      attempt == 0 ? lead : mixSeed(lead, static_cast<uint64_t>(attempt)));
         if (!memoHitsAnyBar(topVoice(*c.score, n0, c.piano ? Part::Piano : Part::Lead, c.plan->bars))) return;
         c.score->notes.resize(n0);   // two bars of a known track: drawn again
     }

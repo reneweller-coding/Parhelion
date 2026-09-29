@@ -58,11 +58,16 @@ int pick(Rng& r, std::initializer_list<int> options)
 }
 
 /** @brief The sections of a template, lengths drawn (Planner.h). */
-std::vector<Spec> drawSpecs(const StyleProfile& prof, FormTemplate form, Rng& r)
+std::vector<Spec> drawSpecs(const StyleProfile& prof, FormTemplate form, Rng& r, bool mixable)
 {
     std::vector<Spec> s;
-    const int intro = prof.introBars * (r.uniform() < prof.introLong ? 2 : 1);
-    if (r.uniform() < prof.ambientIntro) s.push_back({ Role::AmbientIntro, std::max(8, prof.ambientIntroBars + 8 * (r.below(3) - 1)) });
+    int intro = prof.introBars * (r.uniform() < prof.introLong ? 2 : 1);
+    // (The draws in the same order as ever, taken or not: a track alone stays the track it was.)
+    if (r.uniform() < prof.ambientIntro) {
+        const int ambientBars = std::max(8, prof.ambientIntroBars + 8 * (r.below(3) - 1));
+        if (!mixable) s.push_back({ Role::AmbientIntro, ambientBars });
+    }
+    if (mixable) intro = std::max(intro, 32);
     s.push_back({ Role::Intro, intro });
     switch (form) {
     case FormTemplate::Anthem:
@@ -104,21 +109,31 @@ std::vector<Spec> drawSpecs(const StyleProfile& prof, FormTemplate form, Rng& r)
             s.push_back({ Role::ShortBreak, pick(r, { 8, 16 }) });
             s.push_back({ Role::Plateau, 32 });
         }
-        s.push_back({ Role::Breakdown, pick(r, { 16, 32 }) });
+        s.push_back({ Role::Breakdown, pick(r, { 24, 32 }) });   // (16 measured 15 bars, under the references' 16 to 32)
         s.push_back({ Role::Build, 8 });
         s.push_back({ Role::MainDrop, pick(r, { 32, 48 }) });
         break;
     }
     case FormTemplate::Drift:
     default:
-        s.push_back({ Role::Groove, 32 });
-        s.push_back({ Role::Breakdown, pick(r, { 32, 48, 64 }) });
+        // (Tools/calibrate.py: the references' breakdowns are 11 to 47 bars and their tracks near nine minutes, so the
+        // length lies in a longer groove, a plateau and the drop.)
+        s.push_back({ Role::Groove, pick(r, { 32, 48 }) });
+        if (r.uniform() < 0.6f) {
+            s.push_back({ Role::ShortBreak, 16 });
+            s.push_back({ Role::Plateau, 32 });
+        }
+        s.push_back({ Role::Breakdown, pick(r, { 32, 32, 40 }) });   // (48 over the references' 11 to 47)
         s.push_back({ Role::Build, 8 });
-        s.push_back({ Role::MainDrop, pick(r, { 32, 48 }) });
+        s.push_back({ Role::MainDrop, pick(r, { 32, 48, 64 }) });
         break;
     }
-    s.push_back({ Role::Outro, prof.outroBars * (r.uniform() < 0.5f ? 2 : 1) });
-    if (r.uniform() < prof.ambientOutro) s.push_back({ Role::AmbientOutro, pick(r, { 8, 16, 16, 24 }) });
+    const int outro = prof.outroBars * (r.uniform() < 0.5f ? 2 : 1);
+    s.push_back({ Role::Outro, mixable ? std::max(outro, 32) : outro });
+    if (r.uniform() < prof.ambientOutro) {
+        const int ambientOutBars = pick(r, { 8, 16, 16, 24 });
+        if (!mixable) s.push_back({ Role::AmbientOutro, ambientOutBars });
+    }
     return s;
 }
 
@@ -134,7 +149,7 @@ int totalBars(const std::vector<Spec>& s)
  *        takes what is left -- never the intro, which would keep the DJ waiting (the first version lengthened it and a
  *        Progressive track ran 104 bars before its groove).
  */
-void fitTo32(std::vector<Spec>& s)
+void fitTo32(std::vector<Spec>& s, int minOutro)
 {
     for (int guard = 0; guard < 8 && totalBars(s) % 32 != 0; ++guard) {
         const int over = totalBars(s) % 32;   // 8, 16 or 24
@@ -144,7 +159,7 @@ void fitTo32(std::vector<Spec>& s)
             if (x.role == Role::Outro) outro = &x;
             if ((x.role == Role::Groove || x.role == Role::Plateau) && groove == nullptr) groove = &x;
         }
-        if (outro != nullptr && outro->bars - over >= 16) outro->bars -= over;
+        if (outro != nullptr && outro->bars - over >= minOutro) outro->bars -= over;
         else if (outro != nullptr && outro->bars + (32 - over) <= 64) outro->bars += 32 - over;
         else if (groove != nullptr) groove->bars += 32 - over;
         else break;
@@ -177,8 +192,51 @@ void rhythm(std::array<LayerState, kNumLayers>& a, const Cast& c, bool withLow =
     set(a, Layer::Clap, LayerState::On);
 }
 
+/**
+ * @brief A section's own variations (its stream, `section<n>`): when the voices that vary enter, the intro's order, the
+ *        mini-break. Every field is drawn for every section, whatever its role, so a stream never shifts; none touches the
+ *        kick or the low end (the breakdown share stays the form's).
+ */
+struct Scatter {
+    int arpFrom = 1;          ///< the groove's block where the arp enters (1 or 2)
+    int stabFrom = 2;         ///< the groove's block where the stab enters (2 or 3)
+    int percFrom = 0;         ///< the groove's block where the percussion enters (0 or 1)
+    int dropArpLate = 0;      ///< a drop's arp a block later (0 or 1)
+    int dropRideLate = 0;     ///< the first drop's ride a block later (0 or 1)
+    bool counterEarly = false;   ///< the main drop's counter from its first quarter, not its half
+    int stabParity = 1;       ///< the main drop's stab on the odd blocks (1) or the even ones (0)
+    bool introSwap = false;   ///< the intro's percussion before its open hat
+    bool counterInPeak = true;   ///< the counter in the breakdown's peak
+    bool arpInPeak = true;       ///< the arp (filtered) in the breakdown's peak
+    int outroPercCut = 2;     ///< the outro's percussion leaves this many blocks before its end (2 or 3)
+    bool miniBreak = false;   ///< a mini-break (a long groove or the first drop)
+    int miniBreakBar = 15;    ///< its bar in the section (15 or 7)
+    int vacuum = 0;           ///< a drop's vacuum before it: the last beat, two beats, the bar, the kick alone on 4
+};
+
+Scatter drawScatter(Rng& r)
+{
+    Scatter s;
+    s.arpFrom = r.uniform() < 0.6f ? 1 : 2;
+    s.stabFrom = r.uniform() < 0.6f ? 2 : 3;
+    s.percFrom = r.uniform() < 0.7f ? 0 : 1;
+    s.dropArpLate = r.uniform() < 0.35f ? 1 : 0;
+    s.dropRideLate = r.uniform() < 0.35f ? 1 : 0;
+    s.counterEarly = r.uniform() < 0.35f;
+    s.stabParity = r.uniform() < 0.6f ? 1 : 0;
+    s.introSwap = r.uniform() < 0.4f;
+    s.counterInPeak = r.uniform() < 0.7f;
+    s.arpInPeak = r.uniform() < 0.6f;
+    s.outroPercCut = r.uniform() < 0.6f ? 2 : 3;
+    s.miniBreak = r.uniform() < 0.6f;
+    s.miniBreakBar = r.uniform() < 0.7f ? 15 : 7;
+    const float uv = r.uniform();
+    s.vacuum = uv < 0.35f ? 0 : uv < 0.6f ? 1 : uv < 0.8f ? 2 : 3;
+    return s;
+}
+
 /** @brief The layer states of block @p k of @p n in a section of role @p role. */
-std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Cast& c, const BreakdownParts* bd, int bar, Rng& r)
+std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Cast& c, const BreakdownParts* bd, int bar, const Scatter& v)
 {
     using S = LayerState;
     auto a = none();
@@ -190,8 +248,10 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
         else if (c.arp) set(a, Layer::Arp, S::Filtered);
         break;
     case Role::Intro: {
-        // Dok. 6: kick alone, hats, bass, open hat, percussion, the filtered pluck; spread over the intro's blocks.
-        const Layer order[] = { Layer::Kick, Layer::ClosedHat, bassLayer, Layer::OpenHat, Layer::Perc, Layer::Pluck };
+        // Dok. 6: kick alone, hats, bass, open hat, percussion, the filtered pluck; spread over the intro's blocks (the
+        // percussion now and then before the open hat: PLAN 6.3's "Streuung").
+        Layer order[] = { Layer::Kick, Layer::ClosedHat, bassLayer, Layer::OpenHat, Layer::Perc, Layer::Pluck };
+        if (v.introSwap && c.perc) std::swap(order[3], order[4]);
         const int steps = 6;
         const int upto = n <= 1 ? 2 : std::min(steps, 1 + (k * (steps - 1) + (n - 2)) / std::max(1, n - 1));
         for (int i = 0; i < upto; ++i) {
@@ -207,11 +267,11 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
     case Role::Groove:
     case Role::Plateau:
         rhythm(a, c);
-        if (c.perc) set(a, Layer::Perc, S::On);
+        if (c.perc && k >= v.percFrom) set(a, Layer::Perc, S::On);
         if (c.pluck) set(a, Layer::Pluck, S::On);
         set(a, Layer::Pad, role == Role::Plateau ? S::On : S::Filtered);
-        if (c.arp && (k >= 1 || role == Role::Plateau)) set(a, Layer::Arp, S::On);
-        if (c.stab && k >= 2) set(a, Layer::Stab, S::On);
+        if (c.arp && (k >= v.arpFrom || role == Role::Plateau)) set(a, Layer::Arp, S::On);
+        if (c.stab && k >= v.stabFrom) set(a, Layer::Stab, S::On);
         if (k == 0 && bar > 0) set(a, Layer::Crash, S::On);
         break;
     case Role::ShortBreak:
@@ -239,10 +299,10 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
         if (k == 0) set(a, Layer::Crash, S::On);
         // A variation every block (Dok. 6: "Variation nach 16 Takten"): the ride, the arp, the counter, the stab.
         const bool main = role != Role::Drop1;
-        if (c.ride && (main || k >= 1)) set(a, Layer::Ride, S::On);
-        if (c.arp && (role == Role::FinalDrop || k >= (main ? 1 : 2))) set(a, Layer::Arp, S::On);
-        if (c.counter && main && k >= n / 2) set(a, Layer::Counter, S::On);
-        if (c.stab && (role == Role::FinalDrop || (main && k % 2 == 1))) set(a, Layer::Stab, S::On);
+        if (c.ride && (main || k >= 1 + v.dropRideLate)) set(a, Layer::Ride, S::On);
+        if (c.arp && (role == Role::FinalDrop || k >= (main ? 1 : 2) + v.dropArpLate)) set(a, Layer::Arp, S::On);
+        if (c.counter && main && k >= (v.counterEarly ? std::max(1, n / 4) : n / 2)) set(a, Layer::Counter, S::On);
+        if (c.stab && (role == Role::FinalDrop || (main && k % 2 == v.stabParity))) set(a, Layer::Stab, S::On);
         if (!c.lead && c.acidBass) set(a, Layer::Acid, S::On);
         break;
     }
@@ -257,8 +317,8 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
             if (!c.lead && c.arp) set(a, Layer::Arp, part == 1 ? S::Filtered : S::On);
         }
         if (part == 2) {
-            if (c.counter) set(a, Layer::Counter, S::On);
-            if (c.arp) set(a, Layer::Arp, S::Filtered);
+            if (c.counter && v.counterInPeak) set(a, Layer::Counter, S::On);
+            if (c.arp && (v.arpInPeak || !c.lead)) set(a, Layer::Arp, S::Filtered);
         }
         break;
     }
@@ -279,7 +339,7 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
         if (k < 2 && c.lead) set(a, Layer::Lead, S::Filtered);
         if (k < 2 && c.pluck) set(a, Layer::Pluck, k == 0 ? S::On : S::Filtered);
         if (k == 0) set(a, Layer::Pad, S::Filtered);
-        if (c.perc && k < n - 2) set(a, Layer::Perc, S::On);
+        if (c.perc && k < n - v.outroPercCut) set(a, Layer::Perc, S::On);
         if (k >= n - 2) set(a, Layer::Clap, S::Off);
         if (k == n - 1) set(a, Layer::OpenHat, S::Off);
         break;
@@ -288,24 +348,37 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
         set(a, Layer::Pad, S::Filtered);
         break;
     }
-    (void)r;
     return a;
 }
 
-/** @brief The whole plan from a list of sections. */
-Plan buildPlan(const StyleProfile& prof, FormTemplate form, const std::vector<Spec>& specs, const Cast& cast, Rng& r)
+/** @brief The whole plan from a list of sections; the matrix's and the energy's streams from @p stream. */
+Plan buildPlan(const StyleProfile& prof, FormTemplate form, const std::vector<Spec>& specs, const Cast& cast, const UnitStream& stream)
 {
     Plan p;
     p.form = form;
     p.beatless = cast.beatless;
     int bar = 0;
     std::vector<Role> roles;
+    // The energy: the table's, scattered by half a point (the main drop stays the peak), rising through a breakdown and
+    // its build.
+    Rng er;
+    er.seed(stream("energy"));
     for (const Spec& s : specs) {
         Section sec;
         sec.beat = 4.0 * bar;
         sec.length = 4.0 * s.bars;
         sec.kind = kindOf(s.role);
         energyOf(s.role, sec.energyFrom, sec.energyTo);
+        const float jf = 0.5f * er.bipolar(), jt = 0.5f * er.bipolar();
+        if (s.role != Role::MainDrop) {
+            sec.energyFrom = std::clamp(sec.energyFrom + jf, 0.0f, 9.5f);
+            sec.energyTo = std::clamp(sec.energyTo + jt, 0.0f, 9.5f);
+        }
+        if (s.role == Role::Breakdown || s.role == Role::Build) sec.energyTo = std::max(sec.energyTo, sec.energyFrom);
+        if (s.role == Role::Build && !p.sections.empty()) {
+            sec.energyFrom = std::max(sec.energyFrom, p.sections.back().energyTo);
+            sec.energyTo = std::max(sec.energyTo, sec.energyFrom);
+        }
         if (s.role == Role::MainDrop) p.mainDrop = static_cast<int>(p.sections.size());
         if (s.role == Role::Breakdown && (p.mainBreakdown < 0 || s.bars >= static_cast<int>(p.sections[static_cast<size_t>(p.mainBreakdown)].length / 4.0)))
             p.mainBreakdown = static_cast<int>(p.sections.size());
@@ -319,13 +392,28 @@ Plan buildPlan(const StyleProfile& prof, FormTemplate form, const std::vector<Sp
             bd.end = bar + s.bars;
             p.breakdowns.push_back(bd);
         }
-        if (kindOf(s.role) == SectionKind::Drop) p.vacuums.push_back(bar - 1);
         p.sections.push_back(sec);
         roles.push_back(s.role);
         bar += s.bars;
     }
     p.bars = bar;
-    // The layer matrix.
+    // The layer matrix: every section's variations on its own stream.
+    const uint64_t matrixSeed = stream("matrix");
+    std::vector<Scatter> scatter;
+    for (size_t i = 0; i < specs.size(); ++i) {
+        Rng sr;
+        sr.seed(mixSeed(matrixSeed, stream("section" + std::to_string(i + 1))));
+        scatter.push_back(drawScatter(sr));
+        // The vacuum before a drop (Phosphene's four).
+        if (kindOf(roles[i]) == SectionKind::Drop) {
+            static const double kFrom[4] = { 3.0, 2.0, 0.0, 3.0 };
+            Vacuum v;
+            v.bar = static_cast<int>(p.sections[i].beat / 4.0) - 1;
+            v.from = kFrom[scatter.back().vacuum];
+            v.kickOn4 = scatter.back().vacuum == 3;
+            p.vacuums.push_back(v);
+        }
+    }
     for (size_t i = 0; i < specs.size(); ++i) {
         const int start = static_cast<int>(p.sections[i].beat / 4.0), n = specs[i].bars / 8;
         const BreakdownParts* bd = nullptr;
@@ -333,7 +421,7 @@ Plan buildPlan(const StyleProfile& prof, FormTemplate form, const std::vector<Sp
         for (int k = 0; k < n; ++k) {
             LayerBlock lb;
             lb.beat = 4.0 * (start + 8 * k);
-            lb.state = blockStates(roles[i], k, n, cast, bd, start + 8 * k, r);
+            lb.state = blockStates(roles[i], k, n, cast, bd, start + 8 * k, scatter[i]);
             const float t = (k + 0.5f) / static_cast<float>(n);
             lb.energy = p.sections[i].energyFrom + (p.sections[i].energyTo - p.sections[i].energyFrom) * t;
             p.blocks.push_back(lb);
@@ -352,8 +440,8 @@ Plan buildPlan(const StyleProfile& prof, FormTemplate form, const std::vector<Sp
         if (get(p.blocks[b].state, Layer::Lead) != LayerState::Off) { p.firstLeadBar = static_cast<int>(p.blocks[b].beat / 4.0); break; }
     for (size_t i = 0; i < specs.size(); ++i) {
         const int start = static_cast<int>(p.sections[i].beat / 4.0);
-        if ((roles[i] == Role::Groove || roles[i] == Role::Drop1) && specs[i].bars >= 32 && !cast.beatless && r.uniform() < 0.6f)
-            p.miniBreaks.push_back(start + 15);
+        if ((roles[i] == Role::Groove || roles[i] == Role::Drop1) && specs[i].bars >= 32 && !cast.beatless && scatter[i].miniBreak)
+            p.miniBreaks.push_back(start + scatter[i].miniBreakBar);
     }
     (void)prof;
     return p;
@@ -400,34 +488,53 @@ float breakdownShare(const Plan& plan)
     return plan.bars > 0 ? static_cast<float>(8.0 * n / plan.bars) : 0.0f;
 }
 
-Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed)
+uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls)
 {
+    uint64_t h = 1469598103934665603ull;
+    for (char ch : name) { h ^= static_cast<uint8_t>(ch); h *= 1099511628211ull; }
+    return mixSeed(mixSeed(seed, h), static_cast<uint64_t>(rerolls));
+}
+
+Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed, bool mixable)
+{
+    return planTrack(prof, bars, [seed](const std::string& name) { return unitSeed(seed, name); }, mixable);
+}
+
+Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable)
+{
+    const uint64_t formSeed = stream("form");
     Rng r;
-    r.seed(seed);
+    r.seed(formSeed);
     const FormTemplate form = static_cast<FormTemplate>(drawWeighted(prof.forms.data(), kFormTemplates, r.uniform()));
-    // The cast: which voices the track has (the same for every candidate).
     Cast cast;
-    const int bassPattern = drawWeighted(prof.bass.data(), kBassPatterns, r.uniform());
-    // The 303 carries the bass where the pattern says so, and always where it is the profile's lead (Acid).
+    cast.beatless = r.uniform() < prof.beatless && !mixable;   // (drawn either way: the stream stays put)
+    // The bass figure; the 303 carries the bass where it says so, and always where it is the profile's lead (Acid).
+    Rng br;
+    br.seed(stream("bass"));
+    const int bassPattern = drawWeighted(prof.bass.data(), kBassPatterns, br.uniform());
     cast.acidBass = bassPattern == static_cast<int>(BassPattern::Acid) || prof.lead == LeadKind::Acid;
     cast.lead = prof.lead == LeadKind::Supersaw || prof.lead == LeadKind::Piano;
-    cast.pluck = r.uniform() < prof.pluck || prof.lead == LeadKind::PluckArp;
-    cast.arp = r.uniform() < prof.arp || prof.lead == LeadKind::PluckArp || prof.lead == LeadKind::Pad;
-    cast.stab = r.uniform() < prof.stab;
-    cast.counter = cast.lead && r.uniform() < prof.counter;
-    cast.ride = r.uniform() < prof.ride;
-    cast.perc = r.uniform() < prof.perc;
-    cast.beatless = r.uniform() < prof.beatless;
+    // The cast: which voices the track has (the same for every candidate).
+    Rng mr;
+    mr.seed(mixSeed(stream("matrix"), 0x43415354ull));   // "CAST"
+    const float uPluck = mr.uniform(), uArp = mr.uniform(), uStab = mr.uniform(), uCounter = mr.uniform();
+    const float uRide = mr.uniform(), uPerc = mr.uniform();
+    cast.pluck = uPluck < prof.pluck || prof.lead == LeadKind::PluckArp;
+    cast.arp = uArp < prof.arp || prof.lead == LeadKind::PluckArp || prof.lead == LeadKind::Pad;
+    cast.stab = uStab < prof.stab;
+    cast.counter = cast.lead && uCounter < prof.counter;
+    cast.ride = uRide < prof.ride;
+    cast.perc = uPerc < prof.perc;
     cast.bassInBreaks = form == FormTemplate::Dream;
     // Candidates: the nearest to the length asked for, inside the profile's breakdown share.
     Plan best;
     double bestScore = 1e30;
     for (int c = 0; c < 8; ++c) {
         Rng cr;
-        cr.seed(mixSeed(seed, 0x43414E44ull + static_cast<uint64_t>(c)));   // "CAND"
-        std::vector<Spec> specs = drawSpecs(prof, form, cr);
-        fitTo32(specs);
-        Plan p = buildPlan(prof, form, specs, cast, cr);
+        cr.seed(mixSeed(formSeed, 0x43414E44ull + static_cast<uint64_t>(c)));   // "CAND"
+        std::vector<Spec> specs = drawSpecs(prof, form, cr, mixable);
+        fitTo32(specs, mixable ? 32 : 16);
+        Plan p = buildPlan(prof, form, specs, cast, stream);
         const float share = breakdownShare(p);
         int introBars = 0;
         for (const Section& s : p.sections) { if (s.kind != SectionKind::Intro) break; introBars += static_cast<int>(s.length / 4.0); }

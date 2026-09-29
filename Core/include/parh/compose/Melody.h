@@ -36,17 +36,23 @@ struct MelodyContext {
     const Harmony* harmony = nullptr;
     Score* score = nullptr;
     float humanize = 0.08f;   ///< velocity scatter (compose.humanize)
-    Rng* vel = nullptr;       ///< its stream
+    /** @brief The scatter's seed: a note's scatter is a hash of it and the note (its beat, part and pitch), so a voice
+     *         drawn again changes no other voice's velocities (PLAN 6.9). */
+    uint64_t velSeed = 0;
     bool piano = false;       ///< the lead is the piano's (Dream House): Part::Piano, legato, the piano corpus, no octave up
     float anthemShare = 0.7f; ///< the chance of the anthem motif (long notes) over the sixteenth riff
-    /** @brief Whether the note at @p beat falls into a vacuum (the last beat before a drop): it is not written. */
-    bool silent(double beat) const;
+    /** @brief Whether a note of @p part at @p beat falls into a vacuum (the silence before a drop): it is not written. */
+    bool silent(double beat, Part part) const;
     /** @brief Adds a note (dropped in a vacuum), its velocity scattered. */
     void note(double beat, double len, Part part, int pitch, float velocity, int shift = 0, bool accent = false, bool slide = false) const;
 };
 
-/** @brief The lead (the motif and its versions, see above). @p seed: the stream `melody`. */
-void writeLead(const MelodyContext& c, uint64_t seed);
+/**
+ * @brief The lead (the motif and its versions, see above).
+ * @param motif the stream `motif`: the kind (anthem or riff), the scale's colour, the motifs A and B
+ * @param lead  the stream `lead`: A', A'' and the tones drawn again where a motif meets other chords
+ */
+void writeLead(const MelodyContext& c, uint64_t motif, uint64_t lead);
 /**
  * @brief The counter: answers in the lead's held tones, an octave over them, chord tones walking down (Phosphene); a held
  *        third or fifth over the riff where the lead has no long notes. Written after the lead.
@@ -61,7 +67,7 @@ void writeStab(const MelodyContext& c, uint64_t seed);
 /**
  * @brief The 303 (Dok. 5): a bar of sixteen steps, the onsets and pitches from the acid corpus (the first step the
  *        chord's root), accents and slides by the rules; two steps drawn again every four bars; the line moves with the
- *        chord's root. @p seed: the stream `bass`.
+ *        chord's root. @p seed: the stream `acid`.
  */
 void writeAcid(const MelodyContext& c, uint64_t seed);
 

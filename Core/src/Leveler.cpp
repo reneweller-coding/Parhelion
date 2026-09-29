@@ -70,9 +70,9 @@ BalanceDb against(const PartPeaks& peaks)
 /**
  * @brief The corrections that bring @p found into the windows. A rank within the kit's two kinds (the hat-like lanes, the
  *        percussion): the two loudest keep their windows, the third's lies 3 dB lower, the others' 6 (Totality's rule:
- *        ten parts pushed up at once flood the mids).
+ *        ten parts pushed up at once flood the mids). @p windowDb moves the voices' windows (LevelMark::windowDb).
  */
-BalanceDb corrections(const Engine& e, const BalanceDb& found)
+BalanceDb corrections(const Engine& e, const BalanceDb& found, float windowDb)
 {
     const ParamStore& ps = e.params();
     int role[kBalLanes] = {};
@@ -98,6 +98,7 @@ BalanceDb corrections(const Engine& e, const BalanceDb& found)
         balanceWindow(p, p < kBalLanes ? role[p] : -1, lo, hi);
         lo -= lower[p];
         hi -= lower[p];
+        if (p > static_cast<int>(BalPart::Bass) && p != static_cast<int>(BalPart::Fx)) { lo += windowDb; hi += windowDb; }
         out[static_cast<size_t>(p)] = std::clamp(f < lo ? lo - f : f > hi ? hi - f : 0.0f, kBalDown, kBalUp);
     }
     return out;
@@ -123,6 +124,52 @@ std::optional<LoudnessReport> measure(Engine& e, const Score& s, double beat, do
         meter.process(l.data(), r.data(), kBlock);
     }
     return meter.report();
+}
+
+/**
+ * @brief The drop as the references were measured (Tools/analyze_ref.py): the whole of it from @p beat for @p seconds
+ *        (at most 150), every 20-second window hopping 5 s -- the loudest window's integrated loudness is the drop's
+ *        (the references' loud20), the loudest 3 s anywhere in it its short-term maximum. A drop that grows (its second
+ *        half an octave up, the choir coming in) is measured where it is loudest, not where it begins.
+ */
+std::optional<LoudnessReport> measureDrop(Engine& e, const Score& s, double beat, double seconds, const std::function<bool()>& stop)
+{
+    seconds = std::clamp(seconds, 20.0, 150.0);
+    const double at = s.tempo.secondsAt(beat);
+    e.seek(s.tempo.beatAt(std::max(0.0, at - kWarm)));
+    std::vector<float> l(kBlock), r(kBlock);
+    const double warm = std::min(kWarm, at);
+    for (int done = 0; done < static_cast<int>(warm * kRate); done += kBlock) {
+        if (stop && stop()) return std::nullopt;
+        e.process(l.data(), r.data(), kBlock);
+    }
+    const int windows = static_cast<int>((seconds - 20.0) / 5.0) + 1;
+    std::vector<LoudnessMeter> meters(static_cast<size_t>(windows));
+    for (LoudnessMeter& m : meters) m.prepare(kRate);
+    LoudnessMeter whole;
+    whole.prepare(kRate);
+    const int total = static_cast<int>(seconds * kRate);
+    for (int done = 0; done < total; done += kBlock) {
+        if (stop && stop()) return std::nullopt;
+        e.process(l.data(), r.data(), kBlock);
+        whole.process(l.data(), r.data(), kBlock);
+        const double t = static_cast<double>(done) / kRate;
+        for (int w = 0; w < windows; ++w)
+            if (t >= 5.0 * w && t < 5.0 * w + 20.0) meters[static_cast<size_t>(w)].process(l.data(), r.data(), kBlock);
+    }
+    LoudnessReport rep = whole.report();
+    double loudest = -120.0;
+    for (LoudnessMeter& m : meters) loudest = std::max(loudest, m.report().integrated);
+    rep.integrated = loudest;
+    return rep;
+}
+
+/** @brief The length in seconds of the section that begins at or contains @p beat. */
+double sectionSeconds(const Score& s, double beat)
+{
+    for (const Section& sec : s.sections)
+        if (beat >= sec.beat - 1e-9 && beat < sec.beat + sec.length) return s.tempo.secondsAt(sec.beat + sec.length) - s.tempo.secondsAt(beat);
+    return 20.0;
 }
 
 /** @brief The main breakdown of the track that begins at @p from: the longest Breakdown section (else Break) after it. */
@@ -167,8 +214,8 @@ void balanceWindow(int part, int role, float& lo, float& hi)
     case BalPart::Pad:     lo = -13.0f; hi = -8.0f;  return;
     case BalPart::Stab:    lo = -12.0f; hi = -7.0f;  return;
     case BalPart::Piano:   lo = -9.0f;  hi = -3.0f;  return;
-    case BalPart::Strings: lo = -13.0f; hi = -7.0f;  return;
-    case BalPart::Choir:   lo = -14.0f; hi = -8.0f;  return;
+    case BalPart::Strings: lo = -16.0f; hi = -10.0f; return;   // (sustained: their energy is more than their peak says)
+    case BalPart::Choir:   lo = -17.0f; hi = -11.0f; return;
     case BalPart::Brass:   lo = -10.0f; hi = -4.0f;  return;
     case BalPart::Timpani: lo = -12.0f; hi = -5.0f;  return;
     case BalPart::Fx:      lo = -12.0f; hi = -5.0f;  return;
@@ -204,11 +251,12 @@ std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, dou
             if (!readParts(*e, s, at, kBalSeconds, peaks, stop)) return {};
         }
         out[i].found = against(peaks);
-        out[i].bal = corrections(*e, out[i].found);
+        out[i].bal = corrections(*e, out[i].found, m.windowDb);
         s.levels[i].balDb = out[i].bal;
     }
 
-    // 2. The breakdown against the drop (twice: the correction, then checked and refined).
+    // 2. The breakdown against the drop (the correction, checked and refined, and checked again: the gap reported is the
+    // one the last correction left).
     const double trackEnd = s.lengthBeats;
     for (size_t i = 0; i < s.levels.size(); ++i) {
         LevelMark& m = s.levels[i];
@@ -217,18 +265,18 @@ std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, dou
         const double end = i + 1 < s.levels.size() ? s.levels[i + 1].beat : trackEnd;
         const Section* bd = mainBreakdown(s, m.beat, end);
         if (bd == nullptr) continue;
-        for (int round = 0; round < 2; ++round) {
+        for (int round = 0; round < 3; ++round) {
             e->load(s);
             // The breakdown's own loudness begins after its first three seconds (the meter's short-term window).
             const double bdSeconds = s.tempo.secondsAt(bd->beat + bd->length) - s.tempo.secondsAt(bd->beat) - 3.0;
             const std::optional<LoudnessReport> rb = measure(*e, s, s.tempo.beatAt(s.tempo.secondsAt(bd->beat) + 3.0),
                                                              std::max(3.5, bdSeconds), stop, 3.0);
-            const std::optional<LoudnessReport> rd = measure(*e, s, m.peakBeat, seconds, stop);
+            const std::optional<LoudnessReport> rd = measureDrop(*e, s, m.peakBeat, std::max(seconds, sectionSeconds(s, m.peakBeat)), stop);
             if (!rb || !rd) return {};
             const float gap = static_cast<float>(rd->shortTermMax - rb->shortTermMax);
             if (round == 0) out[i].gapBefore = gap;
             out[i].gapAfter = gap;
-            if (std::fabs(gap - m.gapLu) < 0.4f) break;
+            if (std::fabs(gap - m.gapLu) < 0.4f || round == 2) break;
             m.breakDb = std::clamp(m.breakDb + (gap - m.gapLu), -kBreakMost, kBreakMost);
         }
         out[i].breakDb = m.breakDb;
@@ -252,7 +300,7 @@ std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, dou
                 worst = std::max(worst, static_cast<float>(rb->shortTermMax));
             }
             if (worst <= -99.0f) break;
-            const std::optional<LoudnessReport> rd = measure(*e, s, m.peakBeat, seconds, stop);
+            const std::optional<LoudnessReport> rd = measureDrop(*e, s, m.peakBeat, std::max(seconds, sectionSeconds(s, m.peakBeat)), stop);
             if (!rd) return {};
             const float over = worst - static_cast<float>(rd->shortTermMax - 1.0);
             if (over <= 0.25f) break;
@@ -265,7 +313,7 @@ std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, dou
     for (size_t i = 0; i < s.levels.size(); ++i) {
         const LevelMark& m = s.levels[i];
         if (std::isnan(m.targetLufs)) continue;
-        const std::optional<LoudnessReport> got = measure(*e, s, m.peakBeat, seconds, stop);
+        const std::optional<LoudnessReport> got = measureDrop(*e, s, m.peakBeat, std::max(seconds, sectionSeconds(s, m.peakBeat)), stop);
         if (!got) return {};
         out[i].measured = static_cast<float>(got->integrated);
         out[i].trim = out[i].measured > -70.0f ? std::clamp(m.targetLufs - out[i].measured, -kMostDb, kMostDb) : 0.0f;
@@ -274,7 +322,8 @@ std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, dou
     e->load(s);
     for (size_t i = 0; i < s.levels.size(); ++i) {
         if (std::isnan(s.levels[i].targetLufs)) continue;
-        const std::optional<LoudnessReport> got = measure(*e, s, s.levels[i].peakBeat, seconds, stop);
+        const std::optional<LoudnessReport> got = measureDrop(*e, s, s.levels[i].peakBeat,
+                                                              std::max(seconds, sectionSeconds(s, s.levels[i].peakBeat)), stop);
         if (!got) return {};
         const float again = static_cast<float>(got->integrated);
         if (again > -70.0f) out[i].trim = std::clamp(out[i].trim + (out[i].target - again), -kMostDb, kMostDb);

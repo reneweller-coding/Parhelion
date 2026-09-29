@@ -21,7 +21,9 @@
 #include "parh/compose/Melody.h"
 #include "parh/compose/Memo.h"
 #include "parh/compose/Planner.h"
+#include "parh/compose/Set.h"
 #include "parh/compose/Study.h"
+#include "parh/compose/Style.h"
 #include "parh/mix/TranceGate.h"
 #include "parh/synth/Kick.h"
 #include "parh/synth/Brass.h"
@@ -40,6 +42,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <tuple>
 #include <vector>
 
 using namespace parh;
@@ -497,7 +500,9 @@ void testPlanner()
                 if (!ok) { ++bad[3]; where += fmt("%s/%llu lead first in %s; ", prof.name, static_cast<unsigned long long>(seed), kSectionNames[static_cast<int>(k)]); }
             }
             for (size_t i = 1; i < plan.sections.size(); ++i)
-                if (plan.sections[i].kind == SectionKind::Drop && !contains(plan.vacuums, static_cast<int>(plan.sections[i].beat / 4.0) - 1)) ++bad[4];
+                if (plan.sections[i].kind == SectionKind::Drop
+                    && std::none_of(plan.vacuums.begin(), plan.vacuums.end(), [&](const Vacuum& v) { return v.bar == static_cast<int>(plan.sections[i].beat / 4.0) - 1; }))
+                    ++bad[4];
             if (std::abs(plan.bars - ask) > ask / 4) { ++bad[5]; where += fmt("%s/%llu %d bars for %d; ", prof.name, static_cast<unsigned long long>(seed), plan.bars, ask); }
             const float share = breakdownShare(plan);
             if (share < prof.breakdownLow - 0.1f || share > prof.breakdownHigh + 0.1f) {
@@ -550,14 +555,14 @@ void testHarmony()
                 }
                 const std::array<int, 4> v = voicePad(h, bar, prev, bar == 0);
                 prev = v;
-                if (v[0] < 57 || ((v[0] - h.key - h.shift[static_cast<size_t>(bar)]) % 12 + 12) % 12 == ((h.bars[static_cast<size_t>(bar)].tones[0]) % 12 + 12) % 12) ++voiceBad;
+                if (v[0] < 52 || ((v[0] - h.key - h.shift[static_cast<size_t>(bar)]) % 12 + 12) % 12 == ((h.bars[static_cast<size_t>(bar)].tones[0]) % 12 + 12) % 12) ++voiceBad;
             }
         }
     }
     check(liftBad == 0, "the two bars before a drop on VII (major: V)", fmt("%d drops", liftBad));
     check(resolveBad == 0, "the drop resolves on the tonic chord", fmt("%d drops", resolveBad));
     check(scaleBad == 0, "every chord tone in the chord's scale (the major V of harmonic minor aside)", fmt("%d tones", scaleBad));
-    check(voiceBad == 0, "the pad's lowest voice a third or a fifth, from A3 up", fmt("%d voicings", voiceBad));
+    check(voiceBad == 0, "the pad's lowest voice a third or a fifth, from E3 up", fmt("%d voicings", voiceBad));
     std::printf("         (%d of the plans change key)\n", keyChanges);
 }
 
@@ -575,17 +580,96 @@ void testComposer()
         same = a.notes[i].beat == b.notes[i].beat && a.notes[i].pitch == b.notes[i].pitch && a.notes[i].part == b.notes[i].part
             && a.notes[i].velocity == b.notes[i].velocity;
     check(same && !a.notes.empty(), "the same seed, the same score", fmt("%zu notes", a.notes.size()));
-    Curation cur;
-    cur.reroll("melody");
-    const Score c = composeTrack(*p, 21, TrackRequest{}, &cur);
-    auto partNotes = [](const Score& s, std::initializer_list<Part> parts) {
-        std::vector<std::pair<double, int>> out;
-        for (const NoteEvent& n : s.notes) for (Part q : parts) if (n.part == q) out.push_back({ n.beat, n.pitch });
+    // PLAN 6.9: a unit rerolled draws its voices again and leaves every other note as it was, to the velocity.
+    using Key = std::tuple<double, double, int, int, float>;
+    auto notesOf = [](const Score& s, std::initializer_list<Part> parts, bool inside) {
+        std::vector<Key> out;
+        for (const NoteEvent& n : s.notes) {
+            const bool in = std::find(parts.begin(), parts.end(), n.part) != parts.end();
+            if (in == inside) out.push_back({ n.beat, n.length, static_cast<int>(n.part), n.pitch, n.velocity });
+        }
         return out;
     };
-    check(partNotes(a, { Part::Kick, Part::Perc1, Part::Perc3, Part::Bass, Part::Sub, Part::Pad }) == partNotes(c, { Part::Kick, Part::Perc1, Part::Perc3, Part::Bass, Part::Sub, Part::Pad }),
-          "a rerolled melody leaves the drums, the bass and the pad as they were");
-    check(partNotes(a, { Part::Lead }) != partNotes(c, { Part::Lead }) || partNotes(a, { Part::Lead }).empty(), "and draws the lead again");
+    auto sameForm = [](const Score& x, const Score& y) {
+        bool s = x.sections.size() == y.sections.size();
+        for (size_t i = 0; s && i < x.sections.size(); ++i) s = x.sections[i].beat == y.sections[i].beat && x.sections[i].kind == y.sections[i].kind;
+        return s;
+    };
+    struct Case { const char* style; const char* unit; std::initializer_list<Part> parts; };
+    const Case cases[] = {
+        { "Uplifting", "motif", { Part::Lead, Part::Counter, Part::Strings } },
+        { "Uplifting", "lead", { Part::Lead, Part::Counter, Part::Strings } },
+        { "Uplifting", "arp", { Part::Arp } },
+        { "Uplifting", "pluck", { Part::Pluck, Part::Stab } },
+        { "Uplifting", "drums", { Part::Perc1, Part::Perc2, Part::Perc3, Part::Perc4, Part::Perc5, Part::Perc6, Part::Perc7, Part::Perc8, Part::Perc9, Part::Perc10 } },
+        { "Uplifting", "fx", { Part::Fx } },
+        { "Uplifting", "sounds", {} },
+        { "Acid", "acid", { Part::Acid } },
+        { "Dream House", "motif", { Part::Piano, Part::Counter, Part::Strings } },
+    };
+    int isolated = 0, changed = 0, total = 0;
+    std::string bad;
+    for (const Case& k : cases) {
+        auto q = std::make_unique<ParamStore>();
+        q->parseText(std::string("compose.style=") + k.style);
+        for (uint64_t seed : { 21ull, 22ull }) {
+            const Score base = composeTrack(*q, seed);
+            Curation cur;
+            cur.reroll(k.unit);
+            const Score re = composeTrack(*q, seed, TrackRequest{}, &cur);
+            ++total;
+            const bool iso = notesOf(base, k.parts, false) == notesOf(re, k.parts, false) && sameForm(base, re);
+            // (Its own: its notes, or its automation and knob sets -- the effects' throws, the sounds.)
+            bool automation = base.gestures.size() != re.gestures.size() || base.knobs.size() != re.knobs.size();
+            for (size_t i = 0; !automation && i < base.gestures.size(); ++i)
+                automation = base.gestures[i].param != re.gestures[i].param || base.gestures[i].beat != re.gestures[i].beat || base.gestures[i].to != re.gestures[i].to;
+            for (size_t i = 0; !automation && i < base.knobs.size(); ++i) automation = base.knobs[i].value != re.knobs[i].value;
+            const bool moved = automation || notesOf(base, k.parts, true) != notesOf(re, k.parts, true) || notesOf(base, k.parts, true).empty();
+            isolated += iso;
+            changed += moved;
+            if (!iso || !moved) bad += std::string(" ") + k.style + "/" + k.unit;
+        }
+    }
+    check(isolated == total, "a rerolled unit leaves every other voice as it was, to the velocity", fmt("%d of %d%s", isolated, total, bad.c_str()));
+    check(changed == total, "and draws its own voices again", fmt("%d of %d", changed, total));
+    // The matrix and a section: the form stays, the matrix moves.
+    int formKept = 0, matrixMoved = 0;
+    for (uint64_t seed = 1; seed <= 6; ++seed) {
+        const Score base = composeTrack(*p, seed);
+        for (const char* u : { "matrix", "section5" }) {
+            Curation cur;
+            cur.reroll(u);
+            const Score re = composeTrack(*p, seed, TrackRequest{}, &cur);
+            formKept += sameForm(base, re);
+            bool kept = base.layers.size() == re.layers.size();
+            for (size_t i = 0; kept && i < base.layers.size(); ++i) kept = base.layers[i].state == re.layers[i].state;
+            matrixMoved += !kept;
+        }
+    }
+    check(formKept == 12, "a rerolled matrix or section keeps the form", fmt("%d of 12", formKept));
+    check(matrixMoved >= 6, "and moves the layer matrix (mostly)", fmt("%d of 12", matrixMoved));
+    // The vacuum before a drop (rule 5, Phosphene's four): all four drawn over some tracks, and nothing sounds in one but
+    // the kick on the last beat where the variant keeps it.
+    int kinds[4] = {}, loud = 0;
+    for (uint64_t seed = 1; seed <= 12; ++seed) {
+        const StyleProfile& prof = styleProfile(Style::Uplifting);
+        const Plan plan = planTrack(prof, 256, seed);
+        for (const Vacuum& v : plan.vacuums) ++kinds[v.kickOn4 ? 3 : v.from == 3.0 ? 0 : v.from == 2.0 ? 1 : 2];
+        TrackRequest req;
+        req.profile = &prof;
+        req.bars = 256;   // (the plan above)
+        const Score sc = composeTrack(*p, seed, req);
+        for (const NoteEvent& n : sc.notes) {
+            if (n.part == Part::Fx) continue;   // (the riser and the reverse crash run into the drop)
+            for (const Vacuum& v : plan.vacuums)
+                if (n.beat >= 4.0 * v.bar + v.from - 1e-9 && n.beat < 4.0 * (v.bar + 1)
+                    && !(v.kickOn4 && (n.part == Part::Kick || n.part == Part::Ghost) && n.beat == 4.0 * v.bar + 3.0))
+                    ++loud;
+        }
+    }
+    check(kinds[0] > 0 && kinds[1] > 0 && kinds[2] > 0 && kinds[3] > 0, "the four vacuums before a drop",
+          fmt("a beat %d, two beats %d, the bar %d, the kick alone on 4 %d", kinds[0], kinds[1], kinds[2], kinds[3]));
+    check(loud == 0, "nothing sounds in a vacuum but the kick it keeps", fmt("%d notes", loud));
 }
 
 /**
@@ -732,7 +816,7 @@ void testMelody()
             mc.score = &sc;
             mc.piano = prof.lead == LeadKind::Piano;
             mc.anthemShare = mc.piano ? 1.0f : 0.7f;
-            writeLead(mc, seed * 131);
+            writeLead(mc, seed * 131, seed * 137);
             std::vector<int> top(static_cast<size_t>(plan.bars) * 16, -1);
             int n = 0;
             for (const NoteEvent& e : sc.notes) {
@@ -1162,6 +1246,137 @@ void testOrchestraBlocks()
     check(diffB == 0 && diffC == 0, "37 and 1 equal 512, bit for bit", fmt("%zu and %zu samples differ", diffB, diffC));
 }
 
+/**
+ * The sub-genres (PLAN 6.7, Phase 4c): each profile brings its own voice -- Acid the 303 with its four curves rising
+ * to the filter's peaks, Deep the pad drifting and the granular cloud, Dream House the piano, Uplifting the orchestra
+ * in some tracks -- and a morph between two profiles lands between them.
+ */
+void testSubGenres()
+{
+    section("the sub-genres");
+    auto p = std::make_unique<ParamStore>();
+    auto gesturesOn = [&](const Score& sc, Module m, int param) {
+        const int id = p->id(m, 0, param);
+        int n = 0;
+        for (const Gesture& g : sc.gestures) n += g.param == id;
+        return n;
+    };
+    auto knobOf = [&](const Score& sc, Module m, int param, float& value) {
+        const int id = p->id(m, 0, param);
+        for (const KnobSet& k : sc.knobs) if (k.param == id) { value = k.value; return true; }
+        return false;
+    };
+    {
+        p->parseText("compose.style=Acid");
+        const Score sc = composeTrack(*p, 3);
+        int acid = 0;
+        for (const NoteEvent& n : sc.notes) acid += n.part == Part::Acid;
+        const int curves = std::min({ gesturesOn(sc, Module::Acid, synth::Cutoff), gesturesOn(sc, Module::Acid, synth::Resonance),
+                                      gesturesOn(sc, Module::Acid, synth::EnvAmount), gesturesOn(sc, Module::Acid, synth::Decay) });
+        check(acid > 500 && curves >= 4, "Acid: the 303 plays, its cutoff, resonance, envelope and decay in curves", fmt("%d notes, %d curves each at least", acid, curves));
+    }
+    {
+        p->parseText("compose.style=Deep");
+        const Score sc = composeTrack(*p, 3);
+        float cloud = -60.0f;
+        const bool has = knobOf(sc, Module::Cloud, cloud::Level, cloud);
+        int drift = 0;
+        for (const Gesture& g : sc.gestures) drift += g.param == p->id(Module::Poly, static_cast<int>(PolyInstance::Pad), poly::Pan);
+        check(has && cloud > -30.0f && drift > 4, "Deep: the granular cloud and the pad drifting", fmt("cloud %.0f dB, %d pan waves", cloud, drift));
+    }
+    {
+        p->parseText("compose.style=Dream House");
+        const Score sc = composeTrack(*p, 3);
+        int piano = 0, lead = 0;
+        for (const NoteEvent& n : sc.notes) { piano += n.part == Part::Piano; lead += n.part == Part::Lead; }
+        check(piano > 50 && lead == 0, "Dream House: the motif on the piano", fmt("%d piano notes", piano));
+    }
+    {
+        p->parseText("compose.style=Uplifting");
+        int with = 0;
+        for (uint64_t seed = 1; seed <= 8; ++seed) {
+            const Score sc = composeTrack(*p, seed);
+            bool o = false;
+            for (const NoteEvent& n : sc.notes) o = o || n.part == Part::Strings;
+            with += o;
+        }
+        check(with >= 2 && with <= 7, "Uplifting: the orchestra in some tracks (Cinematic), not in all", fmt("%d of 8", with));
+    }
+    {
+        const StyleProfile m = morphProfile(styleProfile(Style::Uplifting), styleProfile(Style::Deep), 0.5f);
+        const StyleProfile& a = styleProfile(Style::Uplifting);
+        const StyleProfile& b = styleProfile(Style::Deep);
+        const bool between = (m.bpmLow - a.bpmLow) * (m.bpmLow - b.bpmLow) <= 0.0f && (m.gapLu - a.gapLu) * (m.gapLu - b.gapLu) <= 0.0f
+                          && (m.orchestra - a.orchestra) * (m.orchestra - b.orchestra) <= 0.0f;
+        check(between, "a morph lands between its two profiles", fmt("tempo from %.0f, gap %.1f LU", m.bpmLow, m.gapLu));
+    }
+    p->parseText("compose.style=Uplifting");
+}
+
+/**
+ * The set (PLAN 6.8, Phase 5): tracks alternate between the decks; the tempo moves at most 2 BPM a track; the keys move
+ * round the Camelot wheel (the same, a fifth, the relative -- the energy boost and a free choice rare); every incoming
+ * track's intro lies over the outgoing end, its bass swap before its groove and no breakdown of it before the swap; the
+ * outgoing track gives the low end up where the incoming one takes it; and a blend renders bit for bit at any block size.
+ */
+void testSet()
+{
+    section("the set");
+    auto p = std::make_unique<ParamStore>();
+    p->parseText("set.dramaturgy=Peak; set.journey=Wander");
+    SetInfo si;
+    const SetScore set = composeSet(*p, 5, 70.0, nullptr, &si);
+    const size_t n = si.tracks.size();
+    check(n >= 8, "a set of seventy minutes has its tracks", fmt("%zu tracks", n));
+    int alternate = 0, tempoOk = 0, wheel = 0, swapOk = 0, clean = 0, styles = 0;
+    std::set<std::string> seen;
+    for (size_t i = 0; i < n; ++i) {
+        const SetTrack& t = si.tracks[i];
+        seen.insert(t.info.style);
+        if (i == 0) continue;
+        const SetTrack& a = si.tracks[i - 1];
+        alternate += t.deck != a.deck;
+        tempoOk += std::fabs(t.info.bpm - a.info.bpm) <= 2.0f;
+        const int d = ((t.info.key - a.info.key) % 12 + 12) % 12;
+        const bool am = a.info.scale != static_cast<int>(Scale::Ionian), tm = t.info.scale != static_cast<int>(Scale::Ionian);
+        const bool camelot = (am == tm && (d == 0 || d == 5 || d == 7)) || (am && !tm && d == 3) || (!am && tm && d == 9);
+        wheel += camelot;
+        swapOk += std::fabs(a.swapOut - t.swapIn) < 1e-9 && t.swapIn > t.start && t.swapIn < a.end && t.start + t.info.introBars * 4.0 <= a.end + 1e-9;
+        bool breakdownBefore = false;
+        for (const auto& b : t.info.breakdowns) breakdownBefore = breakdownBefore || t.start + b.first * 4.0 < t.swapIn;
+        clean += !breakdownBefore;
+    }
+    styles = static_cast<int>(seen.size());
+    const int k = static_cast<int>(n) - 1;
+    check(alternate == k && tempoOk == k, "decks alternate, the tempo moves at most 2 BPM a track");
+    check(wheel >= k * 7 / 10, "the keys move round the Camelot wheel", fmt("%d of %d transitions", wheel, k));
+    check(swapOk == k && clean == k, "the incoming intro over the outgoing end, one bass swap, no incoming breakdown before it",
+          fmt("%d and %d of %d", swapOk, clean, k));
+    check(styles >= 2, "with Wander the styles follow the arc", fmt("%d styles", styles));
+    // A blend at any block size.
+    const double at = set.decks[0].tempo.secondsAt(si.tracks[1].swapIn) - 3.0;
+    auto render = [&](int block) {
+        auto e = std::make_unique<Engine>();
+        e->params().copyValuesFrom(*p);
+        e->prepare(48000.0, block);
+        e->loadSet(set);
+        e->seek(set.decks[0].tempo.beatAt(at));
+        std::vector<float> out, L(static_cast<size_t>(block)), R(static_cast<size_t>(block));
+        const int total = static_cast<int>(6.0 * 48000.0);
+        for (int done = 0; done < total; done += block) {
+            const int m = std::min(block, total - done);
+            e->process(L.data(), R.data(), m);
+            for (int i = 0; i < m; ++i) out.push_back(L[static_cast<size_t>(i)]);
+        }
+        return out;
+    };
+    const std::vector<float> x = render(512), y = render(37);
+    size_t diff = 0;
+    double peak = 0.0;
+    for (size_t i = 0; i < x.size(); ++i) { diff += std::memcmp(&x[i], &y[i], sizeof(float)) != 0; peak = std::max(peak, static_cast<double>(std::fabs(x[i]))); }
+    check(diff == 0 && peak > 0.01, "the first bass swap at block sizes 37 and 512, bit for bit", fmt("%zu samples differ, peak %.2f", diff, peak));
+}
+
 struct TestSection {
     const char* name;
     std::function<void()> fn;
@@ -1191,6 +1406,8 @@ const TestSection kSections[] = {
     { "testPianoBlocks", testPianoBlocks },
     { "testOrchestra", testOrchestra },
     { "testOrchestraBlocks", testOrchestraBlocks },
+    { "testSubGenres", testSubGenres },
+    { "testSet", testSet },
 };
 
 } // namespace

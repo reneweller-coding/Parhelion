@@ -7,6 +7,7 @@ add_library(ParhelionCore STATIC
     src/Halfband.cpp
     src/Loudness.cpp
     src/Leveler.cpp
+    src/fx/Cloud.cpp
     src/fx/Dynamics.cpp
     src/fx/Reverb.cpp
     src/fx/Plate.cpp
@@ -33,12 +34,14 @@ add_library(ParhelionCore STATIC
     src/compose/Harmony.cpp
     src/compose/Melody.cpp
     src/compose/Composer.cpp
+    src/compose/Set.cpp
     src/compose/Corpus.cpp
     src/compose/CorpusTables.cpp
     src/compose/Memo.cpp
     src/compose/MemoFilter.cpp
     src/SetFile.cpp
     src/Deck.cpp
+    src/Export.cpp
     src/Engine.cpp
     src/Cue.cpp
 )

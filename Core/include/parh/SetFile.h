@@ -2,12 +2,12 @@
  * @file SetFile.h
  * @brief Curation and the `.parhset` file (PLAN 7.8, 9): a track or a set as seed, settings and rerolls.
  *
- * The composer writes every part of a track on its own stream (Composer.h): the form, the harmony, the drums, the bass,
- * the chords, the melody, the effects, the sounds, the mix; the set composer its order, tempo and blends (Set.h).
- * **Rerolling** one of them draws it again and leaves every other bit for bit as it was -- the user curates instead of
- * programming. A reroll is a counter per unit that moves the unit's stream (`form`, `harmony`, `drums`, `bass`, `chords`,
- * `melody`, `fx`, `sounds`, `mix`); in a set the same prefixed with the track (`track3.melody`) plus `set` for the
- * order, the styles and the keys. What is not rerolled is locked.
+ * The composer writes every part of a track on its own stream (Composer.h, PLAN 6.9); the set composer its order, tempo
+ * and blends (Set.h). **Rerolling** one of them draws it again and leaves every other bit for bit as it was -- the user
+ * curates instead of programming. A reroll is a counter per unit that moves the unit's stream (`form`, `matrix`,
+ * `energy`, `harmony`, `motif`, `lead`, `bass`, `acid`, `arp`, `pluck`, `piano`, `orchestra`, `drums`, `fx`, `sounds`,
+ * `section<n>`); in a set the same prefixed with the track (`track3.motif`), `track<n>` for the whole track, and `set`
+ * for the order, the styles and the keys. What is not rerolled is locked.
  *
  * The `.parhset` is text in the style of Ephemeris' `.ephset`:
  * @code
@@ -15,8 +15,8 @@
  *   seed=11
  *   minutes=7
  *   set=120
- *   reroll track3.events=1
- *   param compose.style=Ostgut
+ *   reroll track3.motif=1
+ *   param compose.style=Uplifting
  * @endcode
  * Only the parameters that differ from their defaults are written.
  *

@@ -3,12 +3,13 @@
  * @brief Score cues for a visualiser (PLAN 10.3): what the score knows, sent over OSC at the moment it is heard.
  *
  * Kaleidoscope guesses beat and section from the audio it is fed. Parhelion does not have to guess: it wrote the score.
- * So it says so, over UDP as OSC 1.0:
+ * So it says so, over UDP as OSC 1.0 -- the breakdown and the drop above all, the most rewarding moments for a visual
+ * (PLAN 8):
  * @code
  *   /parh/beat i f      beat number, tempo in BPM                         on every beat
  *   /parh/bar i         bar number                                         on every bar
- *   /parh/block s       the block's name ("Intro", "Block 3", "Reduction", "Return", "Outro", a set's track)   at its start
- *   /parh/op s          the form's operation ("add ride", "remove chord", "kick out")                         where it acts
+ *   /parh/block s       the section ("Intro", "Groove", "Breakdown", "Build", "Drop", "Outro", a set's track)   at its start
+ *   /parh/op s          a change of the layer matrix ("add lead", "filter pluck")                             where it acts
  *   /parh/key s         the track's key as a Camelot label ("8A")                                            where a track begins
  * @endcode
  *

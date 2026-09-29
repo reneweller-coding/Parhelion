@@ -43,7 +43,7 @@ public:
      */
     enum Stem : int { kStemKick = 0, kStemSub, kStemBass, kStemAcid, kStemHats, kStemPerc, kStemLead, kStemCounter, kStemPluck,
                       kStemArp, kStemPad, kStemStab, kStemPiano, kStemStrings, kStemChoir, kStemBrass, kStemTimpani, kStemRoom,
-                      kStemPlate, kStemHall, kStemFx, kStemMixFx, kStems };
+                      kStemPlate, kStemHall, kStemCloud, kStemFx, kStemMixFx, kStems };
     static_assert(static_cast<int>(kStemMixFx) == static_cast<int>(Deck::kStems), "the stems are the deck's and the mixer's");
     /** @brief Name of stem @p s. */
     static const char* stemName(int s);

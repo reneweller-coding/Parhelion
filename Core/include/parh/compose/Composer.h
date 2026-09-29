@@ -26,8 +26,15 @@
  * in a breakdown, the group's high pass drawn up over the last bars of a build; a delay throw on the lead before a
  * breakdown; the pad's trance gate in the drops.
  *
- * **Streams.** Every unit draws on its own stream of the seed: `form`, `harmony`, `drums`, `bass`, `chords`, `melody`,
- * `fx`, `mix` (SetFile.h). A set asks for a track with its own tempo, key and energy (TrackRequest).
+ * **Streams** (PLAN 6.9). Every unit draws on its own stream of the seed and is rerolled alone, the rest staying the same
+ * to the bit (SetFile.h, Curation): `form` (the template, the lengths, the minutes), `matrix` (the cast; with
+ * `section<n>` a section's variations, Planner.h), `energy` (the curve and what follows it: the 303's peaks, the pad's
+ * opening), `harmony` (the tempo, the key, the progression), `motif` (the lead's motifs), `lead` (their versions, the
+ * counter), `bass` (the figure), `acid` (the 303's line and curves), `arp`, `pluck` (the pluck and the stab), `piano` (the
+ * instrument), `orchestra` (whether it plays), `drums`, `fx` (the risers' lengths, the sweeps, the throws), `sounds` (the
+ * gate, the choir's vowel, the brass's blare, the pad's drift, the cloud). The velocity scatter is a hash of the track's
+ * seed and each note. A set asks for a track with its own tempo, key and energy (TrackRequest); its units are
+ * `track<n>.<unit>`.
  */
 #pragma once
 #include "parh/Params.h"
@@ -49,6 +56,7 @@ struct TrackRequest {
     int scale = -1;                          ///< -1: drawn or compose.scale
     int bars = 0;                            ///< 0: from compose.minutes (or the profile's lengths with compose.auto)
     float energy = -1.0f;                    ///< the set's energy here, 0..1 (-1: a track alone)
+    bool mixable = false;                    ///< a set's track: DJ intro and outro of 32 bars at least (planTrack)
 };
 
 /** @brief What a track tells the set, the cues and the displays. */
@@ -62,6 +70,11 @@ struct TrackInfo {
     int breakdownBar = -1;       ///< the main breakdown's first bar
     int firstLeadBar = -1;       ///< where the lead is first heard
     bool orchestra = false;      ///< the orchestra plays (Cinematic)
+    int introBars = 0;           ///< the intro's bars (the first groove's first bar)
+    int bassBar = 0;             ///< the first bar with the sub (a blend's bass swap lands the incoming track here)
+    int outroBar = 0;            ///< the last outro's first bar
+    std::vector<std::pair<int, int>> breakdowns;   ///< every breakdown and break, bars [from, to)
+    std::vector<int> drops;      ///< every drop's first bar
     int keyChangeBar = -1;       ///< the Cinematic key change (-1: none)
     std::string progression;     ///< "i-VI-III-VII"
     std::string bass;            ///< the bass figure
@@ -69,8 +82,9 @@ struct TrackInfo {
     bool beatless = false;
 };
 
-/** @brief The names of a track's units, in stream order. */
-extern const char* const kUnitNames[8];
+/** @brief The names of a track's units (and `section<n>`, n from 1, for each of its sections). */
+constexpr int kUnitCount = 15;
+extern const char* const kUnitNames[kUnitCount];
 
 /**
  * @brief Writes one track, beat 0 its first bar.

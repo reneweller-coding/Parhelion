@@ -24,7 +24,8 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 4b gebaut (29.09.2026).**
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 5 gebaut (29.09.2026); als nächstes 5b, die Klangbänke und die
+Modulation (12).**
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
@@ -220,6 +221,79 @@ Stem, Balance-Spur (Fenster [I]) und MIDI-Spur; Messwerkzeug `parh_orchprobe` (`
   Streicher −8, Blech −6, Pauken −10 dB gegen die Kick, der Breakdown 1.8 LU unter dem Drop (zuerst lagen die
   Streicher 8 dB **über** der Kick und der Breakdown über dem Drop: die Pegel der Instrumente um 16, 6 und 6 dB
   gesenkt). Hörfiles: `out/hoeren_p4b` (Orchester-Demo, Uplifting Seed 1 mit Stems).
+
+**Phase 4c, die Sub-Genres (29.09.2026).** Nach 5.3, 5.7, 6.4 und 13.4 gebaut.
+- **Acid**: die 303 trägt Bass und Melodie; ihre vier Kurven (Cutoff, Resonanz, Hüllkurvenhub, Decay) steigen über
+  Phrasen von 16, 32 oder 64 Takten und springen an deren Ende zurück, an jeder Sektionsgrenze geschnitten; wie hoch sie
+  steigen, folgt der Energiekurve (die Höhepunkte sind die Filterpeaks, Dok. 6).
+- **Deep**: das Pad ist das Instrument — Filter und Panorama driften in Wellen von 8 oder 16 Takten; die Granularwolke
+  (fx/Cloud aus Totality, dort aus Noctuary) körnt Pad, Pluck und Piano in die Platte, −15 dB (bei −8 dB fiel die
+  Korrelation auf 0.4 [M]); die Drift-Form mit längerem Groove, Plateau und Haupt-Drop (die Referenzen laufen neun
+  Minuten).
+- **Dream House**: das Motiv dem Piano (4a), ein Hauch der Wolke (−16 dB), die weiche Kick.
+- **Progressive**: die Plateau-Form, rollender und gehender Bass, mehr Luft.
+- **Cinematic**: das Orchester in Uplifting (4b).
+- **Kalibrierung** (Tools/calibrate.py): rendert je Stil drei Seeds (parallel, `--jobs`), misst sie mit genau der
+  Analyse der Referenzen (analyze_ref.measure) und legt 19 Maße neben Minimum, Median und Maximum der Referenzen des
+  Stils (Tempo, Länge, Lautheit, LRA, lautestes 20-s-Fenster, Breakdown-Anteil und -Länge, Abstand, sechs Bänder,
+  Schwerpunkt, Seitenanteil über 200 Hz, Korrelation, Pump, Offbeat-Anteil des Basses). Die Seite unter 120 Hz ist
+  bewusst nicht dabei: Parhelions Tiefe ist mono (master.mono_below), die −14 bis −37 dB der Referenzen dort kommen
+  zum Teil aus ihren verlustbehafteten Transcodes. Fünf Runden [M, alle Spuren eines Stils im Bereich]:
+  Runde 1 (zwei Seeds, noch mit der Seite unter 120 Hz, 20 Maße): Uplifting 6, Progressive 12, Dream House 7,
+  Acid 15, Deep 5; Runde 2: 8, 12, 7, 15, 10; Runde 3 (19 Maße): 10, 14, 8, 15, 11; Runde 4 (drei Seeds, nach dem
+  Umbau der Ströme, 5): 14, 10, 7, 14, 13; Runde 5: 14, 15, 9, 14, 15. Der Prüfstein von 14 (ein Track je Stil im
+  Korridor): der beste Track je Stil trifft 19 (Uplifting Seed 1), 18 (Progressive, Acid), 17 (Deep) und 16 (Dream
+  House) der 19 Maße.
+  Die Korrekturen, jede gemessen: der Leveler misst den lautesten 20-s-Ausschnitt des ganzen Haupt-Drops (vorher dessen
+  Anfang) und den Breakdown-Abstand nach seiner letzten Korrektur noch einmal (er meldete den Stand davor); die Profile
+  bekommen `hatsDb` und `tiltDb` (Luft: Progressive lag in allen Seeds unter dem hellsten Schwerpunkt der Referenzen) und
+  neue Gewichte der Bassfiguren (reine Offbeat-Bässe messen 0.54 bis 0.74 Offbeat-Anteil, die Referenzen 0.2 bis 0.46);
+  **die Fenster der Balance über einer weichen Kick** (LevelMark::windowDb, 6 dB mal kickSoft): Deeps Pad, Pluck und
+  Arp lagen 3 bis 5 dB über ihren Fenstern und wurden gesenkt, weil eine weiche Kick weniger Spitze für ihr Gewicht hat;
+  danach trug ihr Körper 60 % der Drop-Leistung zwischen 60 und 150 Hz (Referenzen 23 bis 43 %). Dazu mix.hats_level −1,
+  master.tilt 1.5, das Pad-Voicing ab E3, Deep ab 128 BPM, die Längen der Breakdowns (Progressive 24 oder 32 statt 16,
+  Deep höchstens 40).
+  Offen nach Runde 5 [M]: die Tiefmitten (150 bis 400 Hz) in Dream House und Progressive zu dünn (0.06 bis 0.09 gegen
+  0.10 bis 0.14 und mehr), Deep zwischen 60 und 150 Hz schwerer als jede Referenz (0.49 bis 0.53 gegen höchstens 0.43)
+  und mit kleinerem Lautheitsumfang (LRA 4.5 bis 5.3 gegen 7.6 bis 12), Dream House über 200 Hz breiter; der
+  Offbeat-Anteil des Basses streut mit seiner Figur (0.10 bis 0.74, die Referenzen 0.20 bis 0.49). Weiter an den
+  Standardknöpfen zu drehen lohnt nicht: mit den Klangbänken (5b) wählt der Komponist je Track und Synth ein Preset, das
+  jede Stimme verändert; die Kalibrierung wird danach wiederholt (5b, Nachkalibrierung in 8).
+- **Tests**: testSubGenres (die 303 mit ihren Kurven, Deeps Wolke und Drift, Dream Houses Piano, das Orchester in
+  einigen Uplifting-Tracks, der Morph zwischen zwei Profilen).
+
+**Phase 5, Set und Ausgaben (29.09.2026).** Nach 6.8, 6.9, 8 und 13.5 gebaut.
+- **Das Set** (compose/Set.h): eine Länge in Minuten, fünf Dramaturgien (Warm-up, Peak, Closing, Sunrise, Journey) als
+  Energiebogen mit Tempoverlauf (höchstens 2 BPM je Track), ein Stil oder die Stil-Reise (Wander: die Leiter Deep,
+  Dream House, Progressive, Uplifting, Acid dem Bogen nach), die Tonartenreise auf dem Camelot-Rad (dieselbe, eine
+  Quinte, die Parallele — aus Dur öfter, Trance lebt in Moll —, der Energy-Boost um einen oder zwei Halbtöne). Die
+  Tracks eines Sets sind mischbar: Intro und Outro 32 Takte und mehr, mit Beat, nie beatless, ohne Ambient-Teile.
+- **Der Blend**: der nächste Track beginnt so, dass sein Intro über dem Outro des laufenden liegt; ein Bass-Swap (der
+  Isolator des DJ-Mixers) 16 Takte vor dem Groove des kommenden, nie vor seinem Bass; Fader- und Filtergesten der Hand;
+  die Hook des nächsten Tracks als Tease auf Deck C.
+- **Ausgaben** (Export.h, parh_render): die Cues (Bass, Breakdowns, Drops, Haupt-Drop, Outro; im Set jeder Track und
+  sein Bass-Swap) im Cue-Chunk des WAV, als JSON und als rekordbox-Sammlung (Beatgrid, Memory Cues, Hot Cues), die
+  DJ-Loops (Intro, Haupt-Drop, Outro, je acht Takte nahtlos), MIDI, Stems, der Plan als JSON; die OSC-Cues (Cue.h)
+  sendet das Plugin (Phase 6).
+- **Sperren und Würfeln** (6.9): jede Einheit auf ihrem Strom — `form`, `matrix`, `energy`, `harmony`, `motif`, `lead`,
+  `bass`, `acid`, `arp`, `pluck`, `piano`, `orchestra`, `drums`, `fx`, `sounds`, `section<n>` —, im Set `track<n>`,
+  `track<n>.<unit>` und `set`; in der `.parhset` gespeichert. Der Streuung der Anschläge nimmt ein Hash je Note den
+  Strom (sonst verschöbe eine neu gewürfelte Stimme die Anschläge aller späteren). Die Matrix bekam dabei ihre Streuung
+  je Sektion (wann Arp, Stab, Percussion, Ride und Counter einsetzen, die Reihenfolge des Intros, der Mini-Break) und
+  die Energie ihre (±0.5, der Haupt-Drop bleibt 10; Pads Öffnung und die 303 folgen ihr); keine Streuung berührt Kick
+  oder Bass, so bleibt die Form beim Würfeln von Matrix und Sektion stehen. Dazu das **Vakuum vor dem Drop** in
+  Phosphenes vier Fassungen (die letzte Zählzeit, die letzten zwei, der ganze Takt, die Kick allein auf 4): vorher war es
+  immer die letzte Zählzeit, und der Haupt-Drop nach dem Build hob sich nur 2.9 dB [M, Uplifting Seed 7].
+- **Evaluation** (Tools/eval_report.py, 13.5): je Track die Neuheitskurve (Foote 2000) gegen die geplanten Grenzen
+  (Precision, Recall, F1 auf ±1 Takt), der Anteil der gefundenen Grenzen auf 8-Takt-Linien, die gehörten Drops (+3 dB),
+  der Abstand Breakdown → Drop, die Tonart des Audios (Krumhansl-Kessler) gegen den Plan, der Korridor der Referenzen.
+  Erster Lauf [M, Uplifting Seed 7, vor den vier Vakuen]: F1 0.60, 92 % der gefundenen Grenzen auf 8-Takt-Linien,
+  Drops gehört 1 von 2 (der Haupt-Drop hob sich 2.9 dB), Abstand 2.1 LU, Tonart eine Quinte daneben (≈), Korridor 17 von
+  19. Das Zwei-Stunden-Set folgt im nächsten Stand.
+- **Tests**: testSet (Tracks und Decks, Tempo, Camelot, Intro über Outro mit einem Bass-Swap, die Stil-Reise, der
+  erste Bass-Swap bei Blockgrößen 37 und 512 bitgleich), testComposer (18 Würfelfälle bitgleich außerhalb der Einheit bis
+  zur Anschlagstärke, Form beim Würfeln von Matrix und Sektion unverändert, die vier Vakuen, im Vakuum nichts außer der
+  Kick auf 4), testLeveler; ctest 28/28.
 
 ## 0. Kurzfassung
 
@@ -1063,11 +1137,49 @@ Wie Totality: CMake, Visual Studio 2026, AVX2, kein Fast-Math, JUCE aus `ThirdPa
 Geschwisters, `PARH_BUILD_PLUGIN=OFF` für Kern, Renderer und Tests allein; Release über `Deploy\build_release.ps1` (Tests,
 pluginval Strenge 10, Handbuch, Installer, Zip); Quest über `Quest/`.
 
-## 12. Parameter und Presets
+## 12. Parameter, Presets und Modulation
 
-1024 Presets je Synth in 16 Gruppen (Kick, Bass, 303, Lead, Pluck, Arp, Pad, Piano, Streicher, Chor, Kit-Lanes, FX), erzeugt
-über `Tools/presets/bank_spec.py` aus den Rezepturen von 2.6 und durch die Fenster von Dok. 7 geprüft; der Komponist wählt je
-Track eines je Synth nach Profil, die Knöpfe zeigen es (Programmwechsel, Ephemeris/Totality).
+**Presets** (Vorgabe des Nutzers, 29.09.2026: "möglichst 1024 pro Modul", "beim Abspielen natürlich auch entsprechend
+angezeigt"). Eine Bank je Klangmodul, 16 Gruppen zu 64 Presets auf einem Raster von acht Adjektiven (dunkel bis hell) und
+acht Nomen der Gruppe (Ephemeris, Totality, Phosphene), erzeugt aus `Tools/presets/bank_spec.py` (Phosphene) nach
+`PresetBank.cpp`: Kick, Sub, Kit-Lanes (je Rolle), Bass, 303, Lead, Counter, Pluck, Arp, Pad, Stab, Piano, Streicher,
+Chor, Blech, Pauken, FX, Wolke — 18 Bänke, 18 432 Presets, aus den Rezepturen von 2.6 und durch die Fenster von Dok. 7
+geprüft. Eine Gruppe gibt jedem Knopf, den sie kennt, einen Bereich und eine Achse (das Adjektiv: meist die Helligkeit,
+das Nomen: meist die Form, oder ein Zufallszug), dazu Filtermodell und Modulation aus ihren Rezepten (Vibrato,
+Filterfahrt, PWM, Wavetable-Scan, Tremolo, Schwellung des Bogendrucks, Vokalwandern ...) und ihr Gewicht je Stil. Ein
+Preset ist der Klang, nicht die Mischung: Pegel, Panorama, Sends, Duck, Gate, Hochpass und die Knöpfe des Komponisten
+bleiben stehen (presetLeaves). Je Preset ein gemessener Pegelausgleich gegen die Standardknöpfe (PresetTrims.inl), damit
+ein Wechsel nicht springt; jedes Preset endlich, ohne Denormale, im Pegelfenster, jeder Name in seiner Bank eindeutig.
+Beim Piano gehören die Entwurfsknöpfe (Instrument bis Condition) zum Preset; den Entwurf rechnet der Nebenfaden, wenn
+der Track lädt.
+
+**Die Wahl des Komponisten**: je Track und Synth eine Gruppe nach den Stilgewichten des (gemorphten) Profils, dann eines
+ihrer Presets (Einheit `sounds`, compose.pick_sounds; mit compose.use_ratings wiegen die Bewertungen des Spielers mit),
+als `SoundPick` und Knopfsätze am Anfang des Tracks in der Partitur (Programmwechsel, Totality).
+
+**Die Anzeige beim Abspielen**: die Engine meldet, welcher Track die Knöpfe stellt (soundsVersion, leadDeck); das Plugin
+zeigt über den Knöpfen jedes Synths sein laufendes Preset (Gruppe und Name) und eine Zeile "Sounds: ..." für den Track,
+der spielt; im Set wechselt die Anzeige mit dem Track, der die Knöpfe hat. `parh_render` druckt die Wahl, der Plan-JSON
+enthält sie, die MIDI-Datei trägt je Synth und Track einen Programmwechsel (Bank aus der Gruppe, Programm aus dem Index).
+
+**Modulation** (Vorgabe des Nutzers: "genügend Modulationsmöglichkeiten in hinreichender Komplexität"). Jede melodische
+Stimme bekommt den Block von Ephemeris und Phosphene (Modulation.h): eine Mod-Hüllkurve (ADSR), vier LFOs (sieben
+Formen, frei oder taktsynchron, Neustart je Note, Einblenden) und eine Matrix mit acht Slots. Quellen: LFO 1 bis 4, die
+Mod-Hüllkurve, die Filterhüllkurve, Velocity, Tonhöhe, ein Zufallswert je Note, dazu neu das **Modrad** (perform.wheel,
+MIDI CC 1) und der **Kanaldruck** als Hand des Spielers und die **Energie** der Partitur (0 bis 10 als 0 bis 1), damit
+ein Preset mit dem Track atmet. Ziele je Stimme, was ihr Modell hergibt:
+- Poly (sechs Stimmen): wie Phosphene (Tonhöhe, zweiter Oszillator, Pulsbreite, Wavetable-Position, FM-Index, Cutoff,
+  Resonanz, Filtermodus, Pegel, Panorama), dazu Detune und die Tiefe des Trance-Gates;
+- Bass und 303 (Totalitys Mono-Synth, bisher ohne Block): Tonhöhe, Pulsbreite, Cutoff, Resonanz, Hüllkurvenhub, Drive,
+  Pegel, Panorama;
+- Piano: Hammerhärte und Anschlagpunkt je Note, Pegel, Panorama, Tonhöhe (Drift als Drehung der modalen Zeiger);
+- Streicher: Bogendruck, Bogengeschwindigkeit, Bogenposition, Tiefe und Rate des Vibratos, Tonhöhe, Pegel, Panorama;
+- Chor: Vokal, Spannung (Rd), Hauch, Vibrato, Formantverschiebung, Tonhöhe, Pegel, Panorama;
+- Blech: Atemdruck, Schmettern, Lippenspannung (Tonhöhe), Vibrato, Pegel, Panorama;
+- Pauken: Tonhöhe (das Pedal), Härte, Anschlagpunkt, Abklingen, Pegel, Panorama;
+- Kick und Kit behalten ihre Hüllkurven und Musterknöpfe (Dichte, Pan-Wanderung), die FX ihre Familienpresets.
+Alles auf dem absoluten Sampletakt und dem Beat (bitgleich über Blockgrößen), die LFOs auf dem Steuerraster der Stimme;
+die Kosten je Stimme im Budget (Test).
 
 ## 13. Tests und Messungen
 
@@ -1130,7 +1242,8 @@ Produkt inhaltlich komplett.
 | **4b Das Orchester** | Sektionsstreicher (Bogenreibung, Korpus), Chor mit LF-Quelle, Brass (Lippenventil, Rohr), Pauke (luftbelastete Membran) nach 5.9 | Hörrunde gegen die Divide-down- und Supersaw-Flächen; CPU im Budget |
 | **4c Die Sub-Genres** | 303 mit Kurven (Acid), Drift und Granular (Deep), Progressive-Groove, Dream House mit dem Piano, Cinematic mit dem Orchester; fünf Profile mit Morph; Kalibrierung gegen die Referenzen | je Profil ein Track im Korridor seiner Referenzen; Hörrunde je Profil |
 | **5 Set und Ausgaben** | Decks, DJ-Mixer, Blends, Tonartenreise, Dramaturgien, Profil-Reise; MIDI, Stems, Loops, Cues, Rekordbox, OSC, `.parhset`, Sperren und Würfeln | ein Zwei-Stunden-Set aus einem Seed; Determinismus; Blend-Test; Evaluationsbericht |
-| **6 GUI** | Tabs, Arrange mit Matrix und Energie, Perform mit Breakdown/Drop jetzt, Handbuch | Standalone und VST3 bedienbar; pluginval Strenge 10 |
+| **5b Klangbänke und Modulation** | Modulationsblock für Bass, 303, Piano, Streicher, Chor, Blech und Pauken, Poly erweitert (Modrad, Druck, Energie); 18 Bänke zu 1024 aus `bank_spec.py` mit Pegelausgleich (12); die Wahl je Track und Synth (`sounds`), SoundPick und Programmwechsel in Partitur und MIDI, die Anzeige des laufenden Presets | jede Bank 1024, jedes Preset endlich und im Pegelfenster; Modulation bei Blockgrößen 1, 37 und 512 bitgleich; `parh_render` nennt je Track die Presets; Kalibrierung mit gewählten Presets |
+| **6 GUI** | Tabs, Arrange mit Matrix und Energie, Perform mit Breakdown/Drop jetzt, Preset-Menüs (16 Gruppen zu 64, Nutzer-Presets) und das laufende Preset je Synth, Modulationsseiten, Handbuch | Standalone und VST3 bedienbar; pluginval Strenge 10 |
 | **7 Quest** | NDK-Build, Qualitätsstufen, Performer-Oberfläche | Set läuft auf der Quest 2, auch im Blend |
 | **8 Qualität und Release** | Hörrunden, Nachkalibrierung, Installer, Handbuch, Social Preview | v1.0 |
 | **(9) Stufe B** | kleiner Transformer für Lead und Piano (Phosphene), nur wenn Stufe A generisch klingt | Hörrunde, Memorisierung |

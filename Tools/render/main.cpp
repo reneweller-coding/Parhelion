@@ -5,11 +5,16 @@
  *
  * Usage:
  *   parh_render [--seed N] [--style S] [--bpm B] [--minutes M] [--set "key=value; ..."] [--reroll unit]
- *               [--save-set f.parhset] [--load-set f.parhset] [--study]
- *               [--out track.wav] [--midi track.mid] [--stems dir]
+ *               [--save-set f.parhset] [--load-set f.parhset] [--study] [--dj minutes]
+ *               [--out track.wav] [--midi track.mid] [--stems dir] [--loops dir] [--plan-json f.json]
  *               [--rate 48000] [--block 512] [--bench] [--quality desktop|quest] [--plan] [--list] [--version]
  *
- * A track is composed from its seed (compose/Composer.h); --study renders the fixed study of Phase 1 instead. Without
+ * A track is composed from its seed (compose/Composer.h); --study renders the fixed study of Phase 1 instead; --dj (or
+ * set.minutes) a DJ set of that many minutes (compose/Set.h), every track levelled before it is placed. Beside the WAV
+ * the cues go into its cue chunk, into <out>.cues.json and into a rekordbox collection <out>.rekordbox.xml (the beat
+ * grid, the breakdowns and drops as memory cues); --loops writes the intro's, the main drop's and the outro's eight bars
+ * as seamless loops (Export.h); --plan-json the plan as JSON (the style, the key, the tempo, every section with its
+ * bar and second; a set's tracks with theirs) for Tools/eval_report.py. Without
  * --out nothing is written and the render only measures: the loudness of the whole and of every section, and the
  * distance between the main breakdown's and the drop's loudest three seconds (the references: 0.5 to 4 LU).
  *
@@ -17,6 +22,7 @@
  *       (29.09.2026).
  */
 #include "parh/Engine.h"
+#include "parh/Export.h"
 #include "parh/Leveler.h"
 #include "parh/Loudness.h"
 #include "parh/Midi.h"
@@ -24,6 +30,7 @@
 #include "parh/WavWriter.h"
 #include "parh/SetFile.h"
 #include "parh/compose/Composer.h"
+#include "parh/compose/Set.h"
 #include "parh/compose/Study.h"
 #include <chrono>
 #include <cmath>
@@ -43,8 +50,13 @@ void usage()
 {
     std::printf("parh_render [--seed N] [--style Uplifting|Progressive|Dream House|Acid|Deep] [--bpm B] [--minutes M]\n"
                 "            [--set \"key=value; ...\"] [--reroll unit] [--save-set f.parhset] [--load-set f.parhset] [--study]\n"
-                "            [--out track.wav] [--midi track.mid] [--stems dir] [--rate 48000] [--block 512] [--bench]\n"
+                "            [--dj minutes] [--out track.wav] [--midi track.mid] [--stems dir] [--loops dir] [--plan-json f.json]\n"
+                "            [--rate 48000]\n"
+                "            [--block 512] [--bench]\n"
                 "            [--quality desktop|quest] [--plan] [--list] [--version]\n");
+    std::printf("units for --reroll:");
+    for (const char* u : kUnitNames) std::printf(" %s", u);
+    std::printf(" section<n>; in a set track<n>, track<n>.<unit> and set\n");
 }
 
 /** @brief Prints the plan: the sections and the layer matrix, one row per element, one column per 8-bar block. */
@@ -67,6 +79,30 @@ void printPlan(const Score& sc)
     }
 }
 
+/** @brief One track's plan as a JSON object: what the evaluation compares the audio with. */
+std::string trackJson(const Score& sc, const TrackInfo& info, double at, const TempoMap& tempo)
+{
+    auto sec = [&](double beat) { return tempo.secondsAt(at + beat); };
+    std::string s = "{\"style\":\"" + info.style + "\",\"bpm\":" + std::to_string(info.bpm) + ",\"key\":" + std::to_string(info.key)
+                  + ",\"scale\":" + std::to_string(info.scale) + ",\"camelot\":\"" + info.camelot + "\",\"bars\":" + std::to_string(info.bars)
+                  + ",\"start\":" + std::to_string(sec(0.0)) + ",\"main_drop_bar\":" + std::to_string(info.mainDropBar)
+                  + ",\"sections\":[";
+    for (size_t i = 0; i < sc.sections.size(); ++i) {
+        const Section& x = sc.sections[i];
+        s += std::string(i ? "," : "") + "{\"kind\":\"" + kSectionNames[static_cast<int>(x.kind)] + "\",\"bar\":" + std::to_string(static_cast<int>(x.beat / 4.0))
+           + ",\"bars\":" + std::to_string(static_cast<int>(x.length / 4.0)) + ",\"seconds\":" + std::to_string(sec(x.beat)) + "}";
+    }
+    return s + "]}";
+}
+
+bool writeText(const std::string& path, const std::string& text)
+{
+    FILE* f = std::fopen(path.c_str(), "wb");
+    if (f == nullptr) return false;
+    std::fwrite(text.data(), 1, text.size(), f);
+    return std::fclose(f) == 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -76,7 +112,8 @@ int main(int argc, char** argv)
     int block = 512;
     float bpm = 0.0f, minutes = 0.0f;
     bool bench = false, quest = false, planOnly = false, list = false, study = false, seedGiven = false;
-    std::string set, out, midi, stems, style, saveSetPath, loadSetPath;
+    std::string set, out, midi, stems, style, saveSetPath, loadSetPath, loopsDir, planJson;
+    double djArg = 0.0;
     Curation curation;
     for (int i = 1; i < argc; ++i) {
         const char* a = argv[i];
@@ -91,6 +128,9 @@ int main(int argc, char** argv)
         else if (!std::strcmp(a, "--save-set")) saveSetPath = next();
         else if (!std::strcmp(a, "--load-set")) loadSetPath = next();
         else if (!std::strcmp(a, "--study")) study = true;
+        else if (!std::strcmp(a, "--dj")) djArg = std::atof(next());
+        else if (!std::strcmp(a, "--loops")) loopsDir = next();
+        else if (!std::strcmp(a, "--plan-json")) planJson = next();
         else if (!std::strcmp(a, "--bpm")) bpm = static_cast<float>(std::atof(next()));
         else if (!std::strcmp(a, "--set")) { set += next(); set += ";"; }
         else if (!std::strcmp(a, "--out")) out = next();
@@ -133,42 +173,113 @@ int main(int argc, char** argv)
     }
 
     const auto t0 = std::chrono::steady_clock::now();
+    const double djMinutes = djArg > 0.0 ? djArg : p.get(p.id(Module::Set, 0, set::Minutes));
+    const bool isSet = djMinutes > 0.0 && !study;
     TrackInfo info;
-    Score score = study ? composeStudy(p, seed) : composeTrack(p, seed, TrackRequest{}, &curation, std::string(), &info);
-    // The Leveler (PLAN 7.5): the balance against the kick, the breakdown against the drop, the loudness.
-    if (!bench && !planOnly) {
-        const std::vector<LevelReading> lr = levelScore(score, p);
-        for (const LevelReading& r : lr) {
-            std::printf("level: the drop %.1f LUFS -> target %.1f, trim %+.1f dB (after %.1f); breakdown under the drop %.1f -> %.1f LU"
-                        " (%+.1f dB); builds %+.1f dB\n", r.measured, r.target, r.trim, r.after, r.gapBefore, r.gapAfter, r.breakDb, r.buildDb);
-            std::string bal = "balance against the kick (dB, correction):";
-            for (int k = 0; k < kBalParts; ++k)
-                if (!std::isnan(r.found[static_cast<size_t>(k)]))
-                    bal += " " + std::string(kBalPartNames[k]) + " " + std::to_string(static_cast<int>(std::lround(r.found[static_cast<size_t>(k)])))
-                         + (r.bal[static_cast<size_t>(k)] != 0.0f ? "(" + std::to_string(static_cast<int>(std::lround(r.bal[static_cast<size_t>(k)]))) + ")" : "");
-            std::printf("%s\n", bal.c_str());
+    Score score;
+    std::vector<CueAt> cues;
+    std::string title, tonality;
+    TempoMap cueTempo;
+    double cueLength = 0.0;
+    auto t1 = std::chrono::steady_clock::now();
+    if (isSet) {
+        // A set (PLAN 6.8): every track levelled on its own before it is placed, then mixed on the decks.
+        SetInfo si;
+        auto level = [&](Score& s) { if (!bench && !planOnly) levelScore(s, p); };
+        const SetScore setScore = composeSet(p, seed, djMinutes, &curation, &si, level);
+        t1 = std::chrono::steady_clock::now();
+        const TempoMap& tm = setScore.decks[0].tempo;
+        std::printf("Parhelion %s  set of seed %llu, %s, %zu tracks, %zu teases, %.1f min\n", PARH_VERSION,
+                    static_cast<unsigned long long>(seed), kDramaturgyNames[static_cast<int>(si.dramaturgy)], si.tracks.size(),
+                    si.teases.size(), tm.secondsAt(setScore.lengthBeats) / 60.0);
+        for (size_t i = 0; i < si.tracks.size(); ++i) {
+            const SetTrack& st = si.tracks[i];
+            std::printf("  T%-2zu deck %c  %6.2f min  %5.1f BPM  %-12s %-4s %-3s %-16s %3d bars, intro %2d, swap at %6.2f min, energy %.2f%s\n",
+                        i + 1, 'A' + st.deck, tm.secondsAt(st.start) / 60.0, st.info.bpm, st.info.style.c_str(), st.info.camelot.c_str(),
+                        kKeyNames[st.info.key], kScaleNames[st.info.scale], st.info.bars, st.info.introBars, tm.secondsAt(st.swapIn) / 60.0,
+                        st.energy, st.info.orchestra ? ", orchestra" : "");
         }
+        cues = setCues(si, tm);
+        if (!planJson.empty()) {
+            std::string j = "{\"set\":true,\"tracks\":[";
+            for (size_t i = 0; i < si.tracks.size(); ++i) {
+                const SetTrack& st = si.tracks[i];
+                Score own;
+                own.tempo = tm;
+                for (const Section& x : setScore.decks[st.deck].sections)
+                    if (x.beat >= st.start - 1e-9 && x.beat < st.end - 1e-9) { Section y = x; y.beat -= st.start; own.sections.push_back(y); }
+                j += std::string(i ? "," : "") + trackJson(own, st.info, st.start, tm);
+            }
+            j += "]}\n";
+            if (!writeText(planJson, j)) { std::fprintf(stderr, "cannot write %s\n", planJson.c_str()); return 1; }
+        }
+        title = std::string("Parhelion set ") + kDramaturgyNames[static_cast<int>(si.dramaturgy)] + " seed " + std::to_string(seed);
+        if (!si.tracks.empty())
+            tonality = std::string(kKeyNames[si.tracks[0].info.key]) + (si.tracks[0].info.scale == static_cast<int>(Scale::Ionian) ? "" : "m");
+        cueTempo = tm;
+        cueLength = setScore.lengthBeats;
+        if (!midi.empty()) {
+            if (!writeMidiFile(flattenSet(setScore), midi.c_str(), "Parhelion", &p)) { std::fprintf(stderr, "cannot write %s\n", midi.c_str()); return 1; }
+            std::printf("MIDI: %s\n", midi.c_str());
+        }
+        if (planOnly) return 0;
+        engine->prepare(rate, block);
+        if (quest) engine->setQuality(Engine::Quality::Quest);
+        engine->loadSet(setScore);
+    } else {
+        score = study ? composeStudy(p, seed) : composeTrack(p, seed, TrackRequest{}, &curation, std::string(), &info);
+        // The Leveler (PLAN 7.5): the balance against the kick, the breakdown against the drop, the loudness.
+        if (!bench && !planOnly) {
+            const std::vector<LevelReading> lr = levelScore(score, p);
+            for (const LevelReading& r : lr) {
+                std::printf("level: the drop %.1f LUFS -> target %.1f, trim %+.1f dB (after %.1f); breakdown under the drop %.1f -> %.1f LU"
+                            " (%+.1f dB); builds %+.1f dB\n", r.measured, r.target, r.trim, r.after, r.gapBefore, r.gapAfter, r.breakDb, r.buildDb);
+                std::string bal = "balance against the kick (dB, correction):";
+                for (int k = 0; k < kBalParts; ++k)
+                    if (!std::isnan(r.found[static_cast<size_t>(k)]))
+                        bal += " " + std::string(kBalPartNames[k]) + " " + std::to_string(static_cast<int>(std::lround(r.found[static_cast<size_t>(k)])))
+                             + (r.bal[static_cast<size_t>(k)] != 0.0f ? "(" + std::to_string(static_cast<int>(std::lround(r.bal[static_cast<size_t>(k)]))) + ")" : "");
+                std::printf("%s\n", bal.c_str());
+            }
+        }
+        t1 = std::chrono::steady_clock::now();
+        std::printf("Parhelion %s  seed %llu  %.1f BPM  %s %s  %.0f bars (%.1f min)\n", PARH_VERSION, static_cast<unsigned long long>(seed),
+                    score.tempo.bpmAt(0.0), kKeyNames[score.keyRoot], kScaleNames[score.scale], score.lengthBeats / 4.0,
+                    score.tempo.secondsAt(score.lengthBeats) / 60.0);
+        if (!study)
+            std::printf("%s, %s form; %s, bass %s; %s; main drop at bar %d, breakdown at bar %d, the lead from bar %d%s%s\n",
+                        info.style.c_str(), info.form == FormTemplate::Anthem ? "anthem" : info.form == FormTemplate::Dream ? "dream"
+                        : info.form == FormTemplate::Acid ? "acid" : info.form == FormTemplate::Plateau ? "plateau" : "drift",
+                        info.progression.c_str(), info.bass.c_str(), info.camelot.c_str(), info.mainDropBar, info.breakdownBar,
+                        info.firstLeadBar, info.keyChangeBar >= 0 ? (", key change at bar " + std::to_string(info.keyChangeBar)).c_str() : "",
+                        info.orchestra ? "; the orchestra" : "");
+        printPlan(score);
+        if (!midi.empty()) {
+            if (!writeMidiFile(score, midi.c_str(), "Parhelion", &p)) { std::fprintf(stderr, "cannot write %s\n", midi.c_str()); return 1; }
+            std::printf("MIDI: %s\n", midi.c_str());
+        }
+        if (!planJson.empty() && !study && !writeText(planJson, "{\"set\":false,\"tracks\":[" + trackJson(score, info, 0.0, score.tempo) + "]}\n")) {
+            std::fprintf(stderr, "cannot write %s\n", planJson.c_str());
+            return 1;
+        }
+        if (planOnly) return 0;
+        if (study) {
+            for (const Section& s : score.sections) cues.push_back({ score.tempo.secondsAt(s.beat), kSectionNames[static_cast<int>(s.kind)] });
+        } else {
+            trackCues(info, 0.0, score.tempo, "", cues);
+        }
+        title = study ? std::string("Parhelion study") : "Parhelion " + info.style + " " + info.camelot + " seed " + std::to_string(seed);
+        tonality = std::string(kKeyNames[score.keyRoot]) + (score.scale == static_cast<int>(Scale::Ionian) ? "" : "m");
+        cueTempo = score.tempo;
+        cueLength = score.lengthBeats;
+        if (!loopsDir.empty() && !study) {
+            if (!renderLoops(p, score, info, loopsDir, rate)) { std::fprintf(stderr, "cannot write the loops\n"); return 1; }
+            std::printf("loops: %s (loop_intro, loop_drop, loop_outro: eight bars each)\n", loopsDir.c_str());
+        }
+        engine->prepare(rate, block);
+        if (quest) engine->setQuality(Engine::Quality::Quest);
+        engine->load(score);
     }
-    const auto t1 = std::chrono::steady_clock::now();
-    std::printf("Parhelion %s  seed %llu  %.1f BPM  %s %s  %.0f bars (%.1f min)\n", PARH_VERSION, static_cast<unsigned long long>(seed),
-                score.tempo.bpmAt(0.0), kKeyNames[score.keyRoot], kScaleNames[score.scale], score.lengthBeats / 4.0,
-                score.tempo.secondsAt(score.lengthBeats) / 60.0);
-    if (!study)
-        std::printf("%s, %s form; %s, bass %s; %s; main drop at bar %d, breakdown at bar %d, the lead from bar %d%s\n",
-                    info.style.c_str(), info.form == FormTemplate::Anthem ? "anthem" : info.form == FormTemplate::Dream ? "dream"
-                    : info.form == FormTemplate::Acid ? "acid" : info.form == FormTemplate::Plateau ? "plateau" : "drift",
-                    info.progression.c_str(), info.bass.c_str(), info.camelot.c_str(), info.mainDropBar, info.breakdownBar,
-                    info.firstLeadBar, info.keyChangeBar >= 0 ? (", key change at bar " + std::to_string(info.keyChangeBar)).c_str() : "");
-    printPlan(score);
-    if (!midi.empty()) {
-        if (!writeMidiFile(score, midi.c_str(), "Parhelion", &p)) { std::fprintf(stderr, "cannot write %s\n", midi.c_str()); return 1; }
-        std::printf("MIDI: %s\n", midi.c_str());
-    }
-    if (planOnly) return 0;
-
-    engine->prepare(rate, block);
-    if (quest) engine->setQuality(Engine::Quality::Quest);
-    engine->load(score);
 
     WavWriter wav;
     if (!out.empty() && !wav.open(out.c_str(), static_cast<int>(rate), 2, WavFormat::Pcm24)) {
@@ -176,10 +287,16 @@ int main(int argc, char** argv)
         return 1;
     }
     if (!out.empty()) {
-        for (const Section& s : score.sections)
-            wav.addCue(static_cast<uint64_t>(std::llround(score.tempo.secondsAt(s.beat) * rate)), kSectionNames[static_cast<int>(s.kind)]);
+        // The cues (PLAN 8): in the WAV's cue chunk, as JSON beside it, and in a rekordbox collection with the beat grid.
+        for (const CueAt& c : cues) wav.addCue(static_cast<uint64_t>(std::llround(c.seconds * rate)), c.label);
+        wav.setInfo("INAM", title);
         wav.setInfo("ISFT", std::string("Parhelion ") + PARH_VERSION);
         wav.setInfo("IGNR", "Trance");
+        if (!cues.empty() && !writeCuesJson(out + ".cues.json", cues, rate)) { std::fprintf(stderr, "cannot write the cues\n"); return 1; }
+        if (cueLength > 0.0 && !writeRekordboxXml(out + ".rekordbox.xml", out, title, tonality, cues, cueTempo, cueLength, rate)) {
+            std::fprintf(stderr, "cannot write the rekordbox xml\n");
+            return 1;
+        }
     }
     std::vector<std::unique_ptr<WavWriter>> stemFiles;
     std::vector<std::vector<float>> stemBufL, stemBufR;

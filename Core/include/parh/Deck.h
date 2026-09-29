@@ -42,6 +42,7 @@
 #include "parh/Params.h"
 #include "parh/Score.h"
 #include "parh/fx/Dynamics.h"
+#include "parh/fx/Cloud.h"
 #include "parh/fx/Plate.h"
 #include "parh/fx/Reverb.h"
 #include "parh/mix/Ducker.h"
@@ -69,7 +70,7 @@ public:
     /** @brief The stems, in the order Engine::setStems() takes them. */
     enum Stem : int { kStemKick = 0, kStemSub, kStemBass, kStemAcid, kStemHats, kStemPerc, kStemLead, kStemCounter, kStemPluck,
                       kStemArp, kStemPad, kStemStab, kStemPiano, kStemStrings, kStemChoir, kStemBrass, kStemTimpani, kStemRoom,
-                      kStemPlate, kStemHall, kStemFx, kStems };
+                      kStemPlate, kStemHall, kStemCloud, kStemFx, kStems };
     static constexpr int kRaster = 32;   ///< the engine's parameter raster, samples
     static constexpr int64_t kNever = std::numeric_limits<int64_t>::max();
 
@@ -207,6 +208,8 @@ private:
     static constexpr int kOrch = 4;
     Ducker orchDuck_[kOrch];
     Sends orchSends_[kOrch];
+    GrainCloud cloud_;         ///< the granular cloud (Deep)
+    float cloudPad_ = 0.8f, cloudKeys_ = 0.5f, cloudPlate_ = 0.5f;
     Sfx sfx_;                  ///< the effects (PLAN 5.10)
     Ducker fxDuck_, subDropDuck_;   ///< the effects' pump and the sub drop's own (sfx.sub_duck)
     Sends fxSends_;
@@ -259,6 +262,7 @@ private:
     std::vector<float> kickBuf_, bodyBuf_, subBuf_, bassL_, bassR_, acidL_, acidR_;
     std::vector<float> polyL_[kPolyInstances], polyR_[kPolyInstances], pianoL_, pianoR_;
     std::vector<float> orchL_[kOrch], orchR_[kOrch];
+    std::vector<float> cloudInL_, cloudInR_, cloudL_, cloudR_;
     std::vector<float> roomInL_, roomInR_, plateInL_, plateInR_, hallInL_, hallInR_, roomL_, roomR_, plateL_, plateR_, hallL_, hallR_;
     std::vector<float> drumL_, drumR_, synthL_, synthR_, fxL_, fxR_, fxSub_, fxWetL_, fxWetR_;
 

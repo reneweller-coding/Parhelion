@@ -47,6 +47,7 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
     brass_.prepare(sampleRate, 0x42524153ull + static_cast<uint64_t>(index));     // "BRAS"
     timpani_.prepare(sampleRate, 0x54494D50ull + static_cast<uint64_t>(index));   // "TIMP"
     for (Ducker& d : orchDuck_) d.prepare(sampleRate);
+    cloud_.prepare(sampleRate, 0x434C4F5544ull + static_cast<uint64_t>(index));   // "CLOUD"
     sfx_.prepare(sampleRate);
     fxDuck_.prepare(sampleRate);
     subDropDuck_.prepare(sampleRate);
@@ -67,6 +68,7 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
     pianoL_.assign(n, 0.0f);
     pianoR_.assign(n, 0.0f);
     for (int o = 0; o < kOrch; ++o) { orchL_[o].assign(n, 0.0f); orchR_[o].assign(n, 0.0f); }
+    for (std::vector<float>* b : { &cloudInL_, &cloudInR_, &cloudL_, &cloudR_ }) b->assign(n, 0.0f);
     clear();
 }
 
@@ -215,6 +217,7 @@ void Deck::seek(int64_t sample)
     choir_.reset();
     brass_.reset();
     timpani_.reset();
+    cloud_.reset();
     for (int i = 0; i < kPolyInstances; ++i) {
         poly_[i].reset();
         // The same start phases and drift walks whatever came before (Poly.h): a render is a function of the score.
@@ -374,6 +377,11 @@ void Deck::updateCell(int64_t sample)
     brass_.update(v);
     orchSends_[2] = Sends{ v[brass::RoomSend], v[brass::PlateSend], v[brass::HallSend] };
     orchDuck_[2].set(1.0f - dbToGain(-v[brass::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    readPlayed(Module::Cloud, 0, v);
+    cloud_.update(v);
+    cloudPad_ = v[cloud::PadSend];
+    cloudKeys_ = v[cloud::KeysSend];
+    cloudPlate_ = v[cloud::PlateSend];
     readPlayed(Module::Timpani, 0, v);
     timpani_.update(v);
     orchSends_[3] = Sends{ v[timpani::RoomSend], v[timpani::PlateSend], v[timpani::HallSend] };
@@ -607,6 +615,7 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
         // The polyphonic voices: gate, sends, pump.
         const double beat = beat_ + (spanOffset + static_cast<double>(i)) * beatsPerSample_;
         float rl = 0.0f, rr = 0.0f, pl = 0.0f, pr = 0.0f, hl = 0.0f, hr = 0.0f, sl = 0.0f, sr = 0.0f;
+        cloudInL_[k] = cloudInR_[k] = 0.0f;
         for (int v = 0; v < kPolyInstances; ++v) {
             float l = polyL_[v][k] * balGain_[static_cast<int>(BalPart::Lead) + v] * synthGain_;
             float r = polyR_[v][k] * balGain_[static_cast<int>(BalPart::Lead) + v] * synthGain_;
@@ -618,6 +627,8 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
             rl += l * s.sends.room; rr += r * s.sends.room;
             pl += l * s.sends.plate; pr += r * s.sends.plate;
             hl += l * s.sends.hall; hr += r * s.sends.hall;
+            if (v == static_cast<int>(PolyInstance::Pad)) { cloudInL_[k] += l * cloudPad_; cloudInR_[k] += r * cloudPad_; }
+            if (v == static_cast<int>(PolyInstance::Pluck)) { cloudInL_[k] += l * cloudKeys_; cloudInR_[k] += r * cloudKeys_; }
             const float g = polyDuck_[v].next();
             lastDuck_[v] = g;
             l *= g;
@@ -632,6 +643,8 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
             // The piano: its sends, its duck, into the synth bus.
             const float gp = balGain_[static_cast<int>(BalPart::Piano)] * synthGain_;
             float l = pianoL_[k] * gp, r = pianoR_[k] * gp;
+            cloudInL_[k] += l * cloudKeys_;
+            cloudInR_[k] += r * cloudKeys_;
             rl += l * pianoSends_.room; rr += r * pianoSends_.room;
             pl += l * pianoSends_.plate; pr += r * pianoSends_.plate;
             hl += l * pianoSends_.hall; hr += r * pianoSends_.hall;
@@ -721,6 +734,12 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
         drumR_[k] = dr;
     }
     PARH_PROF_END(Buses);
+    cloud_.process(cloudInL_.data(), cloudInR_.data(), cloudL_.data(), cloudR_.data(), n);
+    for (int i = 0; i < n; ++i) {
+        const size_t k = static_cast<size_t>(i);
+        plateInL_[k] += cloudL_[k] * cloudPlate_;
+        plateInR_[k] += cloudR_[k] * cloudPlate_;
+    }
     { PARH_PROF(Rooms);
       room_.process(roomInL_.data(), roomInR_.data(), roomL_.data(), roomR_.data(), n);
       std::fill(plateL_.begin(), plateL_.begin() + n, 0.0f);   // the plate adds its return (Plate.h)
@@ -735,6 +754,7 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
         roomL_[k] *= roomReturn_ * g; roomR_[k] *= roomReturn_ * g;
         plateL_[k] *= plateReturn_ * g; plateR_[k] *= plateReturn_ * g;
         hallL_[k] *= hallReturn_ * g; hallR_[k] *= hallReturn_ * g;
+        cloudL_[k] *= g; cloudR_[k] *= g;
     }
     if (stems) {
         for (int i = 0; i < n; ++i) {
@@ -752,6 +772,7 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
             put(kStemRoom, roomL_[k], roomR_[k]);
             put(kStemPlate, plateL_[k], plateR_[k]);
             put(kStemHall, hallL_[k], hallR_[k]);
+            put(kStemCloud, cloudL_[k], cloudR_[k]);
             put(kStemFx, fxL_[k], fxR_[k]);
         }
     }
@@ -759,8 +780,8 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
     PARH_PROF_BEGIN(TrackBus);
     for (int i = 0; i < n; ++i) {
         const size_t k = static_cast<size_t>(i);
-        float l = drumL_[k] + subBuf_[k] + bassL_[k] + acidL_[k] + synthL_[k] + roomL_[k] + plateL_[k] + hallL_[k] + fxL_[k];
-        float r = drumR_[k] + subBuf_[k] + bassR_[k] + acidR_[k] + synthR_[k] + roomR_[k] + plateR_[k] + hallR_[k] + fxR_[k];
+        float l = drumL_[k] + subBuf_[k] + bassL_[k] + acidL_[k] + synthL_[k] + roomL_[k] + plateL_[k] + hallL_[k] + cloudL_[k] + fxL_[k];
+        float r = drumR_[k] + subBuf_[k] + bassR_[k] + acidR_[k] + synthR_[k] + roomR_[k] + plateR_[k] + hallR_[k] + cloudR_[k] + fxR_[k];
         if (groupHpOn_) {
             float lp, bp, hp;
             groupHp_[0][0].tick(l, lp, bp, hp); groupHp_[0][1].tick(hp, lp, bp, l);

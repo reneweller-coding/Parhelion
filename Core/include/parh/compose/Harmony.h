@@ -54,9 +54,9 @@ Harmony composeHarmony(const Plan& plan, const StyleProfile& prof, int key, int 
 /** @brief The pitch of pitch class @p pc at or above @p floor. */
 int atOrAbove(int pc, int floor);
 /**
- * @brief The pad's four voices over the chord of @p bar: the third or the fifth at the bottom from about A3 (Dok. 4:
+ * @brief The pad's four voices over the chord of @p bar: the third or the fifth at the bottom from about E3 (Dok. 4:
  *        "tiefste Stimme Terz oder Quinte, nicht der Grundton"), the smallest movement from @p prev.
  */
-std::array<int, 4> voicePad(const Harmony& h, int bar, const std::array<int, 4>& prev, bool first, int floor = 57);
+std::array<int, 4> voicePad(const Harmony& h, int bar, const std::array<int, 4>& prev, bool first, int floor = 52);
 
 } // namespace parh

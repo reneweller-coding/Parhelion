@@ -156,7 +156,11 @@ struct LevelMark {
     float targetLufs = -8.0f;   ///< what that part should measure (the style's, PLAN 7.5)
     float trimDb = 0.0f;        ///< the correction (levelScore); 0 until measured
     BalanceDb balDb{};          ///< Phase 18: the parts' corrections against the kick (levelScore); 0 until measured
-    std::array<float, 5> styleMix{};   ///< the track's styles, for the parts' windows; 0: Uplifting's
+    /** @brief The windows of every part but the kit's lanes, the sub and the bass moved up by this, dB: a soft kick's
+     *         peak says less of its weight than a hard one's (the composer's, 6 dB times the profile's kickSoft; measured,
+     *         Tools/calibrate.py: Deep's pad, pluck and arp found 3 to 5 dB over their windows and cut, the kick's body
+     *         then carried 60 % of the drop's power in 60 to 150 Hz, the references 23 to 43 %). */
+    float windowDb = 0.0f;
     float gapLu = 2.0f;         ///< the main breakdown's loudest 3 s under the drop's, LU (the style's, Leveler.h)
     float breakDb = 0.0f;       ///< the correction of the synths, rooms and effects in every breakdown and break (levelScore)
     float buildDb = 0.0f;       ///< the correction of the synths, effects and percussion in every build: under the drop (levelScore)

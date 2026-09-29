@@ -64,6 +64,8 @@ enum class Module : int { Compose = 0, Kick, Sub, Perc,
                           Piano,
                           /** The orchestra (PLAN 5.9): the bowed string section, the choir, the brass, the timpani. */
                           Strings, Choir, Brass, Timpani,
+                          /** The granular cloud (PLAN 5.7, Deep): grains of the pad's and the keys' past (Cloud.h). */
+                          Cloud,
                           /** The sidechain's shape (PLAN 7.3): the ghost kick's curve, shared by every bus. */
                           Pump,
                           /** The three rooms (PLAN 5.11): a short room, a plate, a hall, on sends. */
@@ -266,6 +268,10 @@ enum : int { Level,        ///< dB
              Attack, Release,   ///< ms
              Vibrato,      ///< cents
              Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
+}
+/** @brief Parameters of the granular cloud (PLAN 5.7, Cloud.h). */
+namespace cloud {
+enum : int { Level, Density, Size, Pitch, Spray, PadSend, KeysSend, PlateSend, Count };
 }
 /** @brief Parameters of the timpani (PLAN 5.9, Timpani.h). */
 namespace timpani {

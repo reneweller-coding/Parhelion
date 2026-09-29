@@ -6,7 +6,7 @@ sibling of [Noctuary](../AmbientSynth) (ambient), Phosphene (psytrance), Ephemer
 A parhelion, a sun dog, is the bright spot of light beside the sun when it shines through ice crystals: a centre and
 its detuned neighbours, which is what the JP-8000's supersaw is.
 
-**State (29.09.2026): Phases 0 to 4b.** The frame (copied modules with their origin in every header), the parameter
+**State (29.09.2026): Phases 0 to 5.** The frame (copied modules with their origin in every header), the parameter
 system, the score with sections, the layer matrix and the ghost kick, the deck with kick, sub, mid-bass, 303, a
 twelve-lane kit, six polyphonic voices (Phosphene's JP-8000 supersaw, VA, FM and wavetable, the circuit filters, the
 trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master.
@@ -21,8 +21,12 @@ coupled strings as complex modes, a hysteretic hammer, the strings' tension and 
 the strings ringing along under the pedal) plays Dream House's motif. An orchestra for the Cinematic side of
 Uplifting, synthesised as well: a string section of bowed modal strings (every player his own bow, stick and slip
 solved in closed form, the bodies of violins to basses), a choir from the Liljencrants-Fant glottal source and
-formants, brass from lips on a bore, timpani from a membrane's modes under a felt mallet. The set, the plugin and the
-Quest follow (docs/PLAN.md, section 14).
+formants, brass from lips on a bore, timpani from a membrane's modes under a felt mallet. The five styles are
+calibrated against the references (Tools/calibrate.py): Acid's 303 in four curves, Deep's drifting pad and granular
+cloud, Progressive's rolling groove. DJ sets of any length from one seed: five dramaturgies (Warm-up, Peak, Closing,
+Sunrise, Journey), harmonic mixing round the Camelot wheel, blends over DJ intros and outros with one bass swap, the
+next track's hook teased on a third deck; every export with its cues in the WAV, as JSON and as a rekordbox collection,
+DJ loops, MIDI and stems. The plugin and the Quest follow (docs/PLAN.md, section 14).
 
 The plan, in German, with the reasons for everything: [docs/PLAN.md](docs/PLAN.md). The research it rests on:
 [docs/research](docs/research).
@@ -42,8 +46,13 @@ build/Tools/render/Release/parh_render --seed 7 --out study.wav --midi study.mid
 build/Tools/render/Release/parh_render --seed 7 --set "compose.key=F; compose.bpm=136" --out study_f.wav
 build/Tools/render/Release/parh_render --seed 7 --plan
 build/Tools/render/Release/parh_render --seed 7 --style "Dream House" --out dream.wav --midi dream.mid
-build/Tools/render/Release/parh_render --seed 7 --reroll melody --out other_melody.wav
+build/Tools/render/Release/parh_render --seed 7 --reroll motif --out other_motif.wav
+build/Tools/render/Release/parh_render --seed 7 --reroll section5 --reroll arp --save-set curated.parhset --out curated.wav
 build/Tools/render/Release/parh_render --study --out study.wav
+build/Tools/render/Release/parh_render --seed 7 --dj 120 --set "set.dramaturgy=Sunrise; set.journey=Wander" --out set.wav
+build/Tools/render/Release/parh_render --seed 7 --out track.wav --loops loops --plan-json track.json
+python Tools/eval_report.py --plan track.json --wav track.wav --out docs/eval/report.md
+python Tools/calibrate.py --seeds 1,2,3 --jobs 8
 ```
 
 ```

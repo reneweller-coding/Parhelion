@@ -183,7 +183,7 @@ const ParamDesc kPercParams[perc::Count] = {
 
 /** The kit's buses and the track bus (PLAN 7). Levels [I] until the reference measurement (PLAN 13.4). */
 const ParamDesc kMixParams[mix::Count] = {
-    { "hats_level", "Hats Level", "dB", -24.0f,    12.0f,    -3.0f, Curve::Linear },
+    { "hats_level", "Hats Level", "dB", -24.0f,    12.0f,    -1.0f, Curve::Linear },
     { "hats_cut",   "Hats Cut",   "Hz", 200.0f, 20000.0f, 20000.0f, Curve::Log },
     { "perc_level", "Perc Level", "dB", -24.0f,    12.0f,    -4.0f, Curve::Linear },
     { "perc_cut",   "Perc Cut",   "Hz", 200.0f, 20000.0f, 20000.0f, Curve::Log },
@@ -203,7 +203,7 @@ const ParamDesc kMasterParams[master::Count] = {
     { "clip",       "Clip Drive", "dB",   0.0f,   9.0f,   2.0f, Curve::Linear },
     { "ceiling",    "Ceiling",    "dBTP", -6.0f,  0.0f,  -1.0f, Curve::Linear },
     { "mono_below", "Mono Below", "Hz",  40.0f, 250.0f, 120.0f, Curve::Log },
-    { "tilt",       "Tilt",       "dB", -12.0f,  12.0f,   0.0f, Curve::Linear },
+    { "tilt",       "Tilt",       "dB", -12.0f,  12.0f,   1.5f, Curve::Linear },
 };
 
 /**
@@ -432,7 +432,7 @@ const ParamDesc kStringsParams[strings::Count] = {
     { "speed",      "Bow Speed",  "",     0.3f,   3.0f,   1.0f, Curve::Log },
     { "attack",     "Attack",     "ms",   5.0f, 800.0f,  90.0f, Curve::Log },
     { "release",    "Release",    "ms",  10.0f, 1500.0f, 180.0f, Curve::Log },
-    { "width",      "Width",      "",     0.0f,   1.0f,   0.8f, Curve::Linear },
+    { "width",      "Width",      "",     0.0f,   1.0f,   0.55f, Curve::Linear },
     { "low_cut",    "Low Cut",    "Hz",  20.0f, 400.0f,  60.0f, Curve::Log },
     { "duck",       "Duck",       "dB",   0.0f,  18.0f,   3.0f, Curve::Linear },
     { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.05f, Curve::Linear },
@@ -450,7 +450,7 @@ const ParamDesc kChoirParams[choir::Count] = {
     { "tension",    "Tension",    "",     0.0f,   1.0f,   0.4f, Curve::Linear },
     { "attack",     "Attack",     "ms",   5.0f, 1500.0f, 250.0f, Curve::Log },
     { "release",    "Release",    "ms",  10.0f, 2000.0f, 400.0f, Curve::Log },
-    { "width",      "Width",      "",     0.0f,   1.0f,   0.8f, Curve::Linear },
+    { "width",      "Width",      "",     0.0f,   1.0f,   0.55f, Curve::Linear },
     { "low_cut",    "Low Cut",    "Hz",  20.0f, 400.0f,  90.0f, Curve::Log },
     { "duck",       "Duck",       "dB",   0.0f,  18.0f,   3.0f, Curve::Linear },
     { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.0f, Curve::Linear },
@@ -487,6 +487,18 @@ const ParamDesc kTimpaniParams[timpani::Count] = {
     { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.05f, Curve::Linear },
     { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.05f, Curve::Linear },
     { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.4f, Curve::Linear },
+};
+
+/** The granular cloud (PLAN 5.7): silent until a track asks for it (Deep); from the pad and the keys, into the plate. */
+const ParamDesc kCloudParams[cloud::Count] = {
+    { "level",      "Level",      "dB", -60.0f,    6.0f,  -60.0f, Curve::Linear },
+    { "density",    "Density",    "/s",   0.5f,   60.0f,   10.0f, Curve::Log },
+    { "size",       "Grain Size", "ms",  20.0f, 1000.0f,  260.0f, Curve::Log },
+    { "pitch",      "Pitch",      "",     0.0f,    1.0f,    0.3f, Curve::Linear },
+    { "spray",      "Spray",      "s",   0.05f,    4.5f,    2.5f, Curve::Log },
+    { "pad_send",   "From Pad",   "",     0.0f,    1.0f,    0.8f, Curve::Linear },
+    { "keys_send",  "From Keys",  "",     0.0f,    1.0f,    0.5f, Curve::Linear },
+    { "plate_send", "Plate Send", "",     0.0f,    1.0f,    0.5f, Curve::Linear },
 };
 
 /**
@@ -678,6 +690,7 @@ const ModuleSpec kModules[static_cast<int>(Module::Count)] = {
     { "choir",   kChoirParams,   choir::Count,   1 },
     { "brass",   kBrassParams,   brass::Count,   1 },
     { "timpani", kTimpaniParams, timpani::Count, 1 },
+    { "cloud",   kCloudParams,   cloud::Count,   1 },
     { "pump",    kPumpParams,    pump::Count,    1 },
     { "sends",   kSendsParams,   sends::Count,   1 },
     { "mix",     kMixParams,     mix::Count,     1 },

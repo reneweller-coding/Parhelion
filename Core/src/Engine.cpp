@@ -21,7 +21,7 @@ constexpr float kSqrt2 = 1.41421356f;
 const char* Engine::stemName(int s)
 {
     static const char* const kNames[kStems] = { "kick", "sub", "bass", "acid", "hats", "perc", "lead", "counter", "pluck",
-                                                "arp", "pad", "stab", "piano", "strings", "choir", "brass", "timpani", "room", "plate", "hall", "fx", "djfx" };
+                                                "arp", "pad", "stab", "piano", "strings", "choir", "brass", "timpani", "room", "plate", "hall", "cloud", "fx", "djfx" };
     return s >= 0 && s < kStems ? kNames[s] : "";
 }
 
