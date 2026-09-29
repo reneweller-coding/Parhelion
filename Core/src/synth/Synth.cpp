@@ -15,9 +15,10 @@ constexpr double kPiD = 3.141592653589793;
 constexpr double kLn1000 = 6.907755278982137;
 }
 
-void MonoSynth::prepare(double sampleRate)
+void MonoSynth::prepare(double sampleRate, uint64_t seed)
 {
     sr_ = sampleRate;
+    mod_.prepare(sampleRate, seed);
     amp_.setSampleRate(sampleRate);
     duck_.prepare(sampleRate);
     hb_ = designHalfband(90.0, 0.06);
@@ -36,12 +37,16 @@ void MonoSynth::reset()
     fenv_ = 0.0;
     subPhase_ = 0.0;
     slidePending_ = false;
+    pos_ = 0;
+    mod_.reset();
 }
 
 void MonoSynth::update(const float* v, float minLowCut)
 {
     const float fs = static_cast<float>(sr_);
     level_ = v[synth::Level] <= -59.9f ? 0.0f : dbToGain(v[synth::Level]);
+    levelKnob_ = level_;
+    panKnob_ = v[synth::Pan];
     const float th = (clampv(v[synth::Pan], -1.0f, 1.0f) + 1.0f) * 0.25f * kPi;
     gl_ = std::cos(th) * 1.41421356f;
     gr_ = std::sin(th) * 1.41421356f;
@@ -62,10 +67,42 @@ void MonoSynth::update(const float* v, float minLowCut)
     glideMs_ = v[synth::Glide];
     drive_ = 0.5f + 5.0f * v[synth::Drive];
     driveNorm_ = 1.0f / std::tanh(drive_);
+    driveKnob_ = v[synth::Drive];
     keyTrack_ = v[synth::KeyTrack];
     hp_.setK(std::max(v[synth::LowCut], minLowCut), 1.41421356f, fs);
     lp_.setK(std::min(v[synth::HighCut], 0.45f * fs), 1.41421356f, fs);
     duck_.set(1.0f - dbToGain(-v[synth::Duck]), 1.0f, 30.0f, v[synth::DuckRelease]);
+    // The modulation's settings; where no slot is live the voice plays its knobs as they are.
+    mod_.set(readModCore(v + synth::ModFirst, kSynthModDests, static_cast<int>(std::size(kSynthModDests))));
+    pwNow_ = pw_;
+    resNow_ = res_;
+    kNow_ = FilterVoicing::feedback(model_, res_);
+    cutOct_ = envAdd_ = 0.0f;
+    pitchMul_ = 1.0;
+    if (mod_.on() && amp_.isActive()) applyModulation();
+}
+
+void MonoSynth::applyModulation()
+{
+    mod_.evaluate(0, pos_, static_cast<float>(fenv_));
+    pitchMul_ = std::pow(2.0, static_cast<double>(mod_.get(0, ModDest::Pitch)) / 12.0);
+    pwNow_ = std::clamp(pw_ + mod_.get(0, ModDest::PulseWidth), 0.05f, 0.95f);
+    cutOct_ = mod_.get(0, ModDest::Cutoff);
+    envAdd_ = mod_.get(0, ModDest::EnvAmount);
+    if (mod_.targets(ModDest::Resonance)) {
+        resNow_ = std::clamp(res_ + mod_.get(0, ModDest::Resonance), 0.0f, 1.0f);
+        kNow_ = FilterVoicing::feedback(model_, resNow_);
+    }
+    if (mod_.targets(ModDest::Drive)) {
+        drive_ = 0.5f + 5.0f * std::clamp(driveKnob_ + mod_.get(0, ModDest::Drive), 0.0f, 1.0f);
+        driveNorm_ = 1.0f / std::tanh(drive_);
+    }
+    if (mod_.targets(ModDest::Level)) level_ = levelKnob_ * std::clamp(1.0f + mod_.get(0, ModDest::Level), 0.0f, 2.0f);
+    if (mod_.targets(ModDest::Pan)) {
+        const float th = (clampv(panKnob_ + mod_.get(0, ModDest::Pan), -1.0f, 1.0f) + 1.0f) * 0.25f * kPi;
+        gl_ = std::cos(th) * 1.41421356f;
+        gr_ = std::sin(th) * 1.41421356f;
+    }
 }
 
 void MonoSynth::noteOn(int pitch, float velocity, double late, bool accent, bool slide)
@@ -83,6 +120,8 @@ void MonoSynth::noteOn(int pitch, float velocity, double late, bool accent, bool
         amp_.noteOn();
         amp_.advanceAttack(late);
         fenv_ = std::pow(fenvDecay_, 2.0 * late);
+        mod_.noteOn(0, pos_, pitch, velocity_);
+        if (mod_.on()) applyModulation();
     }
     slidePending_ = slide;
 }
@@ -92,6 +131,7 @@ void MonoSynth::noteOff()
     // A sliding note's off comes after the next note has begun (the rack makes it 0.3 beats long), and the engine drops
     // an off whose note is no longer the latest: an off that arrives is a rest after the slide, so the gate closes.
     amp_.noteOff();
+    mod_.noteOff(0);
 }
 
 void MonoSynth::process(float* L, float* R, int n)
@@ -99,27 +139,33 @@ void MonoSynth::process(float* L, float* R, int n)
     const double sr2 = 2.0 * sr_;
     const float accentOct = noteAccent_ ? 1.5f * accent_ : 0.0f;
     const float accentGain = noteAccent_ ? dbToGain(4.0f * accent_) : 1.0f;
-    const float k = FilterVoicing::feedback(model_, res_);
+    const bool modded = mod_.on();
+    if (!modded) kNow_ = FilterVoicing::feedback(model_, res_);
     for (int i = 0; i < n; ++i) {
         if (!amp_.isActive()) {
             // Silent from the sample its envelope ended: only the duck's curve runs on (sample-exact, so the host's
             // blocks cannot move where the voice rests).
-            for (; i < n; ++i) { duck_.next(); L[i] = 0.0f; R[i] = 0.0f; }
+            for (; i < n; ++i) { duck_.next(); L[i] = 0.0f; R[i] = 0.0f; ++pos_; }
             break;
         }
+        if (modded && (pos_ & 15) == 0) applyModulation();
+        ++pos_;
+        const float k = kNow_;
         float pair[2];
         for (int h = 0; h < 2; ++h) {
             hz_ += (targetHz_ - hz_) * glideCoef_;
-            osc_.set(hz_, sr2, wave_, pw_);
+            const double hzm = hz_ * pitchMul_;
+            osc_.set(hzm, sr2, wave_, pwNow_);
             float x = osc_.next();
             // The sub: a square an octave down, naive but low (its first alias lies far under its own level at bass
             // pitches, and the filter follows).
-            subPhase_ += 0.5 * hz_ / sr2;
+            subPhase_ += 0.5 * hzm / sr2;
             subPhase_ -= std::floor(subPhase_);
             x += sub_ * (subPhase_ < 0.5 ? 1.0f : -1.0f);
             x = std::tanh(x * drive_) * driveNorm_;
-            const double track = std::pow(hz_ / 110.0, static_cast<double>(keyTrack_));
-            const double fc = std::min(0.42 * sr2, cutoff_ * track * std::pow(2.0, (envAmt_ + accentOct) * fenv_));
+            const double track = std::pow(hzm / 110.0, static_cast<double>(keyTrack_));
+            const double fc = std::min(0.42 * sr2, cutoff_ * track * std::pow(2.0, static_cast<double>(cutOct_)
+                                                                                  + (envAmt_ + envAdd_ + accentOct) * fenv_));
             const float g = static_cast<float>(std::tan(kPiD * fc / sr2));
             // The knee: transparent under 1, then towards 2. A cutoff moved fast by the envelope pumps the integrators of
             // the diode ladder, the Polivoks and the Wasp at full resonance far beyond any input (peaks of 27 in the self

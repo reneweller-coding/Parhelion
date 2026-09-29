@@ -22,6 +22,7 @@
  */
 #pragma once
 #include "parh/Dsp.h"
+#include "parh/synth/Modulation.h"
 #include <cstdint>
 
 namespace parh {
@@ -39,6 +40,10 @@ public:
     void process(float* L, float* R, int n);
     /** @brief The frequency ratio of mode @p i to the note (the tests). */
     static double ratio(int i);
+    /** @brief The deck's shared modulation sources (Modulation.h). */
+    void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
+    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
 
 private:
     struct Drum {
@@ -53,13 +58,20 @@ private:
         int steps = 0, apart = 0;
         double age = 0.0;
         int quiet = 0;
+        // The modulation's values (Phase 5b): the pedal's bend, the decay's factor, the felt, the drum's place.
+        double bend = 1.0, decayMul = 1.0, K = 8e7, f0 = 110.0;
+        double gainL = 1.0, gainR = 1.0;
     };
-    void tune(Drum& d, int pitch);
+    void tune(Drum& d, int pitch, double bend = 1.0, double decayMul = 1.0);
+    /** @brief Drum @p k's modulation now; @p strike: the mallet is about to meet it (the felt and the place). */
+    void modDrum(int k, bool strike);
     double sr_ = 48000.0;
     uint64_t seed_ = 1;
     float level_ = 1.0f, hardness_ = 1.0f, decay_ = 1.0f, strike_ = 0.68f, width_ = 0.5f, lowCutHz_ = 35.0f;
     Svf lowCut_[2];
     Drum drum_[kTimpaniDrums];
+    NoteModulation<kTimpaniDrums> mod_;   ///< the modulation, a Modulator per drum (Phase 5b)
+    int64_t pos_ = 0;                     ///< the timpani's absolute sample count
 };
 
 } // namespace parh

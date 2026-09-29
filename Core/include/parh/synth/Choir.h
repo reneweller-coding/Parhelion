@@ -23,6 +23,7 @@
  */
 #pragma once
 #include "parh/Dsp.h"
+#include "parh/synth/Modulation.h"
 #include <cstdint>
 
 namespace parh {
@@ -48,6 +49,10 @@ public:
     static int voiceOf(int pitch);
     /** @brief One period of the LF source at @p rd, @p n samples (normalised to Ee = 1; for the tests). */
     void lfPeriod(double rd, int n, float* out) const;
+    /** @brief The deck's shared modulation sources (Modulation.h). */
+    void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
+    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
 
 private:
     struct LfShape { double tp, te, ta, alpha, eps, e0; };
@@ -74,9 +79,16 @@ private:
         Svf formant[2][5];
         float gain[5] = {};
         int quiet = 0;
+        // The modulation's values for this note (Phase 5b); the knobs' where no slot reaches them.
+        float vowel = 0.0f, formantMul = 1.0f, tension = 0.4f, breath = 0.25f, vib = 1.0f, level = 1.0f, panL = 1.0f, panR = 1.0f;
+        double pitchSt = 0.0;
     };
     void startPeriod(Singer& g, const Note& n, double tInto);
     void setFormants(Note& n);
+    /** @brief Every sounding note's modulation at this cell (every 32 samples of the choir's own count). */
+    void modCell();
+    /** @brief Note @p s's modulation now. */
+    void modNote(int s);
     static LfShape solveLf(double rd);
 
     double sr_ = 48000.0;
@@ -89,6 +101,8 @@ private:
     Svf lowCut_[2];
     Singer singer_[kChoirNotes * kChoirSingers];
     Note note_[kChoirNotes];
+    NoteModulation<kChoirNotes> mod_;   ///< the modulation, a Modulator per note (Phase 5b)
+    int64_t pos_ = 0;                   ///< the choir's absolute sample count
 };
 
 } // namespace parh

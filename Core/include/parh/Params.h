@@ -138,7 +138,8 @@ enum : int { Level, Threshold, Ratio, Clip, Ceiling, MonoBelow, Tilt, Count };
 namespace synth {
 enum : int { Level, Pan, Wave, PulseWidth, SubOsc, Filter, Cutoff, Resonance, EnvAmount, Decay, Accent, AmpAttack,
              AmpDecay, AmpSustain, AmpRelease, Glide, Drive, KeyTrack, LowCut, HighCut, PlateSend, RoomSend, Duck, DuckRelease,
-             Count };
+             ModFirst,   ///< the modulation block's core from here (Modulation.h, readModCore: 48 knobs; Phase 5b)
+             Count = ModFirst + 48 };
 }
 /**
  * @brief Parameters of a polyphonic voice (module Poly; Phosphene's table, Poly.h): supersaw, VA, FM or wavetable,
@@ -183,7 +184,16 @@ enum class PolyFilter : int { LowPass = 0, BandPass, HighPass, Notch, Count };
 extern const char* const kLfoShapeNames[];    ///< LfoShape
 extern const char* const kLfoSyncNames[];     ///< lfoCyclesPerBeat's divisions
 extern const char* const kModSourceNames[];   ///< ModSource
-extern const char* const kModDestNames[];     ///< ModDest
+extern const char* const kModDestNames[];     ///< ModDest (the polyphonic voice's targets)
+/** @name The other engines' modulation targets (Modulation.h, kSynthModDests ... kTimpaniModDests)
+ *  @{ */
+extern const char* const kSynthModDestNames[];
+extern const char* const kPianoModDestNames[];
+extern const char* const kStringsModDestNames[];
+extern const char* const kChoirModDestNames[];
+extern const char* const kBrassModDestNames[];
+extern const char* const kTimpaniModDestNames[];
+/** @} */
 /**
  * @brief Values of poly.filter_model: entry 0 is the voice's own state-variable filter, entries 1 .. 9 are Filters.h's
  *        FilterModel from Moog to Wasp.
@@ -234,7 +244,9 @@ enum : int { Instrument,   ///< PianoInstrument: Grand, Baby Grand, Upright, Sof
              Width,        ///< the listening points apart, 0 (mono) .. 1 (bass left, treble right)
              LowCut,       ///< Hz
              Duck,         ///< dB under the pump
-             RoomSend, PlateSend, HallSend, Count };
+             RoomSend, PlateSend, HallSend,
+             ModFirst,     ///< the modulation block's core (48 knobs; Phase 5b)
+             Count = ModFirst + 48 };
 constexpr int kFirstPlayKnob = Level;   ///< the knobs before it change the design
 }
 /** @brief Parameters of the string section (PLAN 5.9, Strings.h). */
@@ -246,7 +258,9 @@ enum : int { Level,        ///< dB
              Position,     ///< the bow's place, -1 sul tasto .. 0 (a tenth of the string) .. 1 sul ponticello
              Speed,        ///< factor on the bow speed
              Attack, Release,   ///< ms: the stroke's start, the bow's lift
-             Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
+             Width, LowCut, Duck, RoomSend, PlateSend, HallSend,
+             ModFirst,   ///< the modulation block's core (48 knobs; Phase 5b)
+             Count = ModFirst + 48 };
 }
 /** @brief Parameters of the choir (PLAN 5.9, Choir.h). */
 namespace choir {
@@ -257,7 +271,9 @@ enum : int { Level,        ///< dB
              Breath,       ///< the aspiration noise in the glottal flow
              Tension,      ///< the voice quality: 0 lax and breathy (Rd 2.7) .. 1 pressed (Rd 0.8)
              Attack, Release,   ///< ms
-             Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
+             Width, LowCut, Duck, RoomSend, PlateSend, HallSend,
+             ModFirst,   ///< the modulation block's core (48 knobs; Phase 5b)
+             Count = ModFirst + 48 };
 }
 /** @brief Parameters of the brass (PLAN 5.9, Brass.h). */
 namespace brass {
@@ -267,7 +283,9 @@ enum : int { Level,        ///< dB
              Brassiness,   ///< the nonlinear steepening in the bore (the fortissimo's blare)
              Attack, Release,   ///< ms
              Vibrato,      ///< cents
-             Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
+             Width, LowCut, Duck, RoomSend, PlateSend, HallSend,
+             ModFirst,   ///< the modulation block's core (48 knobs; Phase 5b)
+             Count = ModFirst + 48 };
 }
 /** @brief Parameters of the granular cloud (PLAN 5.7, Cloud.h). */
 namespace cloud {
@@ -279,7 +297,9 @@ enum : int { Level,        ///< dB
              Hardness,     ///< factor on the mallet felt's stiffness
              Decay,        ///< factor on the modes' decay times
              Strike,       ///< the strike point, the fraction of the radius from the centre
-             Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
+             Width, LowCut, Duck, RoomSend, PlateSend, HallSend,
+             ModFirst,   ///< the modulation block's core (48 knobs; Phase 5b)
+             Count = ModFirst + 48 };
 }
 /**
  * @brief The sidechain (PLAN 7.3, Dok. 7): the curve every bus ducks along when the ghost kick triggers -- the attack,
@@ -316,7 +336,10 @@ enum : int { Dramaturgy, Journey, BlendBars, Minutes, TrackMinutes, Count };
  *        mixer's echo, and a mute per group of parts. Live only (Engine::setLive).
  */
 namespace perform {
-enum : int { Filter, Throw, MuteKick, MuteBass, MuteHats, MutePerc, MuteLead, MuteSynths, MutePads, Count };
+enum : int { Filter, Throw, MuteKick, MuteBass, MuteHats, MutePerc, MuteLead, MuteSynths, MutePads,
+             Wheel,      ///< the modulation wheel, 0..1 (MIDI CC 1): a source of every voice's matrix (Phase 5b)
+             Pressure,   ///< the channel pressure, 0..1: another
+             Count };
 constexpr int kMutes = MutePads - MuteKick + 1;   ///< kick; sub, bass, 303; hats; perc; lead, counter; pluck, arp; pad, stab
 }
 /** @brief The OSC cues (Cue.h): on or off, and the UDP port. */

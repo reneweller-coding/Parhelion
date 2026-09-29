@@ -126,7 +126,7 @@ void Poly::reset()
     for (int v = 0; v < kPolyVoices; ++v) {
         amp_[v].kill();
         fAdsr_[v].kill();
-        mod_[v].kill();
+        mod_[v].prepare(sr_, static_cast<uint64_t>(v) + 1u);   // (the LFOs from their start as well: the count starts again)
         for (float& m : modSum_[v]) m = 0.0f;
         modGainL_[v] = modGainR_[v] = 1.0f;
         fenv_[v] = 0.0f;
@@ -175,9 +175,12 @@ void Poly::writeSlotPitch(int voice)
     const double o2 = modSum_[voice][static_cast<int>(ModDest::Osc2Pitch)] != 0.0f
         ? std::pow(2.0, static_cast<double>(modSum_[voice][static_cast<int>(ModDest::Osc2Pitch)]) / 12.0) : 1.0;
     const double y = glideY_[voice], scale = glideScale_[voice], fmRatio = glideFmRatio_[voice];
+    // The unison's spread doubled or shut by the matrix (Phase 5b).
+    const double det = modOn_ && mod_[voice].targets(ModDest::Detune)
+        ? std::clamp(1.0 + static_cast<double>(modSum_[voice][static_cast<int>(ModDest::Detune)]), 0.0, 2.0) : 1.0;
     for (int u = uFirst; u < uLast; ++u) {
         const int s = voice * kPolyUnison + u;
-        const double hz = f0 * slotHzMul_[s] * (slotOsc2_[s] ? o2 : 1.0) * (1.0 + kSupersawOffsets[u] * slotSpread_[s] * y * scale)
+        const double hz = f0 * slotHzMul_[s] * (slotOsc2_[s] ? o2 : 1.0) * (1.0 + kSupersawOffsets[u] * slotSpread_[s] * y * scale * det)
                         * driftFactorHeld_[s];
         const double dt = std::min(hz / sr_, 0.45);
         slots_.dt[s] = static_cast<float>(dt);
@@ -535,11 +538,12 @@ void Poly::applyModulation(int voice, double beat)
     ext[static_cast<int>(ModSource::Velocity)] = vel_[voice];
     ext[static_cast<int>(ModSource::Key)] = std::clamp(static_cast<float>(pitch_[voice] - 60) / 24.0f, -1.0f, 1.0f);
     ext[static_cast<int>(ModSource::Random)] = noteRand_[voice];
+    fillGlobals(ext, modGlob_);
     float* sum = modSum_[voice];
     mod_[voice].evaluate(static_cast<int64_t>(pos_), beat, ext, sum);
     const Modulator& m = mod_[voice];
     // Pitch: the slots' frequencies (writeSlotPitch reads the sums).
-    if (m.targets(ModDest::Pitch) || m.targets(ModDest::Osc2Pitch)) writeSlotPitch(voice);
+    if (m.targets(ModDest::Pitch) || m.targets(ModDest::Osc2Pitch) || m.targets(ModDest::Detune)) writeSlotPitch(voice);
     const int s0 = voice * kPolyUnison;
     if (m.targets(ModDest::PulseWidth)) {
         const float pw = std::clamp(v[poly::PulseWidth] + sum[static_cast<int>(ModDest::PulseWidth)], 0.05f, 0.95f);

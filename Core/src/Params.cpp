@@ -24,9 +24,39 @@ const char* const kPercRoleNames[kNumPercRoles] = { "Closed Hat", "Rolling Hat",
 const char* const kPolyInstanceNames[kPolyInstances] = { "lead", "counter", "pluck", "arp", "pad", "stab" };
 const char* const kLfoShapeNames[] = { "Sine", "Triangle", "Saw Up", "Saw Down", "Square", "Sample & Hold", "Smooth Random" };
 const char* const kLfoSyncNames[] = { "Free", "4 Bars", "2 Bars", "1 Bar", "1/2", "1/4", "1/8", "1/16", "1/4 T", "1/8 T" };
-const char* const kModSourceNames[] = { "Off", "LFO 1", "LFO 2", "LFO 3", "LFO 4", "Mod Env", "Filter Env", "Velocity", "Key", "Random" };
+const char* const kModSourceNames[] = { "Off", "LFO 1", "LFO 2", "LFO 3", "LFO 4", "Mod Env", "Filter Env", "Velocity", "Key", "Random",
+                                        "Wheel", "Pressure", "Energy" };
 const char* const kModDestNames[] = { "Off", "Pitch", "Osc 2 Pitch", "Pulse Width", "Table Position", "FM Index", "Cutoff",
-                                      "Resonance", "Filter Mode", "Level", "Pan" };
+                                      "Resonance", "Filter Mode", "Level", "Pan", "Detune" };
+// The other engines' targets (Modulation.h maps each list onto ModDest).
+const char* const kSynthModDestNames[] = { "Off", "Pitch", "Pulse Width", "Cutoff", "Resonance", "Env Amount", "Drive", "Level", "Pan" };
+const char* const kPianoModDestNames[] = { "Off", "Pitch", "Hardness", "Level", "Pan" };
+const char* const kStringsModDestNames[] = { "Off", "Pitch", "Bow Pressure", "Bow Speed", "Bow Position", "Vibrato", "Vibrato Rate",
+                                             "Level", "Pan" };
+const char* const kChoirModDestNames[] = { "Off", "Pitch", "Vowel", "Tension", "Breath", "Vibrato", "Formant", "Level", "Pan" };
+const char* const kBrassModDestNames[] = { "Off", "Pitch", "Breath", "Brassiness", "Vibrato", "Level", "Pan" };
+const char* const kTimpaniModDestNames[] = { "Off", "Pitch", "Hardness", "Strike", "Decay", "Level", "Pan" };
+
+// The modulation block's core as rows (Phase 5b): the modulation envelope, four LFOs, eight slots with the engine's
+// targets -- the same keys as the polyphonic voice's, so a preset's modulation reads the same everywhere.
+#define PARH_MOD_LFO(n) \
+    { "lfo" #n "_rate",   "LFO " #n " Rate",   "Hz", 0.01f, 40.0f, 1.0f, Curve::Log }, \
+    { "lfo" #n "_shape",  "LFO " #n " Shape",  "",   0.0f,  6.0f,  0.0f, Curve::Choice, kLfoShapeNames }, \
+    { "lfo" #n "_sync",   "LFO " #n " Sync",   "",   0.0f,  9.0f,  0.0f, Curve::Choice, kLfoSyncNames }, \
+    { "lfo" #n "_retrig", "LFO " #n " Retrig", "",   0.0f,  1.0f,  0.0f, Curve::Toggle }, \
+    { "lfo" #n "_fade",   "LFO " #n " Fade",   "s",  0.0f,  8.0f,  0.0f, Curve::Linear }
+#define PARH_MOD_SLOT(n, DST, DMAX) \
+    { "mx" #n "_src",    "Mod " #n " Source", "", 0.0f, 12.0f, 0.0f, Curve::Choice, kModSourceNames }, \
+    { "mx" #n "_dst",    "Mod " #n " Target", "", 0.0f, DMAX,  0.0f, Curve::Choice, DST }, \
+    { "mx" #n "_amount", "Mod " #n " Amount", "", -1.0f, 1.0f, 0.0f, Curve::Linear }
+#define PARH_MOD_CORE(DST, DMAX) \
+    { "menv_attack",  "Mod Attack",  "ms", 0.1f, 8000.0f,  10.0f, Curve::Log }, \
+    { "menv_decay",   "Mod Decay",   "ms", 5.0f, 12000.0f, 800.0f, Curve::Log }, \
+    { "menv_sustain", "Mod Sustain", "",   0.0f, 1.0f,     0.0f, Curve::Linear }, \
+    { "menv_release", "Mod Release", "ms", 5.0f, 12000.0f, 400.0f, Curve::Log }, \
+    PARH_MOD_LFO(1), PARH_MOD_LFO(2), PARH_MOD_LFO(3), PARH_MOD_LFO(4), \
+    PARH_MOD_SLOT(1, DST, DMAX), PARH_MOD_SLOT(2, DST, DMAX), PARH_MOD_SLOT(3, DST, DMAX), PARH_MOD_SLOT(4, DST, DMAX), \
+    PARH_MOD_SLOT(5, DST, DMAX), PARH_MOD_SLOT(6, DST, DMAX), PARH_MOD_SLOT(7, DST, DMAX), PARH_MOD_SLOT(8, DST, DMAX)
 
 namespace {
 
@@ -237,6 +267,7 @@ const ParamDesc kSynthParams[synth::Count] = {
     { "room_send",    "Room Send",    "",     0.0f,    1.0f,   0.0f, Curve::Linear },
     { "duck",         "Duck",         "dB",   0.0f,   24.0f,   8.0f, Curve::Linear },
     { "duck_release", "Duck Release", "ms",  30.0f,  600.0f, 110.0f, Curve::Log },
+    PARH_MOD_CORE(kSynthModDestNames, 8.0f),
 };
 
 /**
@@ -334,29 +365,29 @@ const ParamDesc kPolyParams[poly::Count] = {
     { "lfo4_sync",     "LFO 4 Sync",     "",      0.0f,     9.0f,   0.0f, Curve::Choice, kLfoSyncNames },
     { "lfo4_retrig",   "LFO 4 Retrig",   "",      0.0f,     1.0f,   0.0f, Curve::Toggle },
     { "lfo4_fade",     "LFO 4 Fade",     "s",     0.0f,     8.0f,   0.0f, Curve::Linear },
-    { "mx1_src",       "Mod 1 Source",   "",      0.0f,     9.0f,   0.0f, Curve::Choice, kModSourceNames },
-    { "mx1_dst",       "Mod 1 Target",   "",      0.0f,    10.0f,   0.0f, Curve::Choice, kModDestNames },
+    { "mx1_src",       "Mod 1 Source",   "",      0.0f,     12.0f,   0.0f, Curve::Choice, kModSourceNames },
+    { "mx1_dst",       "Mod 1 Target",   "",      0.0f,    11.0f,   0.0f, Curve::Choice, kModDestNames },
     { "mx1_amount",    "Mod 1 Amount",   "",     -1.0f,     1.0f,   0.0f, Curve::Linear },
-    { "mx2_src",       "Mod 2 Source",   "",      0.0f,     9.0f,   0.0f, Curve::Choice, kModSourceNames },
-    { "mx2_dst",       "Mod 2 Target",   "",      0.0f,    10.0f,   0.0f, Curve::Choice, kModDestNames },
+    { "mx2_src",       "Mod 2 Source",   "",      0.0f,     12.0f,   0.0f, Curve::Choice, kModSourceNames },
+    { "mx2_dst",       "Mod 2 Target",   "",      0.0f,    11.0f,   0.0f, Curve::Choice, kModDestNames },
     { "mx2_amount",    "Mod 2 Amount",   "",     -1.0f,     1.0f,   0.0f, Curve::Linear },
-    { "mx3_src",       "Mod 3 Source",   "",      0.0f,     9.0f,   0.0f, Curve::Choice, kModSourceNames },
-    { "mx3_dst",       "Mod 3 Target",   "",      0.0f,    10.0f,   0.0f, Curve::Choice, kModDestNames },
+    { "mx3_src",       "Mod 3 Source",   "",      0.0f,     12.0f,   0.0f, Curve::Choice, kModSourceNames },
+    { "mx3_dst",       "Mod 3 Target",   "",      0.0f,    11.0f,   0.0f, Curve::Choice, kModDestNames },
     { "mx3_amount",    "Mod 3 Amount",   "",     -1.0f,     1.0f,   0.0f, Curve::Linear },
-    { "mx4_src",       "Mod 4 Source",   "",      0.0f,     9.0f,   0.0f, Curve::Choice, kModSourceNames },
-    { "mx4_dst",       "Mod 4 Target",   "",      0.0f,    10.0f,   0.0f, Curve::Choice, kModDestNames },
+    { "mx4_src",       "Mod 4 Source",   "",      0.0f,     12.0f,   0.0f, Curve::Choice, kModSourceNames },
+    { "mx4_dst",       "Mod 4 Target",   "",      0.0f,    11.0f,   0.0f, Curve::Choice, kModDestNames },
     { "mx4_amount",    "Mod 4 Amount",   "",     -1.0f,     1.0f,   0.0f, Curve::Linear },
-    { "mx5_src",       "Mod 5 Source",   "",      0.0f,     9.0f,   0.0f, Curve::Choice, kModSourceNames },
-    { "mx5_dst",       "Mod 5 Target",   "",      0.0f,    10.0f,   0.0f, Curve::Choice, kModDestNames },
+    { "mx5_src",       "Mod 5 Source",   "",      0.0f,     12.0f,   0.0f, Curve::Choice, kModSourceNames },
+    { "mx5_dst",       "Mod 5 Target",   "",      0.0f,    11.0f,   0.0f, Curve::Choice, kModDestNames },
     { "mx5_amount",    "Mod 5 Amount",   "",     -1.0f,     1.0f,   0.0f, Curve::Linear },
-    { "mx6_src",       "Mod 6 Source",   "",      0.0f,     9.0f,   0.0f, Curve::Choice, kModSourceNames },
-    { "mx6_dst",       "Mod 6 Target",   "",      0.0f,    10.0f,   0.0f, Curve::Choice, kModDestNames },
+    { "mx6_src",       "Mod 6 Source",   "",      0.0f,     12.0f,   0.0f, Curve::Choice, kModSourceNames },
+    { "mx6_dst",       "Mod 6 Target",   "",      0.0f,    11.0f,   0.0f, Curve::Choice, kModDestNames },
     { "mx6_amount",    "Mod 6 Amount",   "",     -1.0f,     1.0f,   0.0f, Curve::Linear },
-    { "mx7_src",       "Mod 7 Source",   "",      0.0f,     9.0f,   0.0f, Curve::Choice, kModSourceNames },
-    { "mx7_dst",       "Mod 7 Target",   "",      0.0f,    10.0f,   0.0f, Curve::Choice, kModDestNames },
+    { "mx7_src",       "Mod 7 Source",   "",      0.0f,     12.0f,   0.0f, Curve::Choice, kModSourceNames },
+    { "mx7_dst",       "Mod 7 Target",   "",      0.0f,    11.0f,   0.0f, Curve::Choice, kModDestNames },
     { "mx7_amount",    "Mod 7 Amount",   "",     -1.0f,     1.0f,   0.0f, Curve::Linear },
-    { "mx8_src",       "Mod 8 Source",   "",      0.0f,     9.0f,   0.0f, Curve::Choice, kModSourceNames },
-    { "mx8_dst",       "Mod 8 Target",   "",      0.0f,    10.0f,   0.0f, Curve::Choice, kModDestNames },
+    { "mx8_src",       "Mod 8 Source",   "",      0.0f,     12.0f,   0.0f, Curve::Choice, kModSourceNames },
+    { "mx8_dst",       "Mod 8 Target",   "",      0.0f,    11.0f,   0.0f, Curve::Choice, kModDestNames },
     { "mx8_amount",    "Mod 8 Amount",   "",     -1.0f,     1.0f,   0.0f, Curve::Linear },
 };
 
@@ -420,6 +451,7 @@ const ParamDesc kPianoParams[piano::Count] = {
     { "room_send",    "Room Send",    "",      0.0f,   1.0f,   0.05f, Curve::Linear },
     { "plate_send",   "Plate Send",   "",      0.0f,   1.0f,   0.1f, Curve::Linear },
     { "hall_send",    "Hall Send",    "",      0.0f,   1.0f,   0.35f, Curve::Linear },
+    PARH_MOD_CORE(kPianoModDestNames, 4.0f),
 };
 
 /** The string section (PLAN 5.9): six players a note, the bow at half Schelleng's upper force, the hall behind it. */
@@ -438,6 +470,7 @@ const ParamDesc kStringsParams[strings::Count] = {
     { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.05f, Curve::Linear },
     { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.1f, Curve::Linear },
     { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.45f, Curve::Linear },
+    PARH_MOD_CORE(kStringsModDestNames, 8.0f),
 };
 
 /** The choir (PLAN 5.9): six singers a note on "aah", a modal voice (Rd 1.5), the hall behind it. */
@@ -456,6 +489,7 @@ const ParamDesc kChoirParams[choir::Count] = {
     { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.0f, Curve::Linear },
     { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.1f, Curve::Linear },
     { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.55f, Curve::Linear },
+    PARH_MOD_CORE(kChoirModDestNames, 8.0f),
 };
 
 /** The brass (PLAN 5.9): three players a note, mezzo-forte, a little blare. */
@@ -473,6 +507,7 @@ const ParamDesc kBrassParams[brass::Count] = {
     { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.05f, Curve::Linear },
     { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.1f, Curve::Linear },
     { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.45f, Curve::Linear },
+    PARH_MOD_CORE(kBrassModDestNames, 6.0f),
 };
 
 /** The timpani (PLAN 5.9): a felt mallet a third of the radius in from the rim. */
@@ -487,6 +522,7 @@ const ParamDesc kTimpaniParams[timpani::Count] = {
     { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.05f, Curve::Linear },
     { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.05f, Curve::Linear },
     { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.4f, Curve::Linear },
+    PARH_MOD_CORE(kTimpaniModDestNames, 6.0f),
 };
 
 /** The granular cloud (PLAN 5.7): silent until a track asks for it (Deep); from the pad and the keys, into the plate. */
@@ -582,6 +618,8 @@ const ParamDesc kPerformParams[perform::Count] = {
     { "mute_lead",   "Mute Lead",     "",   0.0f, 1.0f, 0.0f, Curve::Toggle },
     { "mute_synths", "Mute Synths",   "",   0.0f, 1.0f, 0.0f, Curve::Toggle },
     { "mute_pads",   "Mute Pads",     "",   0.0f, 1.0f, 0.0f, Curve::Toggle },
+    { "wheel",       "Mod Wheel",     "",   0.0f, 1.0f, 0.0f, Curve::Linear },
+    { "pressure",    "Pressure",      "",   0.0f, 1.0f, 0.0f, Curve::Linear },
 };
 
 /** The OSC cues (Cue.h). */

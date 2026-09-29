@@ -26,6 +26,7 @@
 #include "parh/Leveler.h"
 #include "parh/Loudness.h"
 #include "parh/Midi.h"
+#include "parh/Presets.h"
 #include "parh/Profile.h"
 #include "parh/WavWriter.h"
 #include "parh/SetFile.h"
@@ -79,6 +80,32 @@ void printPlan(const Score& sc)
     }
 }
 
+/** @brief The label of a synth (its bank's): "kick", "lead", "perc3". */
+std::string synthLabel(int module, int instance)
+{
+    const Module m = static_cast<Module>(module);
+    if (m == Module::Poly) return kPolyInstanceNames[instance];
+    if (m == Module::Perc) return "perc" + std::to_string(instance + 1);
+    static const std::pair<Module, const char*> kNames[] = { { Module::Kick, "kick" }, { Module::Sub, "sub" }, { Module::Bass, "bass" },
+        { Module::Acid, "acid" }, { Module::Piano, "piano" }, { Module::Strings, "strings" }, { Module::Choir, "choir" },
+        { Module::Brass, "brass" }, { Module::Timpani, "timpani" }, { Module::Sfx, "sfx" }, { Module::Cloud, "cloud" } };
+    for (const auto& [mm, name] : kNames) if (mm == m) return name;
+    return "?";
+}
+
+/** @brief The presets a track plays from beat @p from (its SoundPicks there): "lead Anthem Supersaw / Golden Zenith", ... */
+std::vector<std::pair<std::string, std::string>> soundsAt(const Score& sc, double from)
+{
+    std::vector<std::pair<std::string, std::string>> out;
+    for (const SoundPick& s : sc.sounds) {
+        if (s.beat != from) continue;
+        const std::vector<SoundPreset>& ps = factoryPresets(static_cast<Module>(s.module), s.instance);
+        if (s.preset < 0 || static_cast<size_t>(s.preset) >= ps.size()) continue;
+        out.push_back({ synthLabel(s.module, s.instance), ps[static_cast<size_t>(s.preset)].group + " / " + ps[static_cast<size_t>(s.preset)].name });
+    }
+    return out;
+}
+
 /** @brief One track's plan as a JSON object: what the evaluation compares the audio with. */
 std::string trackJson(const Score& sc, const TrackInfo& info, double at, const TempoMap& tempo)
 {
@@ -92,7 +119,10 @@ std::string trackJson(const Score& sc, const TrackInfo& info, double at, const T
         s += std::string(i ? "," : "") + "{\"kind\":\"" + kSectionNames[static_cast<int>(x.kind)] + "\",\"bar\":" + std::to_string(static_cast<int>(x.beat / 4.0))
            + ",\"bars\":" + std::to_string(static_cast<int>(x.length / 4.0)) + ",\"seconds\":" + std::to_string(sec(x.beat)) + "}";
     }
-    return s + "]}";
+    s += "],\"sounds\":{";
+    const auto sounds = soundsAt(sc, 0.0);
+    for (size_t i = 0; i < sounds.size(); ++i) s += std::string(i ? "," : "") + "\"" + sounds[i].first + "\":\"" + sounds[i].second + "\"";
+    return s + "}}";
 }
 
 bool writeText(const std::string& path, const std::string& text)
@@ -253,6 +283,14 @@ int main(int argc, char** argv)
                         info.progression.c_str(), info.bass.c_str(), info.camelot.c_str(), info.mainDropBar, info.breakdownBar,
                         info.firstLeadBar, info.keyChangeBar >= 0 ? (", key change at bar " + std::to_string(info.keyChangeBar)).c_str() : "",
                         info.orchestra ? "; the orchestra" : "");
+        if (!study) {
+            const auto sounds = soundsAt(score, 0.0);
+            if (!sounds.empty()) {
+                std::printf("sounds:");
+                for (size_t i = 0; i < sounds.size(); ++i) std::printf("%s %s: %s", i ? "," : "", sounds[i].first.c_str(), sounds[i].second.c_str());
+                std::printf("\n");
+            }
+        }
         printPlan(score);
         if (!midi.empty()) {
             if (!writeMidiFile(score, midi.c_str(), "Parhelion", &p)) { std::fprintf(stderr, "cannot write %s\n", midi.c_str()); return 1; }

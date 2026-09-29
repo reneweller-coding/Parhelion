@@ -5,6 +5,7 @@
  * @note Copied from Totality `Core/src/Midi.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
  */
 #include "parh/Midi.h"
+#include "parh/Presets.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -80,6 +81,26 @@ void appendTrack(std::vector<uint8_t>& file, std::vector<Ev>& evs)
     file.insert(file.end(), { 'M', 'T', 'r', 'k' });
     put32(file, static_cast<uint32_t>(body.size()));
     file.insert(file.end(), body.begin(), body.end());
+}
+
+/** @brief The part a chosen sound plays on (Part::Count: none, the cloud has no notes of its own). */
+Part partOfSound(const SoundPick& s)
+{
+    switch (static_cast<Module>(s.module)) {
+    case Module::Kick: return Part::Kick;
+    case Module::Sub: return Part::Sub;
+    case Module::Bass: return Part::Bass;
+    case Module::Acid: return Part::Acid;
+    case Module::Poly: return static_cast<Part>(static_cast<int>(Part::Lead) + s.instance);
+    case Module::Perc: return static_cast<Part>(static_cast<int>(Part::Perc1) + s.instance);
+    case Module::Piano: return Part::Piano;
+    case Module::Strings: return Part::Strings;
+    case Module::Choir: return Part::Choir;
+    case Module::Brass: return Part::Brass;
+    case Module::Timpani: return Part::Timpani;
+    case Module::Sfx: return Part::Fx;
+    default: return Part::Count;
+    }
 }
 
 } // namespace
@@ -177,6 +198,21 @@ std::vector<uint8_t> encodeMidi(const Score& score, const char* title, const Par
         const uint8_t ch = static_cast<uint8_t>(midiChannelOf(part));
         std::vector<Ev> evs;
         evs.push_back(metaText(0, 0x03, kPartNames[pi]));
+        // The sound the composer chose (Presets.h) where each track begins: its name, and on a voice's own channel the
+        // program change (bank select 0 = preset / 128, program = preset % 128); the kick and the kit share the drum
+        // channel, where a program change would switch a host's kit, so they carry the name only.
+        for (const SoundPick& s : score.sounds) {
+            if (partOfSound(s) != part) continue;
+            const std::vector<SoundPreset>& ps = factoryPresets(static_cast<Module>(s.module), s.instance);
+            if (s.preset < 0 || static_cast<size_t>(s.preset) >= ps.size()) continue;
+            const int64_t at = std::max<int64_t>(0, toTick(s.beat));
+            const SoundPreset& sp = ps[static_cast<size_t>(s.preset)];
+            evs.push_back(metaText(at, 0x01, "preset: " + sp.group + " / " + sp.name));
+            if (ch == 9) continue;
+            evs.push_back(Ev{ at, 0, { static_cast<uint8_t>(0xB0 | ch), 0, static_cast<uint8_t>(s.preset / 128) } });
+            evs.push_back(Ev{ at, 0, { static_cast<uint8_t>(0xB0 | ch), 32, 0 } });
+            evs.push_back(Ev{ at, 0, { static_cast<uint8_t>(0xC0 | ch), static_cast<uint8_t>(s.preset % 128) } });
+        }
         for (const NoteEvent& n : score.notes) {
             if (n.part != part) continue;
             const int pitch = std::clamp(n.pitch, 0, 127);

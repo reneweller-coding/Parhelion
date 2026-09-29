@@ -22,6 +22,7 @@ void Brass::prepare(double sampleRate, uint64_t seed)
 {
     sr_ = sampleRate;
     seed_ = seed;
+    mod_.prepare(sampleRate, mixSeed(seed, 0x4D4F44ull));   // "MOD"
     for (Player& p : player_) p.line.assign(kLineMax, 0.0f);
     for (Svf& f : lowCut_) f.setQ(lowCutHz_, 0.707f, static_cast<float>(sr_));
     reset();
@@ -41,6 +42,39 @@ void Brass::update(const float* v)
         lowCutHz_ = v[brass::LowCut];
         for (Svf& f : lowCut_) f.setQ(lowCutHz_, 0.707f, static_cast<float>(sr_));
     }
+    mod_.set(readModCore(v + brass::ModFirst, kBrassModDests, static_cast<int>(std::size(kBrassModDests))));
+    for (int s = 0; s < kBrassNotes; ++s) {
+        if (!mod_.targets(ModDest::Brassiness)) noteBrass_[s] = brassiness_;
+        if (!mod_.targets(ModDest::VibDepth)) noteVib_[s] = vibratoCents_;
+    }
+}
+
+void Brass::modNote(int s)
+{
+    mod_.evaluate(s, pos_);
+    noteBrass_[s] = std::clamp(brassiness_ + mod_.get(s, ModDest::Brassiness), 0.0f, 1.0f);
+    noteVib_[s] = vibratoCents_ * std::clamp(1.0f + mod_.get(s, ModDest::VibDepth), 0.0f, 4.0f);
+    const double breath = std::exp2(std::clamp(static_cast<double>(mod_.get(s, ModDest::Pressure)), -2.0, 1.0));
+    const double bend = std::pow(2.0, std::clamp(static_cast<double>(mod_.get(s, ModDest::Pitch)), -2.0, 2.0) / 12.0);
+    const bool pan = mod_.targets(ModDest::Pan) || mod_.targets(ModDest::Level);
+    const float gain = std::clamp(1.0f + mod_.get(s, ModDest::Level), 0.0f, 2.0f);
+    for (int k = 0; k < kBrassPlayers; ++k) {
+        Player& p = player_[s * kBrassPlayers + k];
+        if (!p.on) continue;
+        p.target = p.target0 * breath;
+        if (mod_.targets(ModDest::Pitch)) {
+            // The lips set to the bent note, the bore's delay moved with it (the ear refines it).
+            const double f = p.f0 * bend, period = sr_ / f;
+            p.delay = std::clamp(p.delay * period / p.period, 4.0, static_cast<double>(kLineMax - 4));
+            p.period = period;
+            p.wl = 2.0 * kPiD * f * kLipRatio;
+        }
+        if (pan) {
+            const float x = std::clamp(p.pan0 + mod_.get(s, ModDest::Pan), -1.0f, 1.0f);
+            p.panL = gain * std::cos((x + 1.0f) * kPi / 4.0f);
+            p.panR = gain * std::sin((x + 1.0f) * kPi / 4.0f);
+        }
+    }
 }
 
 void Brass::reset()
@@ -53,6 +87,9 @@ void Brass::reset()
     }
     for (bool& b : noteOn_) b = false;
     for (Svf& f : lowCut_) f.ic1 = f.ic2 = 0.0f;
+    for (int s = 0; s < kBrassNotes; ++s) { noteBrass_[s] = brassiness_; noteVib_[s] = vibratoCents_; }
+    pos_ = 0;
+    mod_.reset();
 }
 
 int Brass::activePlayers() const
@@ -94,19 +131,27 @@ void Brass::noteOn(int pitch, float velocity, bool, double)
         p.wl = 2.0 * kPiD * f0 * kLipRatio;
         p.y = kLipRest;
         p.target = pressure_ * (2500.0 + 6500.0 * velocity) * std::pow(f0 / 100.0, 0.3) * (1.0 + 0.05 * p.rng.bipolar());
+        p.target0 = p.target;
+        p.f0 = f0;
         p.start = 0.03 * p.rng.uniform();
         p.vibHz = 4.5 + p.rng.uniform();
         p.vibPhase = 2.0 * kPiD * p.rng.uniform();
         const float pan = std::clamp((0.35f * static_cast<float>(k) - 0.35f + 0.2f * p.rng.bipolar()) * width_, -1.0f, 1.0f);
         p.panL = std::cos((pan + 1.0f) * kPi / 4.0f);
         p.panR = std::sin((pan + 1.0f) * kPi / 4.0f);
+        p.pan0 = pan;
     }
+    noteBrass_[slot] = brassiness_;
+    noteVib_[slot] = vibratoCents_;
+    mod_.noteOn(slot, pos_, pitch, velocity);
+    if (mod_.on()) modNote(slot);
 }
 
 void Brass::noteOff(int pitch)
 {
     for (int s = 0; s < kBrassNotes; ++s) {
         if (!noteOn_[s] || notePitch_[s] != pitch) continue;
+        mod_.noteOff(s);
         for (int k = 0; k < kBrassPlayers; ++k) {
             Player& p = player_[s * kBrassPlayers + k];
             if (p.on && p.held) { p.held = false; p.released = 0.0; }
@@ -118,7 +163,11 @@ void Brass::process(float* L, float* R, int n)
 {
     const double dt = 1.0 / sr_;
     const double att = static_cast<double>(attackMs_) * 1e-3, rel = static_cast<double>(releaseMs_) * 1e-3;
+    const bool modded = mod_.on();
     for (int i = 0; i < n; ++i) {
+        if (modded && pos_ % kMaxBlock == 0)
+            for (int s = 0; s < kBrassNotes; ++s) if (noteOn_[s]) modNote(s);
+        ++pos_;
         float outL = 0.0f, outR = 0.0f;
         for (int s = 0; s < kBrassNotes; ++s) {
             if (!noteOn_[s]) continue;
@@ -143,7 +192,7 @@ void Brass::process(float* L, float* R, int n)
                     swell *= fall;
                     p.released += dt;
                 }
-                const double vib = 1.0 + (std::pow(2.0, vibratoCents_ * std::sin(p.vibPhase) / 1200.0) - 1.0) * std::clamp((t - 0.25) / 0.3, 0.0, 1.0);
+                const double vib = 1.0 + (std::pow(2.0, noteVib_[s] * std::sin(p.vibPhase) / 1200.0) - 1.0) * std::clamp((t - 0.25) / 0.3, 0.0, 1.0);
                 p.vibPhase += 2.0 * kPiD * p.vibHz * dt;
                 p.pm = p.target * breath;
                 // The returning wave: the bell's reflection of what left one round trip ago.
@@ -191,7 +240,7 @@ void Brass::process(float* L, float* R, int n)
                 ++p.clock;
                 // What leaves the bell (the outgoing wave less what returns), steepened when loud, no constant part.
                 double bell = (back - pMinus) / 4000.0;
-                bell += static_cast<double>(brassiness_) * 1.5 * bell * std::fabs(bell);
+                bell += static_cast<double>(noteBrass_[s]) * 1.5 * bell * std::fabs(bell);
                 const float o = static_cast<float>(bell * swell);
                 p.dc += 0.002f * (o - p.dc);
                 p.out = o - p.dc;

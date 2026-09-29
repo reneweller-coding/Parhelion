@@ -17,6 +17,10 @@
  *
  * **Low end** (PLAN 5.2): where the rumble owns the band under the split, the engine raises the voice's Low Cut to at
  * least 100 Hz, so the bass carries its harmonics above the kick's fundamental and never its own fundamental under it.
+ *
+ * **Modulation** (Phase 5b, Modulation.h): the block's core (the modulation envelope, four LFOs, eight slots) on the
+ * pitch, the pulse width, the cutoff, the resonance, the envelope's amount, the drive, the level and the pan, read every
+ * 16 samples of the voice's own absolute count (so the host's blocks never move it); the filter envelope is a source.
  * @note Copied from Totality `Core/include/tot/synth/Synth.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
  */
 #pragma once
@@ -24,6 +28,7 @@
 #include "parh/Halfband.h"
 #include "parh/mix/Ducker.h"
 #include "parh/synth/Filters.h"
+#include "parh/synth/Modulation.h"
 #include "parh/synth/Oscillator.h"
 
 namespace parh {
@@ -31,8 +36,8 @@ namespace parh {
 /** @brief One monophonic synth voice with its strip. */
 class MonoSynth {
 public:
-    /** @brief Prepares for a sample rate. */
-    void prepare(double sampleRate);
+    /** @brief Prepares for a sample rate; @p seed: the modulation's random stream. */
+    void prepare(double sampleRate, uint64_t seed = 0x4D4F4E4Full);
     /** @brief Silence. */
     void reset();
     /**
@@ -57,8 +62,15 @@ public:
     void process(float* L, float* R, int n);
     /** @brief Whether anything sounds. */
     bool active() const { return amp_.isActive(); }
+    /** @brief The deck's shared modulation sources (Modulation.h). */
+    void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
+    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
 
 private:
+    /** @brief The matrix's sums at this sample (every 16th), onto the voice's settings. */
+    void applyModulation();
+
     double sr_ = 48000.0;
     VaOscillator osc_;                 ///< at twice the rate
     double subPhase_ = 0.0;            ///< the square sub's phase, cycles
@@ -79,6 +91,12 @@ private:
     float drive_ = 1.0f, driveNorm_ = 1.0f, keyTrack_ = 0.5f, level_ = 0.3f, gl_ = 0.7f, gr_ = 0.7f;
     float glideMs_ = 0.0f, attack_ = 0.003f, decay_ = 0.25f, sustain_ = 0.6f, release_ = 0.3f;
     double filtDecayS_ = 0.18;
+    // The modulation (Phase 5b): the knobs' values and what the matrix makes of them now.
+    NoteModulation<1> mod_;
+    int64_t pos_ = 0;                  ///< the voice's absolute sample count (the control grid)
+    float driveKnob_ = 0.25f, panKnob_ = 0.0f, levelKnob_ = 0.3f;
+    float pwNow_ = 0.5f, resNow_ = 0.2f, kNow_ = 0.0f, cutOct_ = 0.0f, envAdd_ = 0.0f;
+    double pitchMul_ = 1.0;
 };
 
 } // namespace parh

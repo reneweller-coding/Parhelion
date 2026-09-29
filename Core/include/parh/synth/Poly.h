@@ -178,6 +178,8 @@ public:
      * @brief The set's beat at the next sample and the beats per sample (Engine.cpp, per chunk; 26.09.2026): the
      *        clock the tempo-synced LFOs of the modulation (Modulation.h) read.
      */
+    /** @brief The deck's shared modulation sources (Modulation.h: the wheel, the pressure, the energy). */
+    void setModGlobals(const ModGlobals& g) { modGlob_ = g; }
     void setClock(double beat, double beatsPerSample) { beat_ = beat; beatsPerSample_ = beatsPerSample; }
     /** @brief A voice's modulation sums per destination, as the last grid step evaluated them (tests, the live ring). */
     const float* modulation(int voice) const { return modSum_[voice]; }
@@ -300,6 +302,7 @@ private:
      *  @{ */
     int   lastVoice_ = -1;                        ///< the voice of the latest note (displayModulation)
     Modulator mod_[kPolyVoices];                  ///< envelope, LFOs and matrix, per voice
+    ModGlobals modGlob_;                          ///< the deck's shared sources (wheel, pressure, energy; Phase 5b)
     float modSum_[kPolyVoices][kModDests] = {};   ///< the sums per destination, per voice, on the 16-sample grid
     bool  modOn_ = false;                         ///< some slot of the matrix reaches something
     Envelope fAdsr_[kPolyVoices];                 ///< the filter envelope as an ADSR (filt_attack, filt_sustain, filt_release)

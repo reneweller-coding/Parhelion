@@ -24,8 +24,7 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 5 gebaut (29.09.2026); als nächstes 5b, die Klangbänke und die
-Modulation (12).**
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 5b gebaut (29.09.2026); als nächstes 6, das Plugin.**
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
@@ -288,12 +287,65 @@ Stem, Balance-Spur (Fenster [I]) und MIDI-Spur; Messwerkzeug `parh_orchprobe` (`
   (Precision, Recall, F1 auf ±1 Takt), der Anteil der gefundenen Grenzen auf 8-Takt-Linien, die gehörten Drops (+3 dB),
   der Abstand Breakdown → Drop, die Tonart des Audios (Krumhansl-Kessler) gegen den Plan, der Korridor der Referenzen.
   Erster Lauf [M, Uplifting Seed 7, vor den vier Vakuen]: F1 0.60, 92 % der gefundenen Grenzen auf 8-Takt-Linien,
-  Drops gehört 1 von 2 (der Haupt-Drop hob sich 2.9 dB), Abstand 2.1 LU, Tonart eine Quinte daneben (≈), Korridor 17 von
-  19. Das Zwei-Stunden-Set folgt im nächsten Stand.
+  Abstand 2.1 LU, Tonart eine Quinte daneben (≈), Korridor 17 von 19.
+- **Der Prüfstein, das Zwei-Stunden-Set** [M, Seed 7, Sunrise, Stil-Reise; `docs/eval/set_seed7_sunrise.md`]: 22 Tracks,
+  124 Minuten, Energie 0.45 → 0.98 und 134 → 138 BPM, Progressive → Dream House → Uplifting, sieben Tracks mit dem
+  Orchester, sieben Teases auf Deck C, die Tonarten schrittweise um das Camelot-Rad (Parallele 11A → 11B, 9B → 9A, ein
+  Energy Boost 4A → 11A); −10.6 LUFS integriert, LRA 7.4 LU, True Peak −1.0 dBTP, Korrelation 0.92; komponiert und
+  gepegelt in 36 Minuten, gerendert in 21 (sechsfache Echtzeit). Sektionsgrenzen F1 0.53 und 63 % auf 8-Takt-Linien (im
+  Set setzen Blends und Teases eigene Neuheitsspitzen), die Tonart 13 von 22 wie geplant oder parallel, 5 eine Quinte
+  daneben. **Zwei Befunde, beide behoben:** (1) Kick, Kit und Effekte blieben in der Tonart des Knopfs (A): der Komponist
+  schrieb die Tonart des Tracks nie auf die Knöpfe, nach denen das Deck stimmt — vier Dream-House-Tracks hörte die
+  Auswertung deshalb in a-Moll; jetzt setzt jeder Track compose.key und compose.scale an seinem Anfang (Test). (2) Das
+  Kriterium "Drop gehört: +3 dB über die zwei Takte davor" (13 von 32) war an keiner Referenz gemessen; an seine Stelle
+  treten `drop_rise` und `drop_rise_low` in analyze_ref.py, auf Referenzen und eigenen Tracks auf dieselbe Weise: der
+  größte Anstieg zweier Takte über die zwei davor in den 24 Takten nach dem längsten Breakdown. (Eine erste Messung an
+  `drop_at` der Referenzen, dem Anfang ihrer lautesten 32 Takte, fand +1.2 dB im Median — falsch gemessen: das Fenster
+  beginnt oft mitten im Drop.) Die Referenzen: breit +1.2 bis +12.6 dB (Uplifting im Median +2.7), tief +3 bis +40 dB
+  (Uplifting +10). Runde 5 daneben: breit im Bereich (Uplifting +2.3 bis +3.5, Progressive +2.9 bis +3.9, Deep +4.1 bis
+  +5.5), das Tiefband aber steigt in Progressive, Deep und einem Uplifting-Track um +36 bis +51 dB — unsere Breakdowns sind
+  unter 150 Hz leer, die der Referenzen tragen dort Pad-Körper, Hall und Sub-Schwellungen; Dream House (der Bass bleibt im
+  Breakdown) steigt tief zu wenig. Beides geht in die Nachkalibrierung.
 - **Tests**: testSet (Tracks und Decks, Tempo, Camelot, Intro über Outro mit einem Bass-Swap, die Stil-Reise, der
   erste Bass-Swap bei Blockgrößen 37 und 512 bitgleich), testComposer (18 Würfelfälle bitgleich außerhalb der Einheit bis
   zur Anschlagstärke, Form beim Würfeln von Matrix und Sektion unverändert, die vier Vakuen, im Vakuum nichts außer der
   Kick auf 4), testLeveler; ctest 28/28.
+
+**Phase 5b, Klangbänke und Modulation (29.09.2026).** Auf Wunsch des Nutzers vor die GUI gezogen (12, 14).
+- **Modulation für jede Stimme** (synth/Modulation.h): der Block von Ephemeris und Phosphene — Mod-Hüllkurve, vier LFOs,
+  Matrix mit acht Slots — jetzt auch für Bass und 303 (Totalitys Mono-Synth, alle 16 Samples seines eigenen Zählers),
+  Piano (je Stimme: Tonhöhe als exakte Drehung der Pole mit der Spannung, Hammerhärte beim Anschlag, die Kraft auf den
+  Steg, die Stegregion als Panorama — ohne Anschlagpunkt: die Hammerlinie ist fest, und der Entwurf kennt die Moden nur
+  dort, an einem Knoten mit null Anregung), Streicher (Bogendruck, -geschwindigkeit und -position: die Kraft mit
+  Schellengs Grenze über v/β mitgeführt, die Modenformen am Bogenpunkt neu; Vibrato-Tiefe und -Rate, Tonhöhe exakt
+  gedreht, Moden nahe Nyquist stumm), Chor (Vokal, Formantverschiebung als Traktlänge, Spannung als Rd, Hauch, Vibrato),
+  Blech (Atemdruck ¼ bis 2×, Schmettern, Lippe und Rohr gemeinsam gebogen, ±2 Halbtöne), Pauken (Härte und Schlagpunkt
+  beim Schlag, Pedal ±5 Halbtöne und Abklingen als neu gestimmte Moden). Neue Quellen für alle: das Modrad und der
+  Kanaldruck (perform.wheel, perform.pressure) und die Energie der Partitur. Poly bekommt Detune als Ziel. Alles auf dem
+  absoluten Sampletakt jeder Engine; ohne belegten Slot rechnet jede Stimme bitgleich wie zuvor. Nebenbei: Poly setzte
+  bei einem Sprung nur die Hüllkurven zurück, die freien LFOs liefen rückwärts weiter — jetzt vom Anfang.
+- **Die Bänke** (Presets.h, PresetBank.cpp, `Tools/presets/bank_spec.py` → PresetBankData.inl): 18 Bänke zu 1024 —
+  Kick, Sub, Kit-Lane (je Rolle), Bass, 303, Lead, Counter, Pluck, Arp, Pad, Stab, Piano, Streicher, Chor, Blech,
+  Pauken, FX, Wolke —, je 16 Gruppen auf dem Raster aus acht Adjektiven und acht Nomen, jede Gruppe mit Bereichen und
+  Achsen, Filtermodellen (Listen), Modulationsrezepten und Gewichten in den fünf Stilen; der Pegelausgleich je Preset
+  gemessen (TRIMS). Die Wahl des Komponisten (Einheit `sounds`, compose.pick_sounds): die Gruppen nach ihrem Gewicht im
+  Stilvektor des Profils, **hoch drei** (mit den einfachen Gewichten war das Lead eines Uplifting-Tracks nur jedes achte
+  Mal ein Anthem-Supersaw), dann eines ihrer Presets; eine Kit-Lane nur aus Gruppen ihrer Rolle. Die Wahl als SoundPick
+  und Knopfsätze am Trackanfang (vor den Stilregeln, die gewinnen), im Set mit jedem Track verschoben, im MIDI als
+  Name und Programmwechsel (Bank = Preset / 128, Programm = Preset % 128; Kick und Kit nur der Name, der Drumkanal),
+  im Plan-JSON und in `parh_render`s Bericht ("sounds: lead Euphoric Octaves / Brilliant Glory, ...").
+- **Nachkalibrierung mit den Presets**: die Pegelausgleiche aller 18 432 Presets gemessen [M] (testPresetBank mit PARH_BANK_TRIMS, 24 Minuten
+  auf 16 Kernen): alle endlich und hörbar, keiner weiter als 21 dB vom Standardklang; im Median brauchen die Sub-Presets
+  −6.7 dB, die der 303 und des Counters +5 dB. Die Zeile (dunkel bis hell) wählt der Komponist um die Helligkeit des
+  Stils (Uplifting 0.65 .. Deep 0.4 der acht Zeilen, eine Glocke von anderthalb Zeilen): gleichverteilt kam ein
+  Progressive-Track auf einen Schwerpunkt von 220 Hz (Referenzen 420 bis 800). Dazu der Befund der Drop-Messung: im
+  Breakdown ohne Sub senkt das Pad seinen Hochpass auf 70 Hz und spielt seinen Grundton eine Oktave tiefer (die
+  Tiefmitten eines Progressive-Tracks 0.126, im Bereich; der Tiefband-Anstieg in den Drop +32 dB, noch über den +20 der
+  Referenzen). Runde 6 der Kalibrierung, mit den Presets, folgt im nächsten Stand.
+- **Tests**: testModulation (40 von 40 Zielen verändern den Klang; Uplifting mit Orchester und Dream House mit Piano,
+  jede Matrix belegt, bei 1, 37 und 512 bitgleich), testPresetBank (18 × 1024, eindeutige Namen, jeder Knopf existiert,
+  jede der 14 Rollen hat Gruppen, eine Stichprobe von 144 Presets endlich, hörbar, innerhalb von 24 dB des Standardklangs;
+  mit PARH_BANK_TRIMS alle 18 432 gemessen, auf 16 Kernen), testComposer (die Tonart auf den Knöpfen); ctest 30/30.
 
 ## 0. Kurzfassung
 

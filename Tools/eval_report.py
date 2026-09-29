@@ -11,7 +11,11 @@ The plan JSON is parh_render's --plan-json (style, key, tempo, every section wit
              ICME 2000: a self-similarity matrix of per-beat spectra, a checkerboard kernel of four bars) against the
              planned section boundaries -- precision, recall and F1 within a bar; and the share of the boundaries the audio
              shows that lie on a multiple of 8 bars (Dok. 10's proxy for a DJ's use)
-  drops      every planned drop heard: the level rises by 3 dB at least from the two bars before it to the two after
+  drops      the rise into the drop after the main breakdown (analyze_ref.py's drop_rise and drop_rise_low: the largest
+             rise of two bars over the two before them within the 24 bars after the breakdown, the whole band and the
+             low band), against the references' range -- measured the same way on both. (A first version counted every
+             planned drop "heard" at +3 dB over the two bars before it: 13 of 32 in a set. The criterion was never
+             measured on the references; a trance drop follows a build that is loud already.)
   gap        the main breakdown's loudest 3 s under the drop's (analyze_ref.py), against the style's references
   key        the key the audio shows (analyze_ref.py's Krumhansl-Kessler estimate) against the planned one; the relative
              major or minor counts as agreeing (the same scale), a fifth either way is counted apart (a Camelot neighbour:
@@ -144,22 +148,13 @@ def evaluate(track, wav, offset_s, refs):
     on8 = [f for f in found if round(f / 4.0) % 8 == 0]
     out["on8"] = len(on8) / max(1, len(found))
     out["boundaries"] = (len(found), len(planned))
-    # Drops heard.
-    drops = [s for s in track["sections"] if s["kind"] == "Drop"]
-    heard = 0
-    for s in drops:
-        b = 4 * s["bar"]
-        a0, a1 = int((b - 8) * spb * SR), int(b * spb * SR)
-        c0, c1 = a1, int((b + 8) * spb * SR)
-        if a0 >= 0 and c1 <= len(x) and rms_db(x[c0:c1]) - rms_db(x[a0:a1]) >= 3.0:
-            heard += 1
-    out["drops"] = (heard, len(drops))
     # The measures of the references on the track's own audio (cut out when it is part of a set).
     with tempfile.TemporaryDirectory() as tmp:
         seg = Path(tmp) / "track.wav"
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0.0, start):.3f}", "-t", f"{dur:.3f}", "-i", str(wav), str(seg)], check=True)
         m = ar.measure(str(seg), bpm)
     out["gap_lu"] = m.get("gap_lu")
+    out["drop_rise"], out["drop_rise_low"] = m.get("drop_rise"), m.get("drop_rise_low")
     audio_key = m.get("key", "")
     out["key_plan"] = key_name(track["key"], track["scale"])
     out["key_audio"] = audio_key
@@ -190,7 +185,7 @@ def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")   # (the console's code page has no ✗)
     refs = json.loads((HERE / "ref_stats.json").read_text(encoding="utf-8"))["rows"]
     lines = ["# Evaluationsbericht", "", "Parhelion, `Tools/eval_report.py` (PLAN 13.5): der Plan gegen das Audio, je Track.", "",
-             "| Track | Stil | Tonart Plan/Audio | Grenzen gefunden/geplant | P | R | F1 | auf 8 Takten | Drops gehört | Abstand LU | Korridor |",
+             "| Track | Stil | Tonart Plan/Audio | Grenzen gefunden/geplant | P | R | F1 | auf 8 Takten | Drop-Anstieg dB (breit/tief) | Abstand LU | Korridor |",
              "|---|---|---|---|---|---|---|---|---|---|---|"]
     rows = []
     for plan_path, wav in zip(a.plan, a.wav):
@@ -200,19 +195,29 @@ def main() -> int:
             rows.append(r)
             name = f"{Path(wav).stem}" + (f" T{i + 1}" if plan.get("set") else "")
             gap = f"{r['gap_lu']:.1f}" if isinstance(r["gap_lu"], (int, float)) and r["gap_lu"] == r["gap_lu"] else "-"
+            num = lambda v: f"{v:+.1f}" if isinstance(v, (int, float)) and v == v else "-"
+            rise = f"{num(r['drop_rise'])} / {num(r['drop_rise_low'])}"
             lines.append(f"| {name} | {r['style']} | {r['key_plan']} / {r['key_audio']}{'' if r['key_ok'] else ' ≈' if r['key_fifth'] else ' ✗'} | "
                          f"{r['boundaries'][0]}/{r['boundaries'][1]} | {r['precision']:.2f} | {r['recall']:.2f} | {r['f1']:.2f} | "
-                         f"{100 * r['on8']:.0f} % | {r['drops'][0]}/{r['drops'][1]} | {gap} | {r['corridor'][0]}/{r['corridor'][1]} |")
+                         f"{100 * r['on8']:.0f} % | {rise} | {gap} | {r['corridor'][0]}/{r['corridor'][1]} |")
             print(lines[-1], flush=True)
     if rows:
         lines += ["", "## Zusammenfassung", ""]
         f1 = np.mean([r["f1"] for r in rows])
         on8 = np.mean([r["on8"] for r in rows])
-        drops = sum(r["drops"][0] for r in rows), sum(r["drops"][1] for r in rows)
+        def rng(k):
+            vals = [x[k] for x in refs if isinstance(x.get(k), (int, float)) and x[k] == x[k]]
+            return (min(vals), float(np.median(vals)), max(vals)) if vals else (float("nan"),) * 3
+        mine = [r["drop_rise"] for r in rows if isinstance(r["drop_rise"], (int, float))]
+        mine_low = [r["drop_rise_low"] for r in rows if isinstance(r["drop_rise_low"], (int, float))]
+        ref_b, ref_l = rng("drop_rise"), rng("drop_rise_low")
         keys = sum(1 for r in rows if r["key_ok"])
         lines.append(f"- Sektionsgrenzen (Neuheitskurve gegen den Plan, ±1 Takt): F1 im Mittel {f1:.2f}")
         lines.append(f"- Grenzen auf Vielfachen von 8 Takten: {100 * on8:.0f} %")
-        lines.append(f"- Drops hörbar (+3 dB): {drops[0]} von {drops[1]}")
+        if mine:
+            lines.append(f"- Anstieg in den Drop nach dem Haupt-Breakdown: Median {np.median(mine):+.1f} dB breit, "
+                         f"{np.median(mine_low):+.1f} dB tief; die Referenzen {ref_b[1]:+.1f} ({ref_b[0]:+.1f} bis {ref_b[2]:+.1f}) "
+                         f"und {ref_l[1]:+.1f} ({ref_l[0]:+.1f} bis {ref_l[2]:+.1f}) dB, auf dieselbe Weise gemessen")
         fifths = sum(1 for r in rows if r["key_fifth"])
         lines.append(f"- Tonart auf dem Audio wie geplant (oder die Parallele): {keys} von {len(rows)}; eine Quinte daneben "
                      f"(Camelot-Nachbar, ≈): {fifths}")

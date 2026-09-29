@@ -6,6 +6,7 @@
 #include "parh/compose/Harmony.h"
 #include "parh/compose/Melody.h"
 #include "parh/Dsp.h"
+#include "parh/Presets.h"
 #include "parh/synth/Sfx.h"
 #include <algorithm>
 #include <cmath>
@@ -203,6 +204,13 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
             first = false;
             prev = v;
             for (int k = 0; k < 4; ++k) note(4.0 * bar, 4.0 * len - 0.05, Part::Pad, v[static_cast<size_t>(k)], 0.75f);
+            // In a breakdown without the sub the pad takes the low end the kick and the bass leave: its root an octave
+            // under the chord (E2 .. D#3). (Tools/eval_report.py, 29.09.2026: under 150 Hz the breakdowns were empty,
+            // the drop's low band rose 36 to 51 dB, the references' 3 to 40.)
+            const int sec = plan.sectionAt(bar);
+            const SectionKind kind = sec >= 0 ? plan.sections[static_cast<size_t>(sec)].kind : SectionKind::Groove;
+            if ((kind == SectionKind::Breakdown || kind == SectionKind::Break) && plan.at(bar, Layer::Sub) == LayerState::Off)
+                note(4.0 * bar, 4.0 * len - 0.05, Part::Pad, atOrAbove(harm.pc(bar, 0), 40), 0.6f);
             bar += len;
         }
     }
@@ -329,6 +337,40 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
     const int pad = static_cast<int>(PolyInstance::Pad);
     auto polyId = [&](PolyInstance i, int param) { return p.id(Module::Poly, static_cast<int>(i), param); };
 
+    // The sounds (Phase 5b, Presets.h; unit `sounds`): a factory preset for every synth, by the profile's styles -- a
+    // lane of the kit by its role --, as a program change at the track's start (the SoundPick, the preset's knobs, its
+    // level corrected by its trim); the style's own settings below come after and win where they meet.
+    const bool pickSounds = p.getBool(p.id(Module::Compose, 0, compose::PickSounds));
+    float trimCloud = 0.0f;
+    {
+        Rng ps;
+        ps.seed(mixSeed(stream("sounds"), 0x50524553ull));   // "PRES"
+        struct Pick { Module m; int instance; int level; };
+        std::vector<Pick> picks = { { Module::Kick, 0, kick::Level }, { Module::Sub, 0, sub::Level }, { Module::Bass, 0, synth::Level },
+                                    { Module::Acid, 0, synth::Level } };
+        for (int i = 0; i < kPolyInstances; ++i) picks.push_back({ Module::Poly, i, poly::Level });
+        picks.push_back({ Module::Piano, 0, piano::Level });
+        picks.push_back({ Module::Strings, 0, strings::Level });
+        picks.push_back({ Module::Choir, 0, choir::Level });
+        picks.push_back({ Module::Brass, 0, brass::Level });
+        picks.push_back({ Module::Timpani, 0, timpani::Level });
+        picks.push_back({ Module::Sfx, 0, sfx::Level });
+        picks.push_back({ Module::Cloud, 0, cloud::Level });
+        for (int l = 0; l < kPercLanes; ++l) picks.push_back({ Module::Perc, l, perc::Level });
+        for (const Pick& k : picks) {
+            const int role = k.m == Module::Perc ? p.getInt(p.id(Module::Perc, k.instance, perc::Role)) : -1;
+            const int index = pickPreset(k.m, k.instance, prof.mix.data(), role, ps);   // (drawn either way: the stream stays put)
+            if (!pickSounds || index < 0) continue;
+            const SoundPreset& sp = factoryPresets(k.m, k.m == Module::Perc ? 0 : k.instance)[static_cast<size_t>(index)];
+            sc.sounds.push_back(SoundPick{ 0.0, static_cast<int>(k.m), k.instance, index });
+            const int base = p.base(k.m, k.instance);
+            for (const auto& [knobIndex, value] : presetKnobs(k.m, k.instance, sp)) sc.knobs.push_back(KnobSet{ 0.0, base + knobIndex, value, 0 });
+            if (k.m == Module::Cloud) { trimCloud = sp.trimDb; continue; }   // (its level is the style's, below)
+            const int level = base + k.level;
+            sc.knobs.push_back(KnobSet{ 0.0, level, std::clamp(p.get(level) + sp.trimDb, p.desc(level).minValue, p.desc(level).maxValue), 0 });
+        }
+    }
+
     // The track's own settings (knob sets at its start): the pump's depths, the gate, the hall.
     if (mc.piano) {
         // The piano (PLAN 5.8): Dok. 5's slightly dull piano most often, an upright or the grand otherwise; the pedal
@@ -337,7 +379,7 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         Rng pr;
         pr.seed(stream("piano"));
         const float u = pr.uniform();
-        knob(p.id(Module::Piano, 0, piano::Instrument), u < 0.6f ? 3.0f : u < 0.85f ? 2.0f : 0.0f);
+        if (!pickSounds) knob(p.id(Module::Piano, 0, piano::Instrument), u < 0.6f ? 3.0f : u < 0.85f ? 2.0f : 0.0f);
         const int pedal = p.id(Module::Piano, 0, piano::Pedal);
         knob(pedal, 1.0f);
         for (int bar = 1; bar < plan.bars; ++bar)
@@ -346,7 +388,7 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
                 ramp(pedal, 4.0 * bar + 0.5, 0.1, -1.0f, 0.0f, GestureShape::Linear);
             }
     }
-    if (orchestra) {
+    if (orchestra && !pickSounds) {
         knob(p.id(Module::Choir, 0, choir::Vowel), orchVowel);
         knob(p.id(Module::Brass, 0, brass::Brassiness), orchBlare);
     }
@@ -358,13 +400,17 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         const int tilt = p.id(Module::Master, 0, master::Tilt);
         knob(tilt, p.defaultValue(tilt) + prof.tiltDb);
     }
+    // The track's key on the knobs (the deck tunes the kick, the kit and the effects by them; without this they stayed
+    // in the knob's key, A, whatever the track's was: found by Tools/eval_report.py on a set, 29.09.2026).
+    knob(p.id(Module::Compose, 0, compose::Key), static_cast<float>(key));
+    knob(p.id(Module::Compose, 0, compose::Scale), static_cast<float>(scale));
     knob(p.id(Module::Bass, 0, synth::Duck), prof.bassDuckDb);
     knob(p.id(Module::Acid, 0, synth::Duck), prof.bassDuckDb);
     knob(p.id(Module::Sub, 0, sub::Duck), prof.bassDuckDb + 3.0f);
     knob(polyId(PolyInstance::Pad, poly::Duck), prof.padDuckDb);
     knob(polyId(PolyInstance::Stab, poly::Duck), prof.padDuckDb);
     knob(polyId(PolyInstance::Pad, poly::GatePattern), static_cast<float>(gatePattern));
-    if (prof.kickSoft > 0.0f) {   // a softer, rounder kick (Dream House, Deep)
+    if (prof.kickSoft > 0.0f && !pickSounds) {   // a softer, rounder kick (Dream House, Deep; the presets' groups weigh it in)
         knob(p.id(Module::Kick, 0, kick::ClickLevel), 0.4f * (1.0f - prof.kickSoft));
         knob(p.id(Module::Kick, 0, kick::TopLevel), -10.0f - 20.0f * prof.kickSoft);
         knob(p.id(Module::Kick, 0, kick::AmpDecay), 320.0f - 120.0f * prof.kickSoft);
@@ -401,6 +447,13 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         const bool breakdown = s.kind == SectionKind::Breakdown || s.kind == SectionKind::Break;
         // The hall (Dok. 7: 2 to 4 s and more in the breakdown, 0.8 to 1.5 s in the drop).
         step(hallDecay, s.beat, breakdown ? hallBreak : s.kind == SectionKind::Drop ? hallDrop : hallMid);
+        // The pad's high pass: down to 70 Hz where the kick and the sub rest (a breakdown, a break), so its body and its
+        // root there are heard; its floor again where they return.
+        {
+            const int padHp = polyId(PolyInstance::Pad, poly::HpFloor);
+            const bool open = (s.kind == SectionKind::Breakdown || s.kind == SectionKind::Break) && plan.at(bar, Layer::Sub) == LayerState::Off;
+            step(padHp, s.beat, open ? off(padHp, 70.0f) : 0.0f);
+        }
         // The pad's filter: filtered in a groove (its cell says so), opening through a breakdown and its build.
         if (s.kind == SectionKind::Breakdown) ramp(padCut, s.beat, s.length, padOpen(s.energyFrom), padOpen(s.energyTo));
         else if (s.kind == SectionKind::Build) ramp(padCut, s.beat, s.length, padOpen(s.energyFrom), padOpen(s.energyTo), GestureShape::EaseIn);
@@ -484,11 +537,14 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
             lastCut = c;
             lastPan = q;
         }
-        knob(p.id(Module::Cloud, 0, cloud::Level), -15.0f);   // (at -8 dB the correlation fell to 0.4, Tools/calibrate.py)
-        knob(p.id(Module::Cloud, 0, cloud::Size), 220.0f + 200.0f * dr2.uniform());
-        knob(p.id(Module::Cloud, 0, cloud::Density), 8.0f + 10.0f * dr2.uniform());
+        knob(p.id(Module::Cloud, 0, cloud::Level), -15.0f + trimCloud);   // (at -8 dB the correlation fell to 0.4, Tools/calibrate.py)
+        const float size = 220.0f + 200.0f * dr2.uniform(), density = 8.0f + 10.0f * dr2.uniform();
+        if (!pickSounds) {
+            knob(p.id(Module::Cloud, 0, cloud::Size), size);
+            knob(p.id(Module::Cloud, 0, cloud::Density), density);
+        }
     } else if (mc.piano) {
-        knob(p.id(Module::Cloud, 0, cloud::Level), -16.0f);   // a breath of it under the piano (Dream House)
+        knob(p.id(Module::Cloud, 0, cloud::Level), -16.0f + trimCloud);   // a breath of it under the piano (Dream House)
     }
 
     // The loudness mark: the main drop.

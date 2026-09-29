@@ -32,8 +32,8 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
     kick_.prepare(sampleRate);
     sub_.prepare(sampleRate);
     kit_.prepare(sampleRate);
-    bass_.prepare(sampleRate);
-    acid_.prepare(sampleRate);
+    bass_.prepare(sampleRate, 0x42415353ull + static_cast<uint64_t>(index));   // "BASS"
+    acid_.prepare(sampleRate, 0x41434944ull + static_cast<uint64_t>(index));   // "ACID"
     for (int i = 0; i < kPolyInstances; ++i) {
         poly_[i].prepare(sampleRate);
         gate_[i].prepare(sampleRate);
@@ -317,7 +317,23 @@ void Deck::updateCell(int64_t sample)
     const float msToBeats = static_cast<float>(bpm / 60000.0);
 
     float v[128];
-    static_assert(poly::Count <= 128 && perc::Count <= 128 && kick::Count <= 128, "the cell's scratch holds a module");
+    static_assert(poly::Count <= 128 && perc::Count <= 128 && kick::Count <= 128 && synth::Count <= 128 && piano::Count <= 128
+                  && strings::Count <= 128 && choir::Count <= 128 && brass::Count <= 128 && timpani::Count <= 128,
+                  "the cell's scratch holds a module");
+    // The modulation's shared sources (Phase 5b, Modulation.h): the player's wheel and pressure, the score's energy.
+    ModGlobals glob;
+    {
+        float perf[perform::Count];
+        readPlayed(Module::Perform, 0, perf);
+        glob.wheel = std::clamp(perf[perform::Wheel], 0.0f, 1.0f);
+        glob.pressure = std::clamp(perf[perform::Pressure], 0.0f, 1.0f);
+        for (const Section& s : score_.sections)
+            if (beat >= s.beat && beat < s.beat + s.length) {
+                const double t = s.length > 0.0 ? (beat - s.beat) / s.length : 0.0;
+                glob.energy = std::clamp(static_cast<float>(s.energyFrom + (s.energyTo - s.energyFrom) * t) * 0.1f, 0.0f, 1.0f);
+                break;
+            }
+    }
     readPlayed(Module::Kick, 0, v);
     Kick::constrain(v, 0.0, keyRoot_);
     kick_.update(v, keyRoot_);
@@ -338,14 +354,19 @@ void Deck::updateCell(int64_t sample)
     }
 
     readPlayed(Module::Bass, 0, v);
+    bass_.setModGlobals(glob);
+    bass_.setClock(beat, beatsPerSample_);
     bass_.update(v, kBassMinCut);
     bassSends_ = Sends{ v[synth::RoomSend], v[synth::PlateSend], 0.0f };
     readPlayed(Module::Acid, 0, v);
+    acid_.setModGlobals(glob);
+    acid_.setClock(beat, beatsPerSample_);
     acid_.update(v, kBassMinCut);
     acidSends_ = Sends{ v[synth::RoomSend], v[synth::PlateSend], 0.0f };
 
     for (int i = 0; i < kPolyInstances; ++i) {
         readPlayed(Module::Poly, i, v);
+        poly_[i].setModGlobals(glob);
         poly_[i].update(v, bpm);
         poly_[i].setClock(beat, beatsPerSample_);
         PolyStrip& s = strip_[i];
@@ -362,18 +383,26 @@ void Deck::updateCell(int64_t sample)
     }
     retDuck_.set(1.0f - dbToGain(-pump[pump::ReturnDuck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
     readPlayed(Module::Piano, 0, v);
+    piano_.setModGlobals(glob);
+    piano_.setClock(beat, beatsPerSample_);
     piano_.update(v);
     pianoSends_ = Sends{ v[piano::RoomSend], v[piano::PlateSend], v[piano::HallSend] };
     pianoDuck_.set(1.0f - dbToGain(-v[piano::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
     readPlayed(Module::Strings, 0, v);
+    strings_.setModGlobals(glob);
+    strings_.setClock(beat, beatsPerSample_);
     strings_.update(v);
     orchSends_[0] = Sends{ v[strings::RoomSend], v[strings::PlateSend], v[strings::HallSend] };
     orchDuck_[0].set(1.0f - dbToGain(-v[strings::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
     readPlayed(Module::Choir, 0, v);
+    choir_.setModGlobals(glob);
+    choir_.setClock(beat, beatsPerSample_);
     choir_.update(v);
     orchSends_[1] = Sends{ v[choir::RoomSend], v[choir::PlateSend], v[choir::HallSend] };
     orchDuck_[1].set(1.0f - dbToGain(-v[choir::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
     readPlayed(Module::Brass, 0, v);
+    brass_.setModGlobals(glob);
+    brass_.setClock(beat, beatsPerSample_);
     brass_.update(v);
     orchSends_[2] = Sends{ v[brass::RoomSend], v[brass::PlateSend], v[brass::HallSend] };
     orchDuck_[2].set(1.0f - dbToGain(-v[brass::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
@@ -383,6 +412,8 @@ void Deck::updateCell(int64_t sample)
     cloudKeys_ = v[cloud::KeysSend];
     cloudPlate_ = v[cloud::PlateSend];
     readPlayed(Module::Timpani, 0, v);
+    timpani_.setModGlobals(glob);
+    timpani_.setClock(beat, beatsPerSample_);
     timpani_.update(v);
     orchSends_[3] = Sends{ v[timpani::RoomSend], v[timpani::PlateSend], v[timpani::HallSend] };
     orchDuck_[3].set(1.0f - dbToGain(-v[timpani::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);

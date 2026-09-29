@@ -37,6 +37,7 @@
 #pragma once
 #include "parh/Dsp.h"
 #include "parh/Vec.h"
+#include "parh/synth/Modulation.h"
 #include <cstdint>
 
 namespace parh {
@@ -72,8 +73,14 @@ public:
     int activeLanes() const;
     /** @brief The family a pitch is played by (0 violins .. 3 basses). */
     static int familyOf(int pitch);
+    /** @brief The deck's shared modulation sources (Modulation.h). */
+    void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
+    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
 
 private:
+    /** @brief A lane's bow point moved to @p beta: its modes' response there and its admittance. */
+    void placeBow(int lane, double beta);
     template <class V> void bowSegment(int n);
     void startLane(int lane, int pitch, float velocity, bool staccato, int player);
     void cellUpdate();
@@ -97,6 +104,7 @@ private:
     float br_[kStringModes][kStringLanes] = {}, bi_[kStringModes][kStringLanes] = {};   ///< bridge force
     float wT_[kStringModes][kStringLanes] = {};                                        ///< angle per sample
     float release_[kStringModes][kStringLanes] = {};                                   ///< decay factor after the stroke
+    float hur_[kStringModes][kStringLanes] = {}, hui_[kStringModes][kStringLanes] = {}; ///< bow-point velocity over sin^2 (the place moved)
     // The lanes.
     struct Lane {
         bool on = false, held = false, staccato = false;
@@ -110,6 +118,9 @@ private:
         float cents = 0.0f;        ///< the player's intonation
         float vibHz = 5.5f, vibCents = 15.0f, vibPhase = 0.0f;
         float panL = 0.7f, panR = 0.7f;
+        // What the stroke began with (the modulation moves from these; Phase 5b).
+        float vbow0 = 0.0f, fbow0 = 0.0f, pan0 = 0.0f;
+        double beta0 = 0.1, beta = 0.1;
         float peak = 0.0f;
         int quiet = 0;
         Rng noise;
@@ -127,6 +138,8 @@ private:
         int quiet = 0;
     };
     Body body_[kStringFamilies];
+    // The modulation (Phase 5b, Modulation.h): a Modulator per note slot.
+    NoteModulation<kStringNotes> mod_;
 };
 
 } // namespace parh

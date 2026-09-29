@@ -86,6 +86,7 @@ inline float sum8(const float* acc, int i)
 
 void Piano::prepare(double sampleRate)
 {
+    mod_.prepare(sampleRate, 0x5049414E4Full);   // "PIANO"
     sampleRate_ = sampleRate;
     for (Svf& f : lowCut_) f.setQ(lowCutHz_, 0.707f, static_cast<float>(sampleRate_));
     if (specSet_) setSpec(spec_);
@@ -141,6 +142,7 @@ void Piano::update(const float* v)
             micR_[q] = (1.0f - width_) * b.micC[q] + width_ * b.micR[q];
         }
     }
+    mod_.set(readModCore(v + piano::ModFirst, kPianoModDests, static_cast<int>(std::size(kPianoModDests))));
 }
 
 void Piano::reset()
@@ -160,6 +162,25 @@ void Piano::reset()
     symBoardOn_ = false;
     for (Svf& f : lowCut_) f.ic1 = f.ic2 = 0.0f;
     pos_ = 0;
+    mod_.reset();
+}
+
+void Piano::modVoice(int i, bool strike)
+{
+    Voice& v = voices_[i];
+    const PianoKey& k = design_->keys[static_cast<size_t>(v.key)];
+    mod_.evaluate(i, pos_);
+    if (strike) v.hardMul = std::exp2(std::clamp(mod_.get(i, ModDest::Hardness), -2.0f, 2.0f));
+    v.bend = std::clamp(static_cast<double>(mod_.get(i, ModDest::Pitch)), -2.0, 2.0);
+    v.modGain = std::clamp(1.0f + mod_.get(i, ModDest::Level), 0.0f, 2.0f);
+    if (mod_.targets(ModDest::Pan)) {
+        // Where on the bridge: the key's place (between its two regions) moved by up to four regions.
+        const float place = std::clamp(static_cast<float>(k.region) + k.regionW1 + 4.0f * mod_.get(i, ModDest::Pan),
+                                       0.0f, static_cast<float>(kPianoRegions) - 1.001f);
+        v.region = static_cast<int>(place);
+        v.w1 = place - static_cast<float>(v.region);
+        v.w0 = 1.0f - v.w1;
+    }
 }
 
 int Piano::activeVoices() const
@@ -197,8 +218,11 @@ void Piano::noteOn(int pitch, float velocity, double late)
     while (key < 0) key += 12;
     while (key >= kPianoKeys) key -= 12;
     ++held_[key];
-    Voice& v = voices_[voiceFor(key)];
+    const int vi = voiceFor(key);
+    Voice& v = voices_[vi];
     startVoice(v, key, clampv(velocity, 0.0f, 1.0f), late);
+    mod_.noteOn(vi, pos_, pitch, clampv(velocity, 0.0f, 1.0f));
+    if (mod_.on()) modVoice(vi, true);
 }
 
 void Piano::noteOff(int pitch)
@@ -207,6 +231,8 @@ void Piano::noteOff(int pitch)
     while (key < 0) key += 12;
     while (key >= kPianoKeys) key -= 12;
     held_[key] = std::max(0, held_[key] - 1);
+    if (held_[key] == 0)
+        for (int i = 0; i < kVoices; ++i) if (voices_[i].key == key) mod_.noteOff(i);
 }
 
 void Piano::startVoice(Voice& v, int key, float velocity, double late)
@@ -224,6 +250,11 @@ void Piano::startVoice(Voice& v, int key, float velocity, double late)
         v.quiet = 0;
     }
     v.key = key;
+    v.bend = 0.0;
+    v.hardMul = v.modGain = 1.0f;
+    v.region = k.region;
+    v.w0 = k.regionW0;
+    v.w1 = k.regionW1;
     // The strings of this key are the voice's now, not the sympathetic bank's.
     symOn_[key] = false;
     std::fill(symZr_.begin() + key * kPianoSymPartials, symZr_.begin() + (key + 1) * kPianoSymPartials, 0.0f);
@@ -268,13 +299,23 @@ void Piano::blockCoefficients(Voice& v, int n)
         e += dd * (static_cast<double>(v.zr[q]) * v.zr[q] + static_cast<double>(v.zi[q]) * v.zi[q]);
     }
     v.delta = static_cast<float>(k.tensionGain * e);
-    // The poles: turned by the tension, shrunk by the damper.
+    // The poles: turned by the tension (and the modulation's bend, exactly), shrunk by the damper.
     const double T = 1.0 / sampleRate_;
+    const bool bent = v.bend != 0.0;
+    const double rel = bent ? (1.0 + static_cast<double>(v.delta)) * std::pow(2.0, v.bend / 12.0) - 1.0 : 0.0;
     for (int m = 0; m < k.modes.count; ++m) {
         const size_t q = static_cast<size_t>(m);
-        const double a = static_cast<double>(k.omegaT[q]) * v.delta;
-        const double c = 1.0 - 0.5 * a * a, s = a - a * a * a / 6.0;
-        const double g = v.damper > 0.0f ? std::exp(-static_cast<double>(k.damperSigma[q]) * v.damper * T) : 1.0;
+        double c, s, g = v.damper > 0.0f ? std::exp(-static_cast<double>(k.damperSigma[q]) * v.damper * T) : 1.0;
+        if (!bent) {
+            const double a = static_cast<double>(k.omegaT[q]) * v.delta;
+            c = 1.0 - 0.5 * a * a;
+            s = a - a * a * a / 6.0;
+        } else {
+            const double a = static_cast<double>(k.omegaT[q]) * rel;
+            c = std::cos(a);
+            s = std::sin(a);
+            if (k.omegaT[q] * (1.0 + rel) > 2.9) g = 0.0;   // (a mode bent towards Nyquist falls silent)
+        }
         const double pr = k.modes.pr[q], pi = k.modes.pi[q];
         v.pr[q] = static_cast<float>((pr * c - pi * s) * g);
         v.pi[q] = static_cast<float>((pr * s + pi * c) * g);
@@ -296,7 +337,7 @@ void Piano::contactBlock(Voice& v, float* force, int n)
             const double u = v.yh - ys;
             const double up = u > 0.0 ? std::pow(u, k.hammerP) : 0.0;
             v.hyst = a * v.hyst + (1.0 - a) * up;
-            double F = u > 0.0 ? k.q0 * (up - k.hammerEps * v.hyst) : 0.0;
+            double F = u > 0.0 ? k.q0 * static_cast<double>(v.hardMul) * (up - k.hammerEps * v.hyst) : 0.0;
             if (F < 0.0) F = 0.0;
             v.vh -= F / k.hammerMass * Ts;
             v.yh += v.vh * Ts;
@@ -486,10 +527,13 @@ void Piano::renderSegment(float* L, float* R, int n, bool cellStart, bool cellEn
     }
     bool sounding = false;
     const int thumpLen = static_cast<int>(0.0015 * sampleRate_), noiseLen = static_cast<int>(0.04 * sampleRate_);
-    for (Voice& v : voices_) {
+    const bool modded = mod_.on();
+    for (int vi = 0; vi < kVoices; ++vi) {
+        Voice& v = voices_[vi];
         if (v.key < 0) continue;
         sounding = true;
         const PianoKey& k = d.keys[static_cast<size_t>(v.key)];
+        if (cellStart && modded) modVoice(vi, false);
         if (cellStart) blockCoefficients(v, kMaxBlock);
         if (v.contact) contactBlock(v, force_, n);
         else stringBlock<V>(v, force_, n);
@@ -519,8 +563,9 @@ void Piano::renderSegment(float* L, float* R, int n, bool cellStart, bool cellEn
                 const int t = v.damperNoise + i;
                 if (t < noiseLen) F += damperNoise_ * v.damperNoiseGain * v.noise.bipolar() * std::exp(-6.0f * static_cast<float>(t) / static_cast<float>(noiseLen));
             }
-            regionF_[k.region][i] += k.regionW0 * F;
-            regionF_[k.region + 1][i] += k.regionW1 * F;
+            const float Fg = F * v.modGain;
+            regionF_[v.region][i] += v.w0 * Fg;
+            regionF_[v.region + 1][i] += v.w1 * Fg;
         }
         if (v.thump >= 0) { v.thump += n; if (v.thump >= thumpLen) v.thump = -1; }
         if (v.damperNoise >= 0) { v.damperNoise += n; if (v.damperNoise >= noiseLen) v.damperNoise = -1; }

@@ -8,7 +8,9 @@ For every recording of Tools/ref_sets.txt (fetched by Tools/fetch_refs.py) and f
   form       per bar the low band (40-120 Hz) and the loudness; a breakdown is a run of at least 8 bars whose low band
              lies 12 dB or more under the body's median (kick and bass out, Dok. 6); the share of the track in
              breakdowns, the longest one, where it lies; the gap -- the loudest 3 s of the 64 bars after the longest
-             breakdown against its own loudest 3 s (Dok. 6, rule 3: 4 to 8 LU)
+             breakdown against its own loudest 3 s (Dok. 6, rule 3: 4 to 8 LU); the drop after it -- the largest rise
+             of two bars over the two before them within the 24 bars after the breakdown, the whole band and the low
+             band (drop_rise, drop_rise_low)
   balance    in the drop (the loudest 32 bars): power in 20-60, 60-150, 150-400, 400-2k, 2-5k, 5-16k Hz as shares of the
              whole; the power centroid
   width      side over mid above 200 Hz and under 120 Hz, the correlation, in the drop
@@ -198,6 +200,19 @@ def measure(path, bpm_hint=None):
         d1 = int((off_s + min(nbars, s + n + 64) * sec_per_bar) * 10)
         if len(st) > d1 > a1 > a0:
             r["gap_lu"] = round(float(np.max(st[a1:d1]) - np.max(st[a0:a1])), 2)
+        # The drop after it (29.09.2026, for Tools/eval_report.py): within the 24 bars after the breakdown's end (the build
+        # comes first where the kick returns before the drop), the largest rise of two bars over the two before them --
+        # the whole band and the low band. The same search on the references and on Parhelion's tracks, so neither is
+        # measured at a place the other is not.
+        rises, rises_low = [], []
+        for b in range(s + n, min(nbars - 2, s + n + 24)):
+            if b < 2:
+                continue
+            rises.append(db(np.mean(all_bar[b:b + 2])) - db(np.mean(all_bar[b - 2:b])))
+            rises_low.append(db(np.mean(low_bar[b:b + 2])) - db(np.mean(low_bar[b - 2:b])))
+        if rises:
+            r["drop_rise"] = round(float(max(rises)), 2)
+            r["drop_rise_low"] = round(float(max(rises_low)), 2)
     # The drop: the loudest 32 bars.
     if nbars >= 32:
         w = np.convolve(all_bar, np.ones(32), mode="valid")
@@ -335,7 +350,7 @@ def main() -> int:
     for prof in sorted({r["profile"] for r in rows}):
         sel = [r for r in rows if r["profile"] == prof]
         med = {}
-        for k in rows[0]:
+        for k in sorted({key for r in rows for key in r}):
             vals = [r[k] for r in sel if isinstance(r.get(k), (int, float)) and r[k] == r[k]]
             if vals:
                 med[k] = round(float(np.median(vals)), 4)

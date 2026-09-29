@@ -31,8 +31,9 @@
  * `section<n>` a section's variations, Planner.h), `energy` (the curve and what follows it: the 303's peaks, the pad's
  * opening), `harmony` (the tempo, the key, the progression), `motif` (the lead's motifs), `lead` (their versions, the
  * counter), `bass` (the figure), `acid` (the 303's line and curves), `arp`, `pluck` (the pluck and the stab), `piano` (the
- * instrument), `orchestra` (whether it plays), `drums`, `fx` (the risers' lengths, the sweeps, the throws), `sounds` (the
- * gate, the choir's vowel, the brass's blare, the pad's drift, the cloud). The velocity scatter is a hash of the track's
+ * instrument), `orchestra` (whether it plays), `drums`, `fx` (the risers' lengths, the sweeps, the throws), `sounds` (a
+ * factory preset for every synth by the profile's styles, Presets.h, as a program change at the track's start; the gate,
+ * the pad's drift, and without the presets the choir's vowel, the brass's blare, the cloud). The velocity scatter is a hash of the track's
  * seed and each note. A set asks for a track with its own tempo, key and energy (TrackRequest); its units are
  * `track<n>.<unit>`.
  */

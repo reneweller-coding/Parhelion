@@ -96,6 +96,7 @@ void Timpani::prepare(double sampleRate, uint64_t seed)
 {
     sr_ = sampleRate;
     seed_ = seed;
+    mod_.prepare(sampleRate, mixSeed(seed, 0x4D4F44ull));   // "MOD"
     for (Svf& f : lowCut_) f.setQ(lowCutHz_, 0.707f, static_cast<float>(sr_));
     reset();
 }
@@ -111,23 +112,60 @@ void Timpani::update(const float* v)
         lowCutHz_ = v[timpani::LowCut];
         for (Svf& f : lowCut_) f.setQ(lowCutHz_, 0.707f, static_cast<float>(sr_));
     }
+    mod_.set(readModCore(v + timpani::ModFirst, kTimpaniModDests, static_cast<int>(std::size(kTimpaniModDests))));
+}
+
+void Timpani::modDrum(int k, bool strike)
+{
+    Drum& d = drum_[k];
+    mod_.evaluate(k, pos_);
+    if (strike) {
+        d.K = 8e7 * static_cast<double>(hardness_) * std::exp2(std::clamp(static_cast<double>(mod_.get(k, ModDest::Hardness)), -3.0, 2.0));
+        if (mod_.targets(ModDest::Position)) {
+            const double strike01 = std::clamp(static_cast<double>(strike_ + mod_.get(k, ModDest::Position)), 0.05, 0.95);
+            for (int m = 0; m < kTimpaniModes; ++m) {
+                const Mode& md = table().modes[m];
+                d.shape[m] = besselJ(md.m, md.j * strike01) / 0.58;
+            }
+        }
+    }
+    // The pedal and the decay: the modes tuned again where they have moved.
+    const double bend = std::pow(2.0, std::clamp(static_cast<double>(mod_.get(k, ModDest::Pitch)), -5.0, 5.0) / 12.0);
+    const double decayMul = std::exp2(std::clamp(static_cast<double>(mod_.get(k, ModDest::Decay)), -3.0, 2.0));
+    if (std::fabs(bend - d.bend) > 1e-6 || std::fabs(decayMul - d.decayMul) > 1e-6) {
+        double shape[kTimpaniModes];
+        for (int m = 0; m < kTimpaniModes; ++m) shape[m] = d.shape[m];
+        tune(d, d.pitch, bend, decayMul);
+        for (int m = 0; m < kTimpaniModes; ++m) d.shape[m] = shape[m];   // (the strike's place stays the strike's)
+    }
+    if (mod_.targets(ModDest::Level) || mod_.targets(ModDest::Pan)) {
+        const double gain = std::clamp(1.0 + static_cast<double>(mod_.get(k, ModDest::Level)), 0.0, 2.0);
+        const double pan = std::clamp(static_cast<double>(mod_.get(k, ModDest::Pan)), -1.0, 1.0);
+        d.gainL = gain * std::cos((pan + 1.0) * kPiD / 4.0) * 1.41421356;
+        d.gainR = gain * std::sin((pan + 1.0) * kPiD / 4.0) * 1.41421356;
+    }
 }
 
 void Timpani::reset()
 {
     for (Drum& d : drum_) d = Drum{};
     for (Svf& f : lowCut_) f.ic1 = f.ic2 = 0.0f;
+    pos_ = 0;
+    mod_.reset();
 }
 
-void Timpani::tune(Drum& d, int pitch)
+void Timpani::tune(Drum& d, int pitch, double bend, double decayMul)
 {
     d.pitch = pitch;
-    const double f0 = midiToHz(pitch), T = 1.0 / sr_;
+    d.bend = bend;
+    d.decayMul = decayMul;
+    const double f0 = midiToHz(pitch) * bend, T = 1.0 / sr_;
+    d.f0 = f0;
     for (int k = 0; k < kTimpaniModes; ++k) {
         const Mode& md = table().modes[k];
         double w = 2.0 * kPiD * f0 * md.ratio;
         if (w > 0.9 * kPiD * sr_) w = 0.9 * kPiD * sr_;
-        const double sigma = md.t60 > 0.0 ? 6.91 / (md.t60 * static_cast<double>(decay_)) * std::sqrt(110.0 / f0) : 1e4;   // a smaller drum rings shorter
+        const double sigma = md.t60 > 0.0 ? 6.91 / (md.t60 * static_cast<double>(decay_) * decayMul) * std::sqrt(110.0 / f0) : 1e4;   // a smaller drum rings shorter
         const cd lam(-sigma, w);
         const cd p = std::exp(lam * T), g = (p - 1.0) / lam, ps = std::exp(lam * (T / kOs)), gs = (ps - 1.0) / lam;
         d.pr[k] = p.real(); d.pi[k] = p.imag(); d.gr[k] = g.real(); d.gi[k] = g.imag();
@@ -162,9 +200,14 @@ void Timpani::noteOn(int pitch, float velocity, bool, double)
     d.on = true;
     d.age = 0.0;
     d.quiet = 0;
+    d.K = 8e7 * static_cast<double>(hardness_);
+    d.gainL = d.gainR = 1.0;
+    mod_.noteOn(at, pos_, pitch, velocity);
+    if (mod_.on()) modDrum(at, true);
     // The mallet meets the membrane where it is.
     double ym = 0.0;
-    for (int k = 0; k < kTimpaniModes; ++k) ym += d.shape[k] * d.zi[k] / (2.0 * kPiD * midiToHz(pitch) * table().modes[k].ratio);
+    const double fm = mod_.on() ? d.f0 : midiToHz(pitch);
+    for (int k = 0; k < kTimpaniModes; ++k) ym += d.shape[k] * d.zi[k] / (2.0 * kPiD * fm * table().modes[k].ratio);
     d.yh = ym;
     d.vh = 0.5 + 3.5 * static_cast<double>(velocity);
     d.contact = true;
@@ -175,13 +218,18 @@ void Timpani::noteOn(int pitch, float velocity, bool, double)
 void Timpani::process(float* L, float* R, int n)
 {
     const double T = 1.0 / sr_, Ts = T / kOs;
-    const double K = 8e7 * static_cast<double>(hardness_);
+    const bool modded = mod_.on();
+    const double K0 = 8e7 * static_cast<double>(hardness_);
     for (int i = 0; i < n; ++i) {
+        if (modded && pos_ % 32 == 0)
+            for (int k = 0; k < kTimpaniDrums; ++k) if (drum_[k].on) modDrum(k, false);
+        ++pos_;
         double outL = 0.0, outR = 0.0;
         for (Drum& d : drum_) {
             if (!d.on) continue;
             d.age += T;
-            const double f0 = midiToHz(d.pitch);
+            const double f0 = modded ? d.f0 : midiToHz(d.pitch);
+            const double K = modded ? d.K : K0;
             if (d.contact) {
                 for (int s = 0; s < kOs; ++s) {
                     // The membrane's displacement under the mallet: Re(-i / w z) per mode, times its shape.
@@ -212,10 +260,21 @@ void Timpani::process(float* L, float* R, int n)
             }
             // Radiated: the modes' velocities (Re z), weighted.
             double peak = 0.0;
-            for (int k = 0; k < kTimpaniModes; ++k) {
-                outL += d.outL[k] * d.zr[k];
-                outR += d.outR[k] * d.zr[k];
-                peak = std::max(peak, std::fabs(d.zr[k]));
+            if (!modded) {
+                for (int k = 0; k < kTimpaniModes; ++k) {
+                    outL += d.outL[k] * d.zr[k];
+                    outR += d.outR[k] * d.zr[k];
+                    peak = std::max(peak, std::fabs(d.zr[k]));
+                }
+            } else {
+                double dl = 0.0, dr = 0.0;
+                for (int k = 0; k < kTimpaniModes; ++k) {
+                    dl += d.outL[k] * d.zr[k];
+                    dr += d.outR[k] * d.zr[k];
+                    peak = std::max(peak, std::fabs(d.zr[k]));
+                }
+                outL += dl * d.gainL;
+                outR += dr * d.gainR;
             }
             d.quiet = !d.contact && peak < 1e-7 ? d.quiet + 1 : 0;
             if (d.quiet > 4800) d.on = false;

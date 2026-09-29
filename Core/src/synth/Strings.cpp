@@ -99,6 +99,7 @@ void StringSection::update(const float* v)
     attackMs_ = v[strings::Attack];
     releaseMs_ = v[strings::Release];
     width_ = v[strings::Width];
+    mod_.set(readModCore(v + strings::ModFirst, kStringsModDests, static_cast<int>(std::size(kStringsModDests))));
     if (v[strings::LowCut] != lowCutHz_) {
         lowCutHz_ = v[strings::LowCut];
         for (Svf& f : lowCut_) f.setQ(lowCutHz_, 0.707f, static_cast<float>(sr_));
@@ -122,6 +123,7 @@ void StringSection::reset()
     }
     for (Svf& f : lowCut_) f.ic1 = f.ic2 = 0.0f;
     pos_ = 0;
+    mod_.reset();
 }
 
 int StringSection::activeLanes() const
@@ -153,10 +155,15 @@ void StringSection::noteOn(int pitch, float velocity, bool staccato, double late
         if (p < players_) startLane(lane, pitch, velocity, staccato, p);
         else lane_[lane].on = false;
     }
+    mod_.noteOn(slot, pos_, pitch, velocity);
 }
 
 void StringSection::noteOff(int pitch)
 {
+    for (int s = 0; s < kStringNotes; ++s) {
+        const Lane& l = lane_[s * kStringPlayers];
+        if (l.on && l.held && l.pitch == pitch) mod_.noteOff(s);
+    }
     for (Lane& l : lane_) if (l.on && l.held && l.pitch == pitch) { l.held = false; l.lift = 0.0; }
 }
 
@@ -191,6 +198,7 @@ void StringSection::startLane(int lane, int pitch, float velocity, bool staccato
     const double T = fam.tension[s], mu = T / std::pow(2.0 * fam.length * fOpen, 2.0), L = fam.length * fOpen / f;
     const double z0 = std::sqrt(T * mu);
     const double beta = 0.1 * std::pow(2.0, -1.3 * static_cast<double>(position_));
+    l.beta0 = l.beta = beta;
     const double b1 = 1.5, b3 = 6e-9, dt = 1.0 / sr_;
     double y = 0.0;
     for (int k = 1; k <= kStringModes; ++k) {
@@ -199,12 +207,16 @@ void StringSection::startLane(int lane, int pitch, float velocity, bool staccato
         if (fk > std::min(0.45 * sr_, 12000.0)) {
             zr_[m][lane] = zi_[m][lane] = pr_[m][lane] = pi_[m][lane] = p0r_[m][lane] = p0i_[m][lane] = 0.0f;
             gr_[m][lane] = gi_[m][lane] = hr_[m][lane] = hi_[m][lane] = br_[m][lane] = bi_[m][lane] = wT_[m][lane] = 0.0f;
+            hur_[m][lane] = hui_[m][lane] = 0.0f;
             continue;
         }
         const double w = 2.0 * kPiD * fk, sigma = b1 + b3 * w * w;
         const cd lam(-sigma, w), p = std::exp(lam * dt), g = (p - 1.0) / lam;
         const double sk = std::sin(k * kPiD * beta), gk = 2.0 / (mu * L) * sk;
         const cd hv = sk * gk * cd(1.0, sigma / w);                                           // velocity at the bow
+        const cd hu = 2.0 / (mu * L) * cd(1.0, sigma / w);                                    // the same over sin^2
+        hur_[m][lane] = static_cast<float>(hu.real());
+        hui_[m][lane] = static_cast<float>(hu.imag());
         const cd bf = (k & 1 ? -1.0 : 1.0) * k * kPiD * T / L * cd(0.0, -1.0 / w) * gk;       // bridge force
         zr_[m][lane] = zi_[m][lane] = 0.0f;
         p0r_[m][lane] = pr_[m][lane] = static_cast<float>(p.real());
@@ -226,27 +238,81 @@ void StringSection::startLane(int lane, int pitch, float velocity, bool staccato
     l.vbow = static_cast<float>(speed_ * (staccato ? 0.12 + 0.35 * velocity : 0.06 + 0.24 * velocity));
     const double fmax = 2.0 * z0 * l.vbow / (beta * (kMuS - kMuD));
     l.fbow = static_cast<float>(pressure_ * 0.5 * fmax);
+    l.vbow0 = l.vbow;
+    l.fbow0 = l.fbow;
+    l.pan0 = pan;
     body_[family].active = true;
     body_[family].quiet = 0;
+}
+
+void StringSection::placeBow(int lane, double beta)
+{
+    double y = 0.0;
+    for (int m = 0; m < kStringModes; ++m) {
+        const double sk = std::sin((m + 1) * kPiD * beta), s2 = sk * sk;
+        hr_[m][lane] = static_cast<float>(s2 * hur_[m][lane]);
+        hi_[m][lane] = static_cast<float>(s2 * hui_[m][lane]);
+        y += static_cast<double>(hr_[m][lane]) * gr_[m][lane] - static_cast<double>(hi_[m][lane]) * gi_[m][lane];
+    }
+    y_[lane] = static_cast<float>(std::max(y, 1e-9));
+    lane_[lane].admittance = y_[lane];
+    lane_[lane].beta = beta;
 }
 
 void StringSection::cellUpdate()
 {
     const float dtCell = static_cast<float>(kMaxBlock / sr_);
+    // The modulation of every note that sounds (Phase 5b): its sums at this cell.
+    const bool modded = mod_.on();
+    if (modded)
+        for (int s = 0; s < kStringNotes; ++s) {
+            bool on = false;
+            for (int p = 0; p < kStringPlayers; ++p) on = on || lane_[s * kStringPlayers + p].on;
+            if (on) mod_.evaluate(s, pos_);
+        }
     for (int lane = 0; lane < kStringLanes; ++lane) {
         Lane& l = lane_[lane];
         if (!l.on) continue;
+        float depth = 1.0f, rate = 1.0f;
+        double pitchSt = 0.0;
+        if (modded) {
+            const int s = lane / kStringPlayers;
+            pitchSt = std::clamp(static_cast<double>(mod_.get(s, ModDest::Pitch)), -12.0, 2.0);
+            depth = std::clamp(1.0f + mod_.get(s, ModDest::VibDepth), 0.0f, 4.0f);
+            rate = std::exp2(std::clamp(mod_.get(s, ModDest::VibRate), -3.0f, 3.0f));
+            // The bow: its speed, its force (Schelleng's limit goes with the speed and against the distance from the
+            // bridge, so the force keeps its place under it), its place.
+            const float speed = std::exp2(std::clamp(mod_.get(s, ModDest::Speed), -2.0f, 2.0f));
+            const float press = std::exp2(std::clamp(mod_.get(s, ModDest::Pressure), -3.0f, 2.0f));
+            if (mod_.targets(ModDest::Position)) {
+                const double place = std::clamp(static_cast<double>(position_ + mod_.get(s, ModDest::Position)), -1.0, 1.0);
+                const double beta = 0.1 * std::pow(2.0, -1.3 * place);
+                if (std::fabs(beta - l.beta) > 1e-6) placeBow(lane, beta);
+            }
+            l.vbow = l.vbow0 * speed;
+            l.fbow = static_cast<float>(l.fbow0 * speed * press * (l.beta0 / l.beta));
+            if (mod_.targets(ModDest::Level) || mod_.targets(ModDest::Pan)) {
+                const float gain = std::clamp(1.0f + mod_.get(s, ModDest::Level), 0.0f, 2.0f);
+                const float pan = std::clamp(l.pan0 + mod_.get(s, ModDest::Pan), -1.0f, 1.0f);
+                l.panL = gain * std::cos((pan + 1.0f) * kPi / 4.0f);
+                l.panR = gain * std::sin((pan + 1.0f) * kPi / 4.0f);
+            }
+        }
         // Vibrato: in after a fifth of a second, over another; the poles turn by the pitch's offset.
-        l.vibPhase += kTwoPi * l.vibHz * dtCell;
+        l.vibPhase += kTwoPi * (l.vibHz * rate) * dtCell;
         if (l.vibPhase > kTwoPi) l.vibPhase -= kTwoPi;
         const double ramp = std::clamp((l.t - 0.2) / 0.3, 0.0, 1.0) * (l.staccato ? 0.3 : 1.0);
-        const double cents = l.vibCents * ramp * std::sin(static_cast<double>(l.vibPhase));
+        const double cents = (l.vibCents * depth) * ramp * std::sin(static_cast<double>(l.vibPhase)) + 100.0 * pitchSt;
         const double rel = std::pow(2.0, cents / 1200.0) - 1.0;
         const bool damping = l.lift > static_cast<double>(releaseMs_) * 1e-3 + 0.05;
+        const bool exact = pitchSt != 0.0;   // (a bend: the turn exactly; the vibrato's few cents: the series)
         for (int m = 0; m < kStringModes; ++m) {
             const double a = static_cast<double>(wT_[m][lane]) * rel;
-            const double c = 1.0 - 0.5 * a * a + a * a * a * a / 24.0, s = a - a * a * a / 6.0;
-            const double g = damping ? release_[m][lane] : 1.0;
+            double c, s;
+            if (exact) { c = std::cos(a); s = std::sin(a); }
+            else { c = 1.0 - 0.5 * a * a + a * a * a * a / 24.0; s = a - a * a * a / 6.0; }
+            // A mode bent towards Nyquist falls silent rather than folding.
+            const double g = (damping ? release_[m][lane] : 1.0) * (exact && wT_[m][lane] * (1.0 + rel) > 2.9 ? 0.0 : 1.0);
             pr_[m][lane] = static_cast<float>((p0r_[m][lane] * c - p0i_[m][lane] * s) * g);
             pi_[m][lane] = static_cast<float>((p0r_[m][lane] * s + p0i_[m][lane] * c) * g);
         }

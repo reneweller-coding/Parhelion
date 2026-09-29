@@ -6,7 +6,7 @@ sibling of [Noctuary](../AmbientSynth) (ambient), Phosphene (psytrance), Ephemer
 A parhelion, a sun dog, is the bright spot of light beside the sun when it shines through ice crystals: a centre and
 its detuned neighbours, which is what the JP-8000's supersaw is.
 
-**State (29.09.2026): Phases 0 to 5.** The frame (copied modules with their origin in every header), the parameter
+**State (29.09.2026): Phases 0 to 5b.** The frame (copied modules with their origin in every header), the parameter
 system, the score with sections, the layer matrix and the ghost kick, the deck with kick, sub, mid-bass, 303, a
 twelve-lane kit, six polyphonic voices (Phosphene's JP-8000 supersaw, VA, FM and wavetable, the circuit filters, the
 trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master.
@@ -26,7 +26,15 @@ calibrated against the references (Tools/calibrate.py): Acid's 303 in four curve
 cloud, Progressive's rolling groove. DJ sets of any length from one seed: five dramaturgies (Warm-up, Peak, Closing,
 Sunrise, Journey), harmonic mixing round the Camelot wheel, blends over DJ intros and outros with one bass swap, the
 next track's hook teased on a third deck; every export with its cues in the WAV, as JSON and as a rekordbox collection,
-DJ loops, MIDI and stems. The plugin and the Quest follow (docs/PLAN.md, section 14).
+DJ loops, MIDI and stems. Eighteen factory banks of 1024 presets each -- kick, sub, kit, bass, 303, lead, counter,
+pluck, arp, pad, stab, piano, strings, choir, brass, timpani, effects, cloud -- sixteen groups of an eight by eight
+grid per bank, each preset with its modulation and a measured level trim; the composer picks one per synth and track
+by the style, and the choice travels with the track as a program change (the score, the MIDI file, the render's
+report). Every melodic voice has a modulation block of its own: a modulation envelope, four LFOs (free or synced) and
+an eight-slot matrix, fed by velocity, key, a random value, the wheel, the pressure and the score's energy, onto the
+targets its model has -- the bow's pressure, speed and place, the choir's vowel and formants, the brass's breath and
+blare, the hammer's and the mallet's hardness, the pitch, the level, the pan. The plugin and the Quest follow
+(docs/PLAN.md, section 14).
 
 The plan, in German, with the reasons for everything: [docs/PLAN.md](docs/PLAN.md). The research it rests on:
 [docs/research](docs/research).

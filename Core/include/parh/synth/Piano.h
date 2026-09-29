@@ -37,9 +37,16 @@
  * and going are decided on an absolute grid of kMaxBlock samples counted from the last reset (as Poly.h does): a call
  * is cut at the grid, so where a host splits its blocks changes no sample. setSpec() allocates (a new design): at
  * load, never on the audio thread.
+ *
+ * **Modulation** (Phase 5b, Modulation.h): a Modulator per voice, read at every cell: the pitch (a drift or a bend of
+ * two semitones at most, the poles turned exactly with the tension's rise), the hammer's hardness (at the strike), the
+ * voice's force on the bridge (the level) and where on the bridge it drives (the pan: its region moved by up to four of
+ * the sixteen, so its image moves with it). No strike point: the action's hammer line is fixed, and the design keeps
+ * the modes' response at that line only.
  */
 #pragma once
 #include "parh/Dsp.h"
+#include "parh/synth/Modulation.h"
 #include "parh/synth/PianoDesign.h"
 #include <cstdint>
 #include <memory>
@@ -76,6 +83,10 @@ public:
     const PianoDesign* design() const { return design_.get(); }
     /** @brief A voice's relative frequency rise from the tension, the largest now sounding (the tests). */
     float maxTensionRise() const;
+    /** @brief The deck's shared modulation sources (Modulation.h). */
+    void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
+    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
 
 private:
     struct Voice {
@@ -96,7 +107,14 @@ private:
         int damperNoise = -1;      ///< samples into the damper's noise, -1 none
         float damperNoiseGain = 0.0f;
         Rng noise;                 ///< its own stream (a shared one would interleave by how the calls are cut)
+        // The modulation's values (Phase 5b): the key's own where no slot reaches them.
+        double bend = 0.0;         ///< semitones
+        float hardMul = 1.0f, modGain = 1.0f;
+        int region = 0;            ///< the bridge region its force goes to (and the next)
+        float w0 = 1.0f, w1 = 0.0f;
     };
+    /** @brief Voice @p i's modulation now; @p strike: its hammer is about to fly (the hardness). */
+    void modVoice(int i, bool strike);
     /** @brief The board's states: its modes and the high bank. */
     struct BoardState {
         std::vector<float> zr, zi, hzr, hzi;
@@ -142,6 +160,7 @@ private:
     float acc_[kMaxBlock * 8] = {};
     float accL_[kMaxBlock * 8] = {}, accR_[kMaxBlock * 8] = {};
     float accA_[kPianoRegions][kMaxBlock * 8] = {};
+    NoteModulation<kVoices> mod_;        ///< the modulation, a Modulator per voice (Phase 5b)
 };
 
 } // namespace parh

@@ -30,6 +30,14 @@
 #include "parh/synth/Choir.h"
 #include "parh/synth/Piano.h"
 #include "parh/synth/Strings.h"
+#include "parh/synth/Synth.h"
+#include "parh/synth/Modulation.h"
+#include "parh/Presets.h"
+#include <atomic>
+#include <thread>
+#include "parh/synth/Sfx.h"
+#include <cstdlib>
+#include <limits>
 #include "parh/synth/Timpani.h"
 #include "parh/synth/PianoDesign.h"
 #include "TestSupport.h"
@@ -580,6 +588,16 @@ void testComposer()
         same = a.notes[i].beat == b.notes[i].beat && a.notes[i].pitch == b.notes[i].pitch && a.notes[i].part == b.notes[i].part
             && a.notes[i].velocity == b.notes[i].velocity;
     check(same && !a.notes.empty(), "the same seed, the same score", fmt("%zu notes", a.notes.size()));
+    // The track's key reaches the knobs the deck tunes the kick, the kit and the effects by.
+    {
+        int right = 0;
+        for (uint64_t seed = 1; seed <= 6; ++seed) {
+            const Score s = composeTrack(*p, seed);
+            right += s.knobAt(p->id(Module::Compose, 0, compose::Key), 0.0) == static_cast<float>(s.keyRoot)
+                  && s.knobAt(p->id(Module::Compose, 0, compose::Scale), 0.0) == static_cast<float>(s.scale);
+        }
+        check(right == 6, "the track's key and scale on the knobs (the kick's, the kit's, the effects' tuning)", fmt("%d of 6", right));
+    }
     // PLAN 6.9: a unit rerolled draws its voices again and leaves every other note as it was, to the velocity.
     using Key = std::tuple<double, double, int, int, float>;
     auto notesOf = [](const Score& s, std::initializer_list<Part> parts, bool inside) {
@@ -1246,6 +1264,370 @@ void testOrchestraBlocks()
     check(diffB == 0 && diffC == 0, "37 and 1 equal 512, bit for bit", fmt("%zu and %zu samples differ", diffB, diffC));
 }
 
+
+/**
+ * The modulation of every voice (Phase 5b, Modulation.h). First each engine alone: for every target of its list two
+ * slots -- a free LFO at 2 Hz and the velocity -- move the sound (the second of a held note differs from the knobs' own,
+ * and stays finite); the velocity reaches the targets read only at the strike (the hammer, the mallet). Then two
+ * composed tracks with every voice's matrix busy -- synced and free LFOs, the envelope, the random value, the wheel,
+ * the pressure, the energy --, the orchestra's Uplifting and the piano's Dream House, rendered at block sizes 1, 37 and
+ * 512: bit for bit the same.
+ */
+void testModulation()
+{
+    section("the modulation of every voice");
+    const DenormalGuard guard;
+    auto p = std::make_unique<ParamStore>();
+    constexpr int kSr = 48000, kLen = 48000, kBlk = 64;
+    auto values = [&](Module m, int count) {
+        std::vector<float> v(static_cast<size_t>(count));
+        for (int k = 0; k < count; ++k) v[static_cast<size_t>(k)] = p->get(p->id(m, 0, k));
+        return v;
+    };
+    // Slots 1 and 2 on target @p dst: LFO 1 (free, 2 Hz, sine) and the velocity.
+    auto slots = [](std::vector<float>& v, int first, int dst) {
+        v[static_cast<size_t>(first + 4)] = 2.0f;                      // lfo1_rate
+        v[static_cast<size_t>(first + 24)] = 1.0f;                     // mx1_src LFO 1
+        v[static_cast<size_t>(first + 25)] = static_cast<float>(dst);  // mx1_dst
+        v[static_cast<size_t>(first + 26)] = 0.6f;                     // mx1_amount
+        v[static_cast<size_t>(first + 27)] = 7.0f;                     // mx2_src velocity
+        v[static_cast<size_t>(first + 28)] = static_cast<float>(dst);
+        v[static_cast<size_t>(first + 29)] = 0.6f;
+    };
+    int reached = 0, total = 0;
+    std::string missed;
+    auto compare = [&](const char* engine, const char* target, const std::vector<float>& a, const std::vector<float>& b) {
+        double ea = 0.0, ed = 0.0;
+        bool finite = true;
+        for (size_t i = 0; i < a.size(); ++i) {
+            ea += static_cast<double>(a[i]) * a[i];
+            ed += static_cast<double>(a[i] - b[i]) * (a[i] - b[i]);
+            finite = finite && std::isfinite(b[i]);
+        }
+        ++total;
+        if (finite && ea > 0.0 && ed > 1e-6 * ea) ++reached;
+        else missed += fmt(" %s/%s", engine, target);
+    };
+    // Renders one engine for a second from a note at its start; @p E: prepare/update/noteOn/process as the engine has them.
+    auto run = [&](auto& engine, auto&& start) {
+        std::vector<float> out, L(kBlk), R(kBlk);
+        start(engine);
+        for (int done = 0; done < kLen; done += kBlk) {
+            engine.process(L.data(), R.data(), kBlk);
+            for (int i = 0; i < kBlk; ++i) out.push_back(L[static_cast<size_t>(i)] + 0.5f * R[static_cast<size_t>(i)]);
+        }
+        return out;
+    };
+    {   // The mono synth (bass).
+        const std::vector<float> base = values(Module::Bass, synth::Count);
+        auto render = [&](const std::vector<float>& v) {
+            auto s = std::make_unique<MonoSynth>();
+            s->prepare(kSr, 3);
+            return run(*s, [&](MonoSynth& e) { e.update(v.data(), 0.0f); e.noteOn(45, 0.8f, 0.0, false, false); });
+        };
+        const std::vector<float> ref = render(base);
+        for (int d = 1; d < static_cast<int>(std::size(kSynthModDests)); ++d) {
+            std::vector<float> v = base;
+            slots(v, synth::ModFirst, d);
+            // (The pulse width needs the pulse: on the saw it has nothing to move.)
+            if (kSynthModDests[d] == static_cast<int>(ModDest::PulseWidth)) {
+                std::vector<float> w = base;
+                w[synth::Wave] = v[synth::Wave] = 1.0f;
+                compare("bass", kSynthModDestNames[d], render(w), render(v));
+                continue;
+            }
+            compare("bass", kSynthModDestNames[d], ref, render(v));
+        }
+    }
+    {   // The strings.
+        const std::vector<float> base = values(Module::Strings, strings::Count);
+        auto render = [&](const std::vector<float>& v) {
+            auto s = std::make_unique<StringSection>();
+            s->prepare(kSr, 5);
+            return run(*s, [&](StringSection& e) { e.update(v.data()); e.noteOn(60, 0.7f, false, 0.0); });
+        };
+        const std::vector<float> ref = render(base);
+        for (int d = 1; d < static_cast<int>(std::size(kStringsModDests)); ++d) {
+            std::vector<float> v = base;
+            slots(v, strings::ModFirst, d);
+            compare("strings", kStringsModDestNames[d], ref, render(v));
+        }
+    }
+    {   // The choir.
+        const std::vector<float> base = values(Module::Choir, choir::Count);
+        auto render = [&](const std::vector<float>& v) {
+            auto s = std::make_unique<Choir>();
+            s->prepare(kSr, 5);
+            return run(*s, [&](Choir& e) { e.update(v.data()); e.noteOn(60, 0.7f, false, 0.0); });
+        };
+        const std::vector<float> ref = render(base);
+        for (int d = 1; d < static_cast<int>(std::size(kChoirModDests)); ++d) {
+            std::vector<float> v = base;
+            slots(v, choir::ModFirst, d);
+            compare("choir", kChoirModDestNames[d], ref, render(v));
+        }
+    }
+    {   // The brass.
+        const std::vector<float> base = values(Module::Brass, brass::Count);
+        auto render = [&](const std::vector<float>& v) {
+            auto s = std::make_unique<Brass>();
+            s->prepare(kSr, 5);
+            return run(*s, [&](Brass& e) { e.update(v.data()); e.noteOn(48, 0.8f, false, 0.0); });
+        };
+        const std::vector<float> ref = render(base);
+        for (int d = 1; d < static_cast<int>(std::size(kBrassModDests)); ++d) {
+            std::vector<float> v = base;
+            slots(v, brass::ModFirst, d);
+            compare("brass", kBrassModDestNames[d], ref, render(v));
+        }
+    }
+    {   // The timpani.
+        const std::vector<float> base = values(Module::Timpani, timpani::Count);
+        auto render = [&](const std::vector<float>& v) {
+            auto s = std::make_unique<Timpani>();
+            s->prepare(kSr, 5);
+            return run(*s, [&](Timpani& e) { e.update(v.data()); e.noteOn(45, 0.8f, false, 0.0); });
+        };
+        const std::vector<float> ref = render(base);
+        for (int d = 1; d < static_cast<int>(std::size(kTimpaniModDests)); ++d) {
+            std::vector<float> v = base;
+            slots(v, timpani::ModFirst, d);
+            compare("timpani", kTimpaniModDestNames[d], ref, render(v));
+        }
+    }
+    {   // The piano.
+        const std::vector<float> base = values(Module::Piano, piano::Count);
+        auto render = [&](const std::vector<float>& v) {
+            auto s = std::make_unique<Piano>();
+            s->prepare(kSr);
+            s->setSpec(PianoSpec{});
+            return run(*s, [&](Piano& e) { e.update(v.data()); e.noteOn(60, 0.7f, 0.0); });
+        };
+        const std::vector<float> ref = render(base);
+        for (int d = 1; d < static_cast<int>(std::size(kPianoModDests)); ++d) {
+            std::vector<float> v = base;
+            slots(v, piano::ModFirst, d);
+            compare("piano", kPianoModDestNames[d], ref, render(v));
+        }
+    }
+    check(reached == total && total == 40, "every target of every voice moves its sound", fmt("%d of %d targets%s", reached, total, missed.c_str()));
+
+    // Every matrix busy, two tracks, three block sizes.
+    const char* busy =
+        "perform.wheel=0.7; perform.pressure=0.4;"
+        "bass.lfo1_sync=5; bass.mx1_src=1; bass.mx1_dst=3; bass.mx1_amount=0.4; bass.mx2_src=12; bass.mx2_dst=6; bass.mx2_amount=0.5;"
+        "bass.menv_decay=150; bass.mx3_src=5; bass.mx3_dst=1; bass.mx3_amount=0.2;"
+        "lead.lfo1_rate=3; lead.mx1_src=1; lead.mx1_dst=11; lead.mx1_amount=0.6; lead.mx2_src=10; lead.mx2_dst=6; lead.mx2_amount=0.4;"
+        "strings.lfo1_rate=0.7; strings.mx1_src=1; strings.mx1_dst=2; strings.mx1_amount=0.6; strings.lfo2_sync=4; strings.mx2_src=2;"
+        "strings.mx2_dst=4; strings.mx2_amount=0.4; strings.mx3_src=5; strings.mx3_dst=1; strings.mx3_amount=0.2; strings.mx4_src=12;"
+        "strings.mx4_dst=7; strings.mx4_amount=0.3;"
+        "choir.lfo1_rate=0.5; choir.mx1_src=1; choir.mx1_dst=2; choir.mx1_amount=0.5; choir.mx2_src=9; choir.mx2_dst=6; choir.mx2_amount=0.5;"
+        "choir.mx3_src=11; choir.mx3_dst=3; choir.mx3_amount=0.5;"
+        "brass.lfo1_rate=4; brass.mx1_src=1; brass.mx1_dst=2; brass.mx1_amount=0.3; brass.mx2_src=5; brass.mx2_dst=1; brass.mx2_amount=0.15;"
+        "timpani.lfo1_rate=1; timpani.mx1_src=1; timpani.mx1_dst=1; timpani.mx1_amount=0.4; timpani.mx2_src=7; timpani.mx2_dst=2; timpani.mx2_amount=0.5;"
+        "piano.lfo1_rate=0.3; piano.mx1_src=1; piano.mx1_dst=1; piano.mx1_amount=0.15; piano.mx2_src=7; piano.mx2_dst=2; piano.mx2_amount=0.5;"
+        "piano.lfo2_sync=3; piano.mx3_src=2; piano.mx3_dst=4; piano.mx3_amount=0.5;";
+    for (const char* style : { "Uplifting", "Dream House" }) {
+        auto q = std::make_unique<ParamStore>();
+        q->parseText(std::string("compose.style=") + style);
+        q->parseText(busy);
+        const Part want = std::string(style) == "Uplifting" ? Part::Choir : Part::Piano;
+        Score sc;
+        double from = -1.0;
+        for (uint64_t seed = 1; seed < 16 && from < 0.0; ++seed) {
+            sc = composeTrack(*q, seed);
+            for (const NoteEvent& n : sc.notes) if (n.part == want) { from = std::floor(n.beat / 4.0) * 4.0; break; }
+        }
+        if (from < 0.0) { check(false, fmt("a %s track with its voice", style).c_str()); continue; }
+        auto render = [&](int block) {
+            auto e = std::make_unique<Engine>();
+            e->params().copyValuesFrom(*q);
+            e->prepare(48000.0, block);
+            e->load(sc);
+            e->seek(from);
+            std::vector<float> out, L(static_cast<size_t>(block)), R(static_cast<size_t>(block));
+            const int n = static_cast<int>(4.0 * 48000.0);
+            for (int done = 0; done < n; done += block) {
+                const int m = std::min(block, n - done);
+                e->process(L.data(), R.data(), m);
+                for (int i = 0; i < m; ++i) out.push_back(L[static_cast<size_t>(i)] - R[static_cast<size_t>(i)] * 0.25f);
+            }
+            return out;
+        };
+        const std::vector<float> a = render(512), b = render(37), c = render(1);
+        size_t diffB = 0, diffC = 0;
+        for (size_t i = 0; i < a.size(); ++i) {
+            diffB += std::memcmp(&a[i], &b[i], sizeof(float)) != 0;
+            diffC += std::memcmp(&a[i], &c[i], sizeof(float)) != 0;
+        }
+        check(diffB == 0 && diffC == 0, fmt("%s, every matrix busy: 37 and 1 equal 512, bit for bit", style).c_str(),
+              fmt("%zu and %zu samples differ", diffB, diffC));
+    }
+}
+
+
+/**
+ * The factory banks (Phase 5b, Presets.h): eighteen banks of 1024, every key a bank names a knob of its module, every
+ * name unique within its bank, a kit lane given only presets of its role; and a sample of every bank (every 64th preset,
+ * a different one per bank) played through the engine against the module's default sound -- finite, audible, within
+ * 24 dB of it. With PARH_BANK_TRIMS=<file> every preset is played and the trims (PresetTrims.inl: the default's loudness
+ * less the preset's, in tenths of a dB) are written to <file>.
+ */
+struct BankId { Module module; int instance; };
+const BankId kBanks[kPresetBanks] = {
+    { Module::Kick, 0 }, { Module::Sub, 0 }, { Module::Perc, 0 }, { Module::Bass, 0 }, { Module::Acid, 0 },
+    { Module::Poly, 0 }, { Module::Poly, 1 }, { Module::Poly, 2 }, { Module::Poly, 3 }, { Module::Poly, 4 }, { Module::Poly, 5 },
+    { Module::Piano, 0 }, { Module::Strings, 0 }, { Module::Choir, 0 }, { Module::Brass, 0 }, { Module::Timpani, 0 },
+    { Module::Sfx, 0 }, { Module::Cloud, 0 } };
+
+/** @brief The loudest 3 s of a short phrase on @p b's voice, the preset @p sp applied (null: the default sound), LUFS. */
+double bankLoudness(const BankId& b, const SoundPreset* sp)
+{
+    auto p = std::make_unique<ParamStore>();
+    if (sp != nullptr) applyPreset(*p, b.module, b.instance, *sp);
+    Score sc;
+    sc.clear(136.0);
+    sc.lengthBeats = 16.0;
+    auto note = [&](double beat, double len, Part part, int pitch, float v) { sc.notes.push_back(NoteEvent{ beat, len, part, pitch, v, 0, false, false }); };
+    switch (b.module) {
+    case Module::Kick: for (int q = 0; q < 12; ++q) note(q, 0.25, Part::Kick, 36, 1.0f); break;
+    case Module::Sub: for (int q = 0; q < 12; ++q) note(q + 0.5, 0.25, Part::Sub, 33, 1.0f); break;
+    case Module::Perc: for (int s = 0; s < 48; ++s) note(0.25 * s, 0.1, Part::Perc1, 42, s % 4 == 0 ? 0.9f : 0.6f); break;
+    case Module::Bass: case Module::Acid:
+        for (int s = 0; s < 24; ++s) note(0.5 * s, 0.4, b.module == Module::Bass ? Part::Bass : Part::Acid, s % 3 == 0 ? 45 : 57, 0.8f);
+        break;
+    case Module::Poly: {
+        const Part part = static_cast<Part>(static_cast<int>(Part::Lead) + b.instance);
+        if (b.instance == 4 || b.instance == 5) for (int k : { 57, 60, 64, 69 }) note(0.0, 11.5, part, k, 0.8f);   // the pad, the stab: a chord
+        else for (int s = 0; s < 24; ++s) note(0.5 * s, 0.45, part, 64 + (s % 4) * 3, 0.8f);
+        break;
+    }
+    case Module::Piano: for (int s = 0; s < 6; ++s) for (int k : { 48, 60, 64, 67 }) note(2.0 * s, 1.8, Part::Piano, k + (s % 2) * 2, 0.7f); break;
+    case Module::Strings: for (int k : { 43, 55, 59, 62 }) note(0.0, 11.5, Part::Strings, k, 0.7f); break;
+    case Module::Choir: for (int k : { 57, 60, 64 }) note(0.0, 11.5, Part::Choir, k, 0.7f); break;
+    case Module::Brass: for (int s = 0; s < 3; ++s) for (int k : { 48, 55, 60 }) note(4.0 * s, 3.5, Part::Brass, k, 0.8f); break;
+    case Module::Timpani: for (int s = 0; s < 6; ++s) note(2.0 * s, 1.0, Part::Timpani, 43 + (s % 2) * 7, 0.9f); break;
+    case Module::Sfx: note(0.0, 8.0, Part::Fx, kSfxBaseNote + static_cast<int>(SfxType::Riser), 0.9f);
+                      note(8.0, 4.0, Part::Fx, kSfxBaseNote + static_cast<int>(SfxType::Impact), 1.0f); break;
+    case Module::Cloud:
+        p->set(p->id(Module::Cloud, 0, cloud::Level), 0.0f);   // (the cloud grains the pad: the pad plays, the cloud is heard)
+        for (int k : { 57, 60, 64 }) note(0.0, 11.5, Part::Pad, k, 0.8f);
+        break;
+    default: break;
+    }
+    sc.sort();
+    auto e = std::make_unique<Engine>();
+    e->params().copyValuesFrom(*p);
+    e->prepare(48000.0, 512);
+    e->load(sc);
+    LoudnessMeter meter;
+    meter.prepare(48000.0);
+    std::vector<float> L(512), R(512);
+    bool finite = true;
+    for (int done = 0; done < static_cast<int>(5.0 * 48000.0); done += 512) {
+        e->process(L.data(), R.data(), 512);
+        for (int i = 0; i < 512; ++i) finite = finite && std::isfinite(L[static_cast<size_t>(i)]) && std::isfinite(R[static_cast<size_t>(i)]);
+        meter.process(L.data(), R.data(), 512);
+    }
+    return finite ? meter.report().shortTermMax : std::numeric_limits<double>::quiet_NaN();
+}
+
+void testPresetBank()
+{
+    section("the factory banks");
+    const DenormalGuard guard;
+    int full = 0, unique = 0;
+    for (const BankId& b : kBanks) {
+        const std::vector<SoundPreset>& ps = factoryPresets(b.module, b.instance);
+        full += ps.size() == static_cast<size_t>(kPresetsPerBank);
+        std::set<std::string> names;
+        for (const SoundPreset& s : ps) names.insert(s.name);
+        unique += names.size() == ps.size();
+    }
+    check(full == kPresetBanks, "eighteen banks of 1024 presets", fmt("%d of %d full", full, kPresetBanks));
+    check(unique == kPresetBanks, "every name unique within its bank", fmt("%d of %d", unique, kPresetBanks));
+    std::string first;
+    const int unknown = bankUnknownKeys(&first);
+    check(unknown == 0, "every key a bank names is a knob of its module", fmt("%d unknown%s", unknown, unknown > 0 ? (": " + first).c_str() : ""));
+    // A lane gets presets of its role only; every role has a group.
+    int roleOk = 0;
+    for (int role = 0; role < kNumPercRoles; ++role) {
+        Rng r;
+        r.seed(static_cast<uint64_t>(role) + 11);
+        const float style[5] = { 0.2f, 0.2f, 0.2f, 0.2f, 0.2f };
+        bool ok = true;
+        for (int k = 0; k < 20 && ok; ++k) {
+            const int i = pickPreset(Module::Perc, 0, style, role, r);
+            ok = i >= 0 && ((factoryPresets(Module::Perc, 0)[static_cast<size_t>(i)].roles >> role) & 1u) != 0u;
+        }
+        roleOk += ok;
+    }
+    check(roleOk == kNumPercRoles, "a kit lane is given presets of its role (every role has a group)", fmt("%d of %d roles", roleOk, kNumPercRoles));
+
+    // The sample (or, with PARH_BANK_TRIMS, every preset): through the engine against the default sound.
+    const char* trimsPath = std::getenv("PARH_BANK_TRIMS");
+    const bool all = trimsPath != nullptr && trimsPath[0] != 0;
+    // The jobs: every bank's default sound (-1) and its presets (all, or every 128th, a different one per bank), on
+    // every core (each render its own engine).
+    struct Job { int bank, preset; double loud; };
+    std::vector<Job> jobs;
+    for (int bi = 0; bi < kPresetBanks; ++bi) {
+        jobs.push_back({ bi, -1, 0.0 });
+        for (int i = all ? 0 : (bi * 7) % 128; i < kPresetsPerBank; i += all ? 1 : 128) jobs.push_back({ bi, i, 0.0 });
+    }
+    for (const BankId& b : kBanks) (void)factoryPresets(b.module, b.instance);   // (built once, before the threads)
+    std::atomic<size_t> next{ 0 };
+    auto work = [&]() {
+        const DenormalGuard g;
+        for (size_t k = next++; k < jobs.size(); k = next++) {
+            Job& j = jobs[k];
+            const BankId& b = kBanks[j.bank];
+            j.loud = bankLoudness(b, j.preset < 0 ? nullptr : &factoryPresets(b.module, b.instance)[static_cast<size_t>(j.preset)]);
+        }
+    };
+    std::vector<std::thread> pool;
+    const unsigned n = std::max(1u, std::min(16u, std::thread::hardware_concurrency()));
+    for (unsigned k = 0; k < n; ++k) pool.emplace_back(work);
+    for (std::thread& th : pool) th.join();
+    int played = 0, bad = 0;
+    double worst = 0.0;
+    std::string worstName;
+    std::vector<std::vector<short>> trims(kPresetBanks, std::vector<short>(kPresetsPerBank, 0));
+    std::vector<double> ref(kPresetBanks, 0.0);
+    for (const Job& j : jobs) if (j.preset < 0) ref[static_cast<size_t>(j.bank)] = j.loud;
+    for (const Job& j : jobs) {
+        if (j.preset < 0) continue;
+        const BankId& b = kBanks[j.bank];
+        const SoundPreset& sp = factoryPresets(b.module, b.instance)[static_cast<size_t>(j.preset)];
+        const double l = j.loud, d = l - ref[static_cast<size_t>(j.bank)];
+        ++played;
+        if (!std::isfinite(l) || l < -70.0 || std::fabs(d) > 24.0) {
+            if (bad++ == 0) worstName = fmt("%s/%s: %.1f LUFS against %.1f", sp.group.c_str(), sp.name.c_str(), l, ref[static_cast<size_t>(j.bank)]);
+        }
+        if (std::isfinite(d) && std::fabs(d) > worst) worst = std::fabs(d);
+        trims[static_cast<size_t>(j.bank)][static_cast<size_t>(j.preset)] = static_cast<short>(std::lround(std::clamp(std::isfinite(d) ? -d : 0.0, -24.0, 24.0) * 10.0));
+    }
+    check(bad == 0, "every preset played is finite, audible and within 24 dB of its module's default sound",
+          fmt("%d played, %d out, largest distance %.1f dB%s", played, bad, worst, bad > 0 ? ("; first: " + worstName).c_str() : ""));
+    if (all) {
+        std::FILE* f = std::fopen(trimsPath, "wb");
+        if (f != nullptr) {
+            std::fprintf(f, "// Generated by parh_selftest testPresetBank with PARH_BANK_TRIMS=<this file> (Tests/selftest.cpp).\n"
+                            "// Each preset's level correction in tenths of a dB, 18 banks of 1024 (Presets.h's order).\n"
+                            "static const short kPresetTrimTenths[18][1024] = {\n");
+            for (int bi = 0; bi < kPresetBanks; ++bi) {
+                std::fprintf(f, "{");
+                for (int i = 0; i < kPresetsPerBank; ++i) std::fprintf(f, "%d%s%s", trims[static_cast<size_t>(bi)][static_cast<size_t>(i)],
+                                                                         i + 1 < kPresetsPerBank ? "," : "", (i % 32 == 31 && i + 1 < kPresetsPerBank) ? "\n" : "");
+                std::fprintf(f, "}%s\n", bi + 1 < kPresetBanks ? "," : "");
+            }
+            std::fprintf(f, "};\n");
+            std::fclose(f);
+        }
+        check(f != nullptr, "the trims written", trimsPath);
+    }
+}
+
 /**
  * The sub-genres (PLAN 6.7, Phase 4c): each profile brings its own voice -- Acid the 303 with its four curves rising
  * to the filter's peaks, Deep the pad drifting and the granular cloud, Dream House the piano, Uplifting the orchestra
@@ -1406,6 +1788,8 @@ const TestSection kSections[] = {
     { "testPianoBlocks", testPianoBlocks },
     { "testOrchestra", testOrchestra },
     { "testOrchestraBlocks", testOrchestraBlocks },
+    { "testModulation", testModulation },
+    { "testPresetBank", testPresetBank },
     { "testSubGenres", testSubGenres },
     { "testSet", testSet },
 };

@@ -57,6 +57,7 @@ void appendShifted(Score& dst, const Score& src, double offset)
     for (Marker m : src.markers) { m.beat += offset; dst.markers.push_back(m); }
     for (LevelMark l : src.levels) { l.beat += offset; l.peakBeat += offset; dst.levels.push_back(l); }
     for (KnobSet k : src.knobs) { k.beat += offset; dst.knobs.push_back(k); }
+    for (SoundPick s : src.sounds) { s.beat += offset; dst.sounds.push_back(s); }
     for (Section s : src.sections) { s.beat += offset; dst.sections.push_back(s); }
 }
 
@@ -247,6 +248,7 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
         deckScore.markers.insert(deckScore.markers.end(), shifted.markers.begin(), shifted.markers.end());
         deckScore.levels.insert(deckScore.levels.end(), shifted.levels.begin(), shifted.levels.end());
         deckScore.knobs.insert(deckScore.knobs.end(), shifted.knobs.begin(), shifted.knobs.end());
+        deckScore.sounds.insert(deckScore.sounds.end(), shifted.sounds.begin(), shifted.sounds.end());
         deckScore.sections.insert(deckScore.sections.end(), shifted.sections.begin(), shifted.sections.end());
         deckScore.keyRoot = scores[i].keyRoot;
         deckScore.scale = scores[i].scale;
@@ -306,6 +308,7 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
         for (int pass = 0; pass < 2; ++pass)
             for (NoteEvent note : notes) { note.beat = note.beat - hook + from + pass * 8.0 * kBar; c.notes.push_back(note); }
         for (KnobSet k : scores[i].knobs) { k.beat = from; c.knobs.push_back(k); }
+        for (SoundPick s : scores[i].sounds) { s.beat = from; c.sounds.push_back(s); }
         std::vector<Gesture> g;
         const int fader = p.id(Module::Deck, 2, deck::Fader), low = p.id(Module::Deck, 2, deck::Low);
         const int filter = p.id(Module::Deck, 2, deck::Filter);

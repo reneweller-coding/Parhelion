@@ -31,6 +31,7 @@
  */
 #pragma once
 #include "parh/Dsp.h"
+#include "parh/synth/Modulation.h"
 #include <cstdint>
 #include <vector>
 
@@ -51,8 +52,14 @@ public:
     void setPlayers(int n) { players_ = n < 1 ? 1 : (n > kBrassPlayers ? kBrassPlayers : n); }
     void process(float* L, float* R, int n);
     int activePlayers() const;
+    /** @brief The deck's shared modulation sources (Modulation.h). */
+    void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
+    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
 
 private:
+    /** @brief Note @p s's modulation now, onto its players. */
+    void modNote(int s);
     struct Player {
         bool on = false, held = false;
         int note = -1;
@@ -64,6 +71,8 @@ private:
         double t = 0.0, released = -1.0, start = 0.0;
         double vibHz = 5.0, vibPhase = 0.0;
         float panL = 0.7f, panR = 0.7f;
+        float pan0 = 0.0f;                ///< where the player sits (the modulation moves from here; Phase 5b)
+        double target0 = 5000.0, f0 = 100.0;   ///< the note's pressure and pitch as they began
         float out = 0.0f, dc = 0.0f;
         std::vector<float> line;          ///< the outgoing wave's delay
         int write = 0;
@@ -85,6 +94,10 @@ private:
     int notePitch_[kBrassNotes] = {};
     bool noteOn_[kBrassNotes] = {};
     double noteAge_[kBrassNotes] = {};
+    // The modulation (Phase 5b): a Modulator per note; a note's blare and vibrato depth as the matrix leaves them.
+    NoteModulation<kBrassNotes> mod_;
+    float noteBrass_[kBrassNotes] = {}, noteVib_[kBrassNotes] = {};
+    int64_t pos_ = 0;
 };
 
 } // namespace parh

@@ -22,6 +22,16 @@
  * stream of their own.
  *
  * **Fade.** An LFO can come in over a few seconds after each note, as a player reaches for the wheel.
+ *
+ * **Every voice** (Phase 5b, 29.09.2026; the user: "genügend Modulationsmöglichkeiten in hinreichender Komplexität").
+ * The block moves from the six melodic voices to the bass, the 303, the piano, the strings, the choir, the brass and the
+ * timpani, each with the destinations its model has (its own list of targets, mapped onto ModDest: the bow's pressure,
+ * speed and place, the choir's vowel and its voice's tension, the brass's breath and blare, the hammer's and the
+ * mallet's hardness and where they strike ...). Three sources join the voice's own: the **wheel** and the **pressure**
+ * (the player's hand: perform.wheel and perform.pressure, MIDI CC 1 and channel pressure) and the score's **energy**
+ * (0 .. 10 as 0 .. 1, the section's, PLAN 6.4), so a sound can breathe with the track. The physical models have no
+ * filter envelope: their block begins with the modulation envelope (readModCore, 48 knobs). NoteModulation holds a
+ * Modulator per note of such an engine and runs it on the engine's own control grid.
  * @note Copied from Phosphene `Core/include/phos/Modulation.h` at 76f7100 (29.09.2026); namespace parh, prefix PARH_.
  */
 #pragma once
@@ -38,13 +48,45 @@ constexpr int kModSlots = 8;    ///< slots of the modulation matrix
 
 /** @brief The LFOs' shapes (kLfoShapeNames). */
 enum class LfoShape : int { Sine, Triangle, SawUp, SawDown, Square, SampleHold, SmoothRandom, Count };
-/** @brief The matrix's sources (kModSourceNames). */
-enum class ModSource : int { Off, Lfo1, Lfo2, Lfo3, Lfo4, ModEnv, FilterEnv, Velocity, Key, Random, Count };
-/** @brief The matrix's destinations (kModDestNames). */
-enum class ModDest : int { Off, Pitch, Osc2Pitch, PulseWidth, TablePos, FmIndex, Cutoff, Resonance, FilterMode, Level, Pan, Count };
+/** @brief The matrix's sources (kModSourceNames); the last three are the same for every voice of a deck. */
+enum class ModSource : int { Off, Lfo1, Lfo2, Lfo3, Lfo4, ModEnv, FilterEnv, Velocity, Key, Random,
+                             Wheel,      ///< perform.wheel (MIDI CC 1), 0..1
+                             Pressure,   ///< perform.pressure (channel pressure), 0..1
+                             Energy,     ///< the score's energy at the beat, 0..1 (Score::sections)
+                             Count };
+/**
+ * @brief The matrix's destinations. The polyphonic voice offers Off .. Detune in this order (kModDestNames); every
+ *        other engine a list of its own mapped onto these (kSynthModDests ... kTimpaniModDests).
+ */
+enum class ModDest : int { Off, Pitch, Osc2Pitch, PulseWidth, TablePos, FmIndex, Cutoff, Resonance, FilterMode, Level, Pan,
+                           Detune,       ///< the unison's spread, doubled or shut
+                           Drive,        ///< the mono synth's drive, 0..1 added
+                           EnvAmount,    ///< the mono synth's filter envelope, octaves added
+                           Pressure,     ///< the bow's force, the breath: a factor 2^x
+                           Speed,        ///< the bow's speed: a factor 2^x
+                           Position,     ///< the bow's place, the hammer's or the mallet's strike point: added (the knob's -1..1 or 0..1)
+                           VibDepth,     ///< the vibrato's depth: a factor 1 + x
+                           VibRate,      ///< the vibrato's rate: a factor 2^x
+                           Hardness,     ///< the hammer's or the mallet's felt: a factor 2^x
+                           Vowel,        ///< the choir's vowel, added
+                           Tension,      ///< the voice's quality (Rd), added
+                           Breath,       ///< the aspiration, added
+                           Formant,      ///< the formants moved, a factor 2^(x/2) (a tract shorter or longer)
+                           Brassiness,   ///< the blare, added
+                           Decay,        ///< the modes' decay: a factor 2^x
+                           Count };
 constexpr int kModSources = static_cast<int>(ModSource::Count);   ///< sources including Off
 constexpr int kModDests = static_cast<int>(ModDest::Count);       ///< destinations including Off
 constexpr int kLfoSyncs = 10;                                     ///< entries of kLfoSyncNames
+
+static_assert(kModDests <= 32, "a slot's destination is a bit of an unsigned mask");
+
+/** @brief The sources every voice of a deck shares (Deck::updateCell). */
+struct ModGlobals {
+    float wheel = 0.0f;      ///< perform.wheel
+    float pressure = 0.0f;   ///< perform.pressure
+    float energy = 0.0f;     ///< the score's energy / 10
+};
 
 /** @brief Cycles per beat of an LFO's sync division (kLfoSyncNames: free, 4, 2, 1 bars, 1/2 .. 1/16, 1/4T, 1/8T); 0: free. */
 inline double lfoCyclesPerBeat(int sync)
@@ -80,15 +122,18 @@ struct ModSettings {
  *        sync, retrig, fade) and eight slots of three (source, target, amount) -- 51 knobs from the block's first.
  */
 constexpr int kModBlockMenv = 3, kModBlockLfo = 7, kModBlockSlots = 27, kModBlockSize = 51;
+/** @brief The block without the filter envelope (every engine but Poly): from the modulation envelope's attack, 48 knobs. */
+constexpr int kModCoreSize = kModBlockSize - kModBlockMenv;
 
 /**
- * @brief The ModSettings a module's knobs ask for; @p b points at the block's first knob (its FiltAttack).
- * @param b the block's first knob in the module's effective values
- * @param dstMap where a synth offers only some destinations (the bass): its target list's index -> ModDest, or null
+ * @brief The ModSettings a module's knobs ask for, from the modulation envelope's first knob on (the block's core).
+ * @param m the core's first knob (MenvAttack) in the module's effective values
+ * @param dstMap where a synth offers its own destinations: its target list's index -> ModDest, or null
  * @param dstCount entries of @p dstMap
  */
-inline ModSettings readModBlock(const float* b, const int* dstMap = nullptr, int dstCount = 0)
+inline ModSettings readModCore(const float* m, const int* dstMap = nullptr, int dstCount = 0)
 {
+    const float* b = m - kModBlockMenv;   // (the offsets below count from the filter envelope's first knob)
     ModSettings ms;
     ms.attackMs = b[kModBlockMenv];
     ms.decayMs = b[kModBlockMenv + 1];
@@ -112,6 +157,12 @@ inline ModSettings readModBlock(const float* b, const int* dstMap = nullptr, int
     return ms;
 }
 
+/** @brief The same from the whole block's first knob (Poly's FiltAttack). */
+inline ModSettings readModBlock(const float* b, const int* dstMap = nullptr, int dstCount = 0)
+{
+    return readModCore(b + kModBlockMenv, dstMap, dstCount);
+}
+
 /** @brief The span of each destination for an amount of 1 (see the file comment); the pitch's amount is squared. */
 inline float modDestSpan(ModDest d)
 {
@@ -120,6 +171,7 @@ inline float modDestSpan(ModDest d)
     case ModDest::Osc2Pitch: return 24.0f;
     case ModDest::PulseWidth: return 0.45f;
     case ModDest::Cutoff: return 5.0f;
+    case ModDest::EnvAmount: return 3.0f;
     case ModDest::Off: return 0.0f;
     default: return 1.0f;
     }
@@ -288,5 +340,114 @@ private:
     int64_t lastAt_ = 0;           ///< the sample the free LFOs ran to
     int64_t noteAt_ = 0;           ///< the last note's sample (the fades)
 };
+
+/**
+ * @brief The modulation of an engine's @p N notes (Phase 5b): a Modulator per note, the sums per destination, the
+ *        note's own sources and the deck's shared ones, the beat on the engine's own sample count.
+ *
+ * Use: prepare(); set() from update(); setClock() from the deck's cell (the engine's sample count and the beat
+ * there); noteOn()/noteOff() with the engine's notes; evaluate() for a sounding note at the engine's control grid
+ * (its absolute samples, so every block size gives the same sums); then read with get().
+ */
+template <int N>
+class NoteModulation {
+public:
+    void prepare(double sampleRate, uint64_t seed)
+    {
+        sr_ = sampleRate;
+        seed_ = seed;
+        for (int i = 0; i < N; ++i) {
+            mod_[i].prepare(sampleRate, mixSeed(seed, 0x4E4F5445ull + static_cast<uint64_t>(i)));   // "NOTE"
+            lastAt_[i] = 0;
+            for (float& s : sum_[i]) s = 0.0f;
+        }
+        rng_.seed(mixSeed(seed, 0x524E44ull));   // "RND"
+        clockAt_ = 0;
+        clockBeat_ = 0.0;
+    }
+    /** @brief Back to the start (the engine's sample count starts again): the LFOs, the envelopes, the random stream; the settings stay. */
+    void reset() { prepare(sr_, seed_); }
+    /** @brief New settings (every note the same). */
+    void set(const ModSettings& ms)
+    {
+        for (Modulator& m : mod_) m.set(ms);
+        on_ = mod_[0].active();
+    }
+    /** @brief Whether any slot is live. */
+    bool on() const { return on_; }
+    /** @brief The deck's shared sources. */
+    void setGlobals(const ModGlobals& g) { glob_ = g; }
+    /** @brief The beat at the engine's sample @p at, and the tempo in beats per sample. */
+    void setClock(int64_t at, double beat, double beatsPerSample) { clockAt_ = at; clockBeat_ = beat; bps_ = beatsPerSample; }
+    /** @brief Note @p i begins at sample @p at. */
+    void noteOn(int i, int64_t at, int pitch, float velocity)
+    {
+        vel_[i] = velocity;
+        key_[i] = std::clamp(static_cast<float>(pitch - 60) / 24.0f, -1.0f, 1.0f);
+        rnd_[i] = rng_.bipolar();   // (drawn for every note, live or not: the stream stays put)
+        lastAt_[i] = at;
+        mod_[i].noteOn(at, beatAt(at));
+        for (float& s : sum_[i]) s = 0.0f;
+    }
+    /** @brief Note @p i is released. */
+    void noteOff(int i) { mod_[i].noteOff(); }
+    /** @brief The sums of note @p i at sample @p at (its envelope run on to there). */
+    void evaluate(int i, int64_t at, float filterEnv = 0.0f)
+    {
+        if (!on_) return;
+        const int64_t n = at - lastAt_[i];
+        if (n > 0) mod_[i].tick(static_cast<int>(std::min<int64_t>(n, 1 << 20)));
+        lastAt_[i] = at;
+        float ext[kModSources] = {};
+        ext[static_cast<int>(ModSource::FilterEnv)] = filterEnv;
+        ext[static_cast<int>(ModSource::Velocity)] = vel_[i];
+        ext[static_cast<int>(ModSource::Key)] = key_[i];
+        ext[static_cast<int>(ModSource::Random)] = rnd_[i];
+        ext[static_cast<int>(ModSource::Wheel)] = glob_.wheel;
+        ext[static_cast<int>(ModSource::Pressure)] = glob_.pressure;
+        ext[static_cast<int>(ModSource::Energy)] = glob_.energy;
+        mod_[i].evaluate(at, beatAt(at), ext, sum_[i]);
+    }
+    /** @brief Note @p i's sum for @p d (0 where no slot reaches it). */
+    float get(int i, ModDest d) const { return on_ && mod_[i].targets(d) ? sum_[i][static_cast<int>(d)] : 0.0f; }
+    /** @brief Whether a live slot reaches @p d. */
+    bool targets(ModDest d) const { return on_ && mod_[0].targets(d); }
+    /** @brief The beat at sample @p at. */
+    double beatAt(int64_t at) const { return clockBeat_ + static_cast<double>(at - clockAt_) * bps_; }
+
+private:
+    double sr_ = 48000.0;
+    uint64_t seed_ = 1;
+    Modulator mod_[N];
+    float sum_[N][kModDests] = {};
+    float vel_[N] = {}, key_[N] = {}, rnd_[N] = {};
+    int64_t lastAt_[N] = {};
+    ModGlobals glob_;
+    Rng rng_;
+    bool on_ = false;
+    int64_t clockAt_ = 0;
+    double clockBeat_ = 0.0, bps_ = 0.0;
+};
+
+/** @brief Fills the shared sources into a voice's own (Poly::applyModulation). */
+inline void fillGlobals(float* ext, const ModGlobals& g)
+{
+    ext[static_cast<int>(ModSource::Wheel)] = g.wheel;
+    ext[static_cast<int>(ModSource::Pressure)] = g.pressure;
+    ext[static_cast<int>(ModSource::Energy)] = g.energy;
+}
+
+/** @name The engines' target lists (their knobs' choices, Params.cpp) mapped onto ModDest
+ *  @{ */
+inline constexpr int kSynthModDests[] = { 0, 1, 3, 6, 7, 13, 12, 9, 10 };        ///< Off Pitch PW Cutoff Res EnvAmt Drive Level Pan
+inline constexpr int kPianoModDests[] = { 0, 1, 19, 9, 10 };                      ///< Off Pitch Hardness Level Pan
+inline constexpr int kStringsModDests[] = { 0, 1, 14, 15, 16, 17, 18, 9, 10 };    ///< Off Pitch Pressure Speed Position Vib VibRate Level Pan
+inline constexpr int kChoirModDests[] = { 0, 1, 20, 21, 22, 17, 23, 9, 10 };      ///< Off Pitch Vowel Tension Breath Vib Formant Level Pan
+inline constexpr int kBrassModDests[] = { 0, 1, 14, 24, 17, 9, 10 };              ///< Off Pitch Pressure Brassiness Vib Level Pan
+inline constexpr int kTimpaniModDests[] = { 0, 1, 19, 16, 25, 9, 10 };            ///< Off Pitch Hardness Strike Decay Level Pan
+/** @} */
+static_assert(static_cast<int>(ModDest::EnvAmount) == 13 && static_cast<int>(ModDest::Drive) == 12
+              && static_cast<int>(ModDest::Pressure) == 14 && static_cast<int>(ModDest::Hardness) == 19
+              && static_cast<int>(ModDest::Formant) == 23 && static_cast<int>(ModDest::Decay) == 25, "the target lists' numbers");
 
 } // namespace parh

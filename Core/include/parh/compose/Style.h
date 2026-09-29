@@ -88,6 +88,7 @@ struct StyleProfile {
     float bassDuckDb = 8.0f;                            ///< the mid-bass's duck (the sub's is 3 dB more)
     float padDuckDb = 4.0f;                             ///< the pads'
     float targetLufs = -8.0f;                           ///< the loudest part's loudness (the Leveler)
+    std::array<float, 5> mix{};                         ///< the styles this profile is (Uplifting .. Deep): the sounds' choice (Presets.h)
 };
 
 /** @brief The profile of a style (Style order). */

@@ -42,6 +42,7 @@ add_library(ParhelionCore STATIC
     src/SetFile.cpp
     src/Deck.cpp
     src/Export.cpp
+    src/PresetBank.cpp
     src/Engine.cpp
     src/Cue.cpp
 )
