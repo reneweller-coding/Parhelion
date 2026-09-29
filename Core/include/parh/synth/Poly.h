@@ -360,6 +360,18 @@ private:
     void advanceDrift();
     /** @brief Renders @p n samples with the lane type @p V (scalar, AVX2 or NEON). */
     template <class V> void renderSegment(float* L, float* R, int n);
+    /**
+     * @name The table reads on eight lanes (AVX2; the optimisation pass, 29.09.2026)
+     * A voice's seven slots in one register (the eighth lane idle), the phase and the index in double as the scalar
+     * WaveTable::sample has them, the four samples of the Catmull-Rom read gathered, the same float arithmetic in the
+     * same order: every value bit for bit the scalar read's (vectest testPolyModels compares the paths). Only the
+     * slots of the unison limit are written and advanced, as in the scalar loop.
+     * @{ */
+    /** @brief The supersaw's reads of @p voice's sounding slots for @p n samples, into its packed lanes. */
+    void sawReads8(int voice, int n);
+    /** @brief A wavetable voice's reads (no slot on the saw frame): the position per sample as the scalar loop has it. */
+    void tableReads8(int voice, int n);
+    /** @} */
 
     double sr_ = 48000.0;   ///< sample rate
     int unisonLimit_ = kPolyUnison;   ///< oscillators per voice (Quality.h)
@@ -384,6 +396,11 @@ private:
     double wtDt_[kPolySlots] = {};            ///< wavetable phase step per slot
     int wtLevel_[kPolySlots] = {};            ///< table level per slot
     bool  sawVoice_[kPolyVoices] = {};        ///< every slot of the voice is the supersaw: the fast path
+    int   liveCount_[kPolyVoices] = {};       ///< how many of the voice's slots carry a gain (noteOn)
+    int   liveSlot_[kPolyVoices][kPolyUnison] = {};   ///< and which, in unison order: the only ones renderSegment renders
+    PolySlots pk_;                            ///< the sounding slots of a segment, packed into the first lanes (renderSegment)
+    int   pkSlot_[kPolySlots] = {};           ///< packed lane -> slot
+    int   pkFirst_[kPolyVoices] = {};         ///< a sounding voice's first packed lane; its slots follow in unison order
     bool  slotSaw_[kPolySlots] = {};          ///< this slot reads the Classic saw frame rather than the table
     double slotHzMul_[kPolySlots] = {};       ///< the slot's pitch against the note (the second oscillator's interval)
     double slotSpread_[kPolySlots] = {};      ///< the share of the unison detune the slot plays (Poly.cpp, kOsc2Spread)

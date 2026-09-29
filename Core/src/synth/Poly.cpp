@@ -138,6 +138,7 @@ void Poly::reset()
         posEnv_[v] = 0.0f;
         lfoPh_[v] = 0.0;
         sawVoice_[v] = false;
+        liveCount_[v] = 0;
         glidePitch_[v] = glideTarget_[v] = 60.0;
         glideY_[v] = glideScale_[v] = glideFmRatio_[v] = 0.0;
         voiceCoefs(v);
@@ -488,6 +489,13 @@ void Poly::noteOn(int pitch, float velocity, double lengthBeats, int gateSamples
         slots_.mph[s] = static_cast<float>(mp - std::floor(mp));
         slots_.idx[s] = static_cast<float>(0.7 * fmI * std::pow(static_cast<double>(idxDecay), late));
     }
+    // The slots that carry a gain, in unison order: renderSegment sums only these. The others -- outside the
+    // unison limit, or the four a VA or FM voice leaves at gain 0 -- render exactly zero, and x + 0 is x.
+    liveCount_[voice] = 0;
+    for (int u = 0; u < kPolyUnison; ++u) {
+        const int s = voice * kPolyUnison + u;
+        if (slots_.gL[s] != 0.0f || slots_.gR[s] != 0.0f) liveSlot_[voice][liveCount_[voice]++] = s;
+    }
     hpHz_[voice] = std::max(v[poly::HpFloor], static_cast<float>(v[poly::HpTrack] * f0Note));
     if (wasIdle) {
         for (int c = 0; c < 2; ++c) {
@@ -626,47 +634,90 @@ void Poly::renderSegment(float* L, float* R, int n)
             mod_[voice].tick();
         }
     }
-    // Wavetable rows, on the scalar side (a table read is a gather): position from the knob, the
-    // voice's envelope and its LFO, one position per voice per sample. This is the most expensive
-    // scalar work of the engine, so the unison limit of the quality level is worth the most here:
-    // only the middle unisonLimit_ slots of a voice are read, the rest are stores of zero.
-    const int uFirst = (kPolyUnison - unisonLimit_) / 2, uLast = uFirst + unisonLimit_;
+    // The sounding slots, packed (the optimisation pass, 29.09.2026). The kernels run on groups of eight lanes, and
+    // with the slots laid out voice by voice (slot = voice x 7 + unison) a voice that sounds three of its seven -- a VA
+    // or an FM voice, any voice under the Quest's unison limit -- kept whole groups busy with silent lanes. Now every
+    // segment gathers the slots that carry a gain, of the voices that sound, voice by voice in unison order, into the
+    // first lanes of pk_: four VA voices take two groups instead of four, a Quest supersaw voice three lanes instead of
+    // seven. A lane computes what it computed in its old place (the arithmetic is lane by lane; which lane does not
+    // matter), its state goes back to its slot after the segment, a voice's slots are summed in unison order as before,
+    // and a source a group weighs in for another lane adds a zero to this one -- so every render is the render it was.
+    int count = 0;
     for (int voice = 0; voice < kPolyVoices; ++voice) {
+        pkFirst_[voice] = count;
+        if (!voiceOn[voice]) continue;
+        for (int k = 0; k < liveCount_[voice]; ++k) pkSlot_[count++] = liveSlot_[voice][k];
+    }
+    const int used = (count + 7) & ~7;
+    for (int k = 0; k < used; ++k) {
+        if (k < count) {
+            const int s = pkSlot_[k];
+            pk_.ph[k] = slots_.ph[s]; pk_.mph[k] = slots_.mph[s]; pk_.idx[k] = slots_.idx[s];
+            pk_.dt[k] = slots_.dt[s]; pk_.inv[k] = slots_.inv[s]; pk_.mdt[k] = slots_.mdt[s];
+            pk_.idxDecay[k] = slots_.idxDecay[s]; pk_.idxFloor[k] = slots_.idxFloor[s]; pk_.pw[k] = slots_.pw[s];
+            pk_.wSaw[k] = slots_.wSaw[s]; pk_.wPulse[k] = slots_.wPulse[s]; pk_.wFm[k] = slots_.wFm[s]; pk_.wWt[k] = slots_.wWt[s];
+            pk_.gL[k] = slots_.gL[s]; pk_.gR[k] = slots_.gR[s];
+        } else {
+            // The rest of the last group: silent and finite (no step, no weight, no gain).
+            pk_.ph[k] = pk_.mph[k] = pk_.idx[k] = pk_.dt[k] = pk_.inv[k] = pk_.mdt[k] = pk_.idxFloor[k] = 0.0f;
+            pk_.idxDecay[k] = 1.0f;
+            pk_.pw[k] = 0.5f;
+            pk_.wSaw[k] = pk_.wPulse[k] = pk_.wFm[k] = pk_.wWt[k] = pk_.gL[k] = pk_.gR[k] = 0.0f;
+        }
+    }
+    // Wavetable rows, on the scalar side (a table read is a gather; AVX2 has one, sawReads8): position from the knob,
+    // the voice's envelope and its LFO, one position per voice per sample -- into the voice's packed lanes. A lane
+    // with no table (another voice, the rest of a group) reads zero: a group that weighs tables in multiplies it by 0.
+    const int uFirst = (kPolyUnison - unisonLimit_) / 2, uLast = uFirst + unisonLimit_;
+    auto zeroLanes = [&](int from, int to) {
+        for (int i = 0; i < n; ++i)
+            for (int k = from; k < to; ++k) wtRow_[static_cast<size_t>(i * kPolySlots + k)] = 0.0f;
+    };
+    zeroLanes(count, used);
+    for (int voice = 0; voice < kPolyVoices; ++voice) {
+        if (!voiceOn[voice]) continue;
         const int s0 = voice * kPolyUnison;
+        const int first = pkFirst_[voice], lanesOf = liveCount_[voice];
+        const int* live = liveSlot_[voice];
         // The source weights are read from the slots inside the limit: noteOn() clears the weights of
         // the slots outside it, so slot 0 of a limited voice says nothing about its oscillator type.
         // Any of them, not just the first: with a second oscillator (22.09.2026) the outer pair can
         // read tables while the middle does not, or the other way round.
         bool wt = false;
         for (int u = uFirst; u < uLast && !wt; ++u) wt = slots_.wWt[s0 + u] != 0.0f;
-        wt = wt && voiceOn[voice];
         if (!wt) {
-            for (int i = 0; i < n; ++i)
-                for (int u = 0; u < kPolyUnison; ++u) wtRow_[static_cast<size_t>(i * kPolySlots + s0 + u)] = 0.0f;
+            zeroLanes(first, first + lanesOf);
             continue;
-        }
-        // The silent slots share their lane group with kept ones, so their row must hold a number
-        // rather than what the last note left there -- one store against a mipmap choice and a
-        // Catmull-Rom read.
-        if (unisonLimit_ < kPolyUnison) {
-            for (int i = 0; i < n; ++i) {
-                for (int u = 0; u < uFirst; ++u) wtRow_[static_cast<size_t>(i * kPolySlots + s0 + u)] = 0.0f;
-                for (int u = uLast; u < kPolyUnison; ++u) wtRow_[static_cast<size_t>(i * kPolySlots + s0 + u)] = 0.0f;
-            }
         }
         tableReads_ += static_cast<uint64_t>(n) * static_cast<uint64_t>(unisonLimit_);
         if (sawVoice_[voice]) {
+#if PARH_VEC_PATH == 1
+            if constexpr (laneWidth<V>() == 8) {
+                sawReads8(voice, n);
+                continue;
+            }
+#endif
             // Supersaw: one frame, no position, no LFO -- a single Catmull-Rom read per slot.
             for (int i = 0; i < n; ++i) {
-                for (int u = uFirst; u < uLast; ++u) {
-                    const int s = s0 + u;
-                    wtRow_[static_cast<size_t>(i * kPolySlots + s)] = sawTable_->sample(wtLevel_[s], kClassicSawFrame, wtPh_[s]);
+                for (int k = 0; k < lanesOf; ++k) {
+                    const int s = live[k];
+                    wtRow_[static_cast<size_t>(i * kPolySlots + first + k)] = sawTable_->sample(wtLevel_[s], kClassicSawFrame, wtPh_[s]);
                     wtPh_[s] += wtDt_[s];
                     if (wtPh_[s] >= 1.0) wtPh_[s] -= 1.0;
                 }
             }
             continue;
         }
+#if PARH_VEC_PATH == 1
+        if constexpr (laneWidth<V>() == 8) {
+            bool saw = false;
+            for (int k = 0; k < lanesOf; ++k) saw = saw || slotSaw_[live[k]];
+            if (!saw) {
+                tableReads8(voice, n);
+                continue;
+            }
+        }
+#endif
         for (int i = 0; i < n; ++i) {
             const float lfo = static_cast<float>(std::sin(2.0 * kPiD * lfoPh_[voice]));
             float pos = v[poly::Position] + v[poly::PosEnv] * posEnv_[voice] + v[poly::PosLfoDepth] * lfo;
@@ -679,12 +730,12 @@ void Poly::renderSegment(float* L, float* R, int n)
             posEnv_[voice] *= posDecay_;
             lfoPh_[voice] += lfoInc_;
             if (lfoPh_[voice] >= 1.0) lfoPh_[voice] -= 1.0;
-            for (int u = uFirst; u < uLast; ++u) {
-                const int s = s0 + u;
+            for (int k = 0; k < lanesOf; ++k) {
+                const int s = live[k];
                 // Per slot since 22.09.2026: a second oscillator may be the supersaw while the first
                 // is a wavetable, and the supersaw reads one frame of the Classic table whatever the
                 // Table parameter says (the DSP round's aliasing figures depend on that frame).
-                wtRow_[static_cast<size_t>(i * kPolySlots + s)] =
+                wtRow_[static_cast<size_t>(i * kPolySlots + first + k)] =
                     slotSaw_[s] ? sawTable_->sample(wtLevel_[s], kClassicSawFrame, wtPh_[s])
                                 : table_->sampleAt(wtLevel_[s], pos, wtPh_[s]);
                 wtPh_[s] += wtDt_[s];
@@ -692,35 +743,41 @@ void Poly::renderSegment(float* L, float* R, int n)
             }
         }
     }
-    // Groups of eight slots and eight channels run when any of their voices sounds: the same decision
-    // on every vector path. A slot outside the unison limit is silent whatever its voice does, so it
-    // no longer keeps its group alive. With seven slots per voice and the middle three kept, every
-    // one of the seven groups still holds kept slots of one or two voices, so the limit frees a group
-    // only when those voices are silent -- a denser layout (voice x unisonLimit_) would free four of
-    // the seven outright, but it moves the lane assignment and with it the bit-identity of the vector
-    // tests (docs/rounds/2026-09.md).
-    for (int g = 0; g < kPolySlots / 8; ++g) {
-        bool on = false, blep = false, fm = false, wt = false;
-        for (int s = g * 8; s < g * 8 + 8; ++s) {
-            const int u = s % kPolyUnison;
-            on = on || (voiceOn[s / kPolyUnison] && u >= uFirst && u < uLast);
-            blep = blep || slots_.wSaw[s] != 0.0f || slots_.wPulse[s] != 0.0f;
-            fm = fm || slots_.wFm[s] != 0.0f;
-            wt = wt || slots_.wWt[s] != 0.0f;
+    // The packed groups, each with the sources its lanes weigh in (the same decision on every vector path), then the
+    // lanes' state back to their slots.
+    for (int g = 0; g < used / 8; ++g) {
+        bool blep = false, fm = false, wt = false;
+        for (int k = g * 8; k < g * 8 + 8 && k < count; ++k) {
+            blep = blep || pk_.wSaw[k] != 0.0f || pk_.wPulse[k] != 0.0f;
+            fm = fm || pk_.wFm[k] != 0.0f;
+            wt = wt || pk_.wWt[k] != 0.0f;
         }
-        if (on) {
-            for (int s = g * 8; s < g * 8 + 8; s += width) polySlotKernel<V>(slots_, s, n, wtRow_.data(), blep, fm, wt, slotL_.data(), slotR_.data());
-        } else {
-            for (int i = 0; i < n; ++i)
-                for (int s = g * 8; s < g * 8 + 8; ++s) slotL_[static_cast<size_t>(i * kPolySlots + s)] = slotR_[static_cast<size_t>(i * kPolySlots + s)] = 0.0f;
-        }
+        for (int k = g * 8; k < g * 8 + 8; k += width) polySlotKernel<V>(pk_, k, n, wtRow_.data(), blep, fm, wt, slotL_.data(), slotR_.data());
+    }
+    for (int k = 0; k < count; ++k) {
+        const int s = pkSlot_[k];
+        slots_.ph[s] = pk_.ph[k];
+        slots_.mph[s] = pk_.mph[k];
+        slots_.idx[s] = pk_.idx[k];
     }
     for (int voice = 0; voice < kPolyVoices; ++voice) {
+        // A silent voice's channels get silence (the optimisation pass, 29.09.2026): its output is its envelope's zero
+        // whatever they hold, and its filter starts from zero when it next sounds (noteOn from idle) -- so what its
+        // slots would have summed to changes nothing. A sounding voice sums its packed lanes, in unison order: the slots
+        // without a gain are exactly zero, and a sum that starts at +0 is not changed by adding a zero of either sign.
+        if (!voiceOn[voice]) {
+            for (int i = 0; i < n; ++i)
+                chanIn_[static_cast<size_t>(i * kPolyLanes + voice * 2)] = chanIn_[static_cast<size_t>(i * kPolyLanes + voice * 2 + 1)] = 0.0f;
+            continue;
+        }
+        const int first = pkFirst_[voice], lanesOf = liveCount_[voice];
         for (int i = 0; i < n; ++i) {
+            const float* rowL = slotL_.data() + static_cast<size_t>(i * kPolySlots + first);
+            const float* rowR = slotR_.data() + static_cast<size_t>(i * kPolySlots + first);
             float sl = 0.0f, sr = 0.0f;
-            for (int u = uFirst; u < uLast; ++u) {   // the slots outside the limit are exactly zero
-                sl += slotL_[static_cast<size_t>(i * kPolySlots + voice * kPolyUnison + u)];
-                sr += slotR_[static_cast<size_t>(i * kPolySlots + voice * kPolyUnison + u)];
+            for (int k = 0; k < lanesOf; ++k) {
+                sl += rowL[k];
+                sr += rowR[k];
             }
             chanIn_[static_cast<size_t>(i * kPolyLanes + voice * 2)] = sl;
             chanIn_[static_cast<size_t>(i * kPolyLanes + voice * 2 + 1)] = sr;
@@ -757,6 +814,158 @@ void Poly::renderSegment(float* L, float* R, int n)
     pos_ += static_cast<uint64_t>(n);
     beat_ += beatsPerSample_ * static_cast<double>(n);
 }
+
+#if PARH_VEC_PATH == 1
+namespace {
+
+/** @brief The lanes of one voice's slots: phases, steps, lengths and cycle offsets, lane 7 and the slots outside the limit idle. */
+struct TableLanes {
+    __m256d phA, phB, dtA, dtB, lenA, lenB;   ///< phase, step and cycle length, lanes 0-3 and 4-7
+    __m256i lenM1;                            ///< the last index of each lane's cycle
+    __m256i live;                             ///< all bits where the lane is a slot inside the unison limit
+};
+
+/**
+ * @brief Catmull-Rom reads of eight lanes, as WaveTable::sample: x = phase * len in double, the index truncated and held
+ *        inside the cycle, t = float(x - index), then y1 + t (a + t (b + t d)) in the scalar read's order.
+ * @param data the table's samples; @p off each lane's cycle start (the index of its element 0)
+ * @param idx,t out: each lane's index and fraction (a second frame reads at the same place)
+ */
+inline void tablePlace(const TableLanes& l, __m256i& idx, __m256& t)
+{
+    const __m256d xA = _mm256_mul_pd(l.phA, l.lenA), xB = _mm256_mul_pd(l.phB, l.lenB);
+    __m256i i = _mm256_set_m128i(_mm256_cvttpd_epi32(xB), _mm256_cvttpd_epi32(xA));
+    i = _mm256_max_epi32(_mm256_min_epi32(i, l.lenM1), _mm256_setzero_si256());
+    const __m128 tA = _mm256_cvtpd_ps(_mm256_sub_pd(xA, _mm256_cvtepi32_pd(_mm256_castsi256_si128(i))));
+    const __m128 tB = _mm256_cvtpd_ps(_mm256_sub_pd(xB, _mm256_cvtepi32_pd(_mm256_extracti128_si256(i, 1))));
+    t = _mm256_set_m128(tB, tA);
+    idx = i;
+}
+
+inline __m256 catmullRom(const float* data, __m256i at, __m256 t)
+{
+    const __m256i one = _mm256_set1_epi32(1);
+    const __m256 y0 = _mm256_i32gather_ps(data, _mm256_sub_epi32(at, one), 4);
+    const __m256 y1 = _mm256_i32gather_ps(data, at, 4);
+    const __m256 y2 = _mm256_i32gather_ps(data, _mm256_add_epi32(at, one), 4);
+    const __m256 y3 = _mm256_i32gather_ps(data, _mm256_add_epi32(at, _mm256_set1_epi32(2)), 4);
+    const __m256 half = _mm256_set1_ps(0.5f);
+    const __m256 a = _mm256_mul_ps(half, _mm256_sub_ps(y2, y0));
+    // y0 - 2.5 y1 + 2 y2 - 0.5 y3, left to right
+    const __m256 b = _mm256_sub_ps(_mm256_add_ps(_mm256_sub_ps(y0, _mm256_mul_ps(_mm256_set1_ps(2.5f), y1)),
+                                                 _mm256_mul_ps(_mm256_set1_ps(2.0f), y2)),
+                                   _mm256_mul_ps(half, y3));
+    const __m256 d = _mm256_add_ps(_mm256_mul_ps(half, _mm256_sub_ps(y3, y0)), _mm256_mul_ps(_mm256_set1_ps(1.5f), _mm256_sub_ps(y1, y2)));
+    return _mm256_add_ps(_mm256_mul_ps(_mm256_add_ps(_mm256_mul_ps(_mm256_add_ps(_mm256_mul_ps(d, t), b), t), a), t), y1);
+}
+
+/** @brief phase += step, less one where it reached one (the scalar loop's wrap). */
+inline void tableAdvance(TableLanes& l)
+{
+    const __m256d one = _mm256_set1_pd(1.0);
+    l.phA = _mm256_add_pd(l.phA, l.dtA);
+    l.phB = _mm256_add_pd(l.phB, l.dtB);
+    l.phA = _mm256_blendv_pd(l.phA, _mm256_sub_pd(l.phA, one), _mm256_cmp_pd(l.phA, one, _CMP_GE_OQ));
+    l.phB = _mm256_blendv_pd(l.phB, _mm256_sub_pd(l.phB, one), _mm256_cmp_pd(l.phB, one, _CMP_GE_OQ));
+}
+
+} // namespace
+
+void Poly::sawReads8(int voice, int n)
+{
+    alignas(32) double ph[8] = {}, dt[8] = {}, len[8];
+    alignas(32) int lenM1[8], off[8], live[8];
+    const float* data = sawTable_->data.data();
+    const int lanesOf = liveCount_[voice];
+    for (int lane = 0; lane < 8; ++lane) {
+        const bool in = lane < lanesOf;   // (lane 7 never: at most seven slots)
+        const int s = in ? liveSlot_[voice][lane] : 0;
+        const int level = in ? wtLevel_[s] : 0;
+        const int l = WaveTable::levelLength(level);
+        len[lane] = static_cast<double>(l);
+        lenM1[lane] = l - 1;
+        off[lane] = static_cast<int>(sawTable_->cycle(level, kClassicSawFrame) - data);
+        ph[lane] = in ? wtPh_[s] : 0.0;
+        dt[lane] = in ? wtDt_[s] : 0.0;
+        live[lane] = in ? -1 : 0;
+    }
+    TableLanes l{ _mm256_load_pd(ph), _mm256_load_pd(ph + 4), _mm256_load_pd(dt), _mm256_load_pd(dt + 4),
+                  _mm256_load_pd(len), _mm256_load_pd(len + 4), _mm256_load_si256(reinterpret_cast<const __m256i*>(lenM1)),
+                  _mm256_load_si256(reinterpret_cast<const __m256i*>(live)) };
+    const __m256i base = _mm256_load_si256(reinterpret_cast<const __m256i*>(off));
+    float* rows = wtRow_.data() + pkFirst_[voice];
+    for (int i = 0; i < n; ++i) {
+        __m256i idx;
+        __m256 t;
+        tablePlace(l, idx, t);
+        const __m256 y = catmullRom(data, _mm256_add_epi32(base, idx), t);
+        _mm256_maskstore_ps(rows + static_cast<size_t>(i * kPolySlots), l.live, y);
+        tableAdvance(l);
+    }
+    _mm256_store_pd(ph, l.phA);
+    _mm256_store_pd(ph + 4, l.phB);
+    for (int k = 0; k < lanesOf; ++k) wtPh_[liveSlot_[voice][k]] = ph[k];
+}
+
+void Poly::tableReads8(int voice, int n)
+{
+    const float* v = values_;
+    const WaveTable& table = *table_;
+    alignas(32) double ph[8] = {}, dt[8] = {}, len[8];
+    alignas(32) int lenM1[8], first[8], stride[8], live[8];
+    const float* data = table.data.data();
+    const int lanesOf = liveCount_[voice];
+    for (int lane = 0; lane < 8; ++lane) {
+        const bool in = lane < lanesOf;
+        const int s = in ? liveSlot_[voice][lane] : 0;
+        const int level = in ? wtLevel_[s] : 0;
+        const int l = WaveTable::levelLength(level);
+        len[lane] = static_cast<double>(l);
+        lenM1[lane] = l - 1;
+        first[lane] = static_cast<int>(table.cycle(level, 0) - data);   // frame f's cycle: first + f * stride
+        stride[lane] = l + WaveTable::kGuard;
+        ph[lane] = in ? wtPh_[s] : 0.0;
+        dt[lane] = in ? wtDt_[s] : 0.0;
+        live[lane] = in ? -1 : 0;
+    }
+    TableLanes lanes8{ _mm256_load_pd(ph), _mm256_load_pd(ph + 4), _mm256_load_pd(dt), _mm256_load_pd(dt + 4),
+                       _mm256_load_pd(len), _mm256_load_pd(len + 4), _mm256_load_si256(reinterpret_cast<const __m256i*>(lenM1)),
+                       _mm256_load_si256(reinterpret_cast<const __m256i*>(live)) };
+    const __m256i firstV = _mm256_load_si256(reinterpret_cast<const __m256i*>(first));
+    const __m256i strideV = _mm256_load_si256(reinterpret_cast<const __m256i*>(stride));
+    const int frames = table.frames;
+    for (int i = 0; i < n; ++i) {
+        // The position, exactly as the scalar loop takes it (renderSegment).
+        const float lfo = static_cast<float>(std::sin(2.0 * kPiD * lfoPh_[voice]));
+        float pos = v[poly::Position] + v[poly::PosEnv] * posEnv_[voice] + v[poly::PosLfoDepth] * lfo;
+        if (v[poly::SlowMod] > 0.0f) pos = std::clamp(pos + 0.15f * v[poly::SlowMod] * slowColour_, 0.0f, 1.0f);
+        if (modOn_ && mod_[voice].targets(ModDest::TablePos))
+            pos = std::clamp(pos + modSum_[voice][static_cast<int>(ModDest::TablePos)], 0.0f, 1.0f);
+        posEnv_[voice] *= posDecay_;
+        lfoPh_[voice] += lfoInc_;
+        if (lfoPh_[voice] >= 1.0) lfoPh_[voice] -= 1.0;
+        // WaveTable::sampleAt: the frame and the blend, then two reads at the same place.
+        const float p = (pos < 0.0f ? 0.0f : (pos > 1.0f ? 1.0f : pos)) * static_cast<float>(frames - 1);
+        int f = static_cast<int>(p);
+        if (f >= frames - 1) f = frames - 2 < 0 ? 0 : frames - 2;
+        __m256i idx;
+        __m256 t;
+        tablePlace(lanes8, idx, t);
+        const __m256i at = _mm256_add_epi32(_mm256_add_epi32(firstV, _mm256_mullo_epi32(_mm256_set1_epi32(f), strideV)), idx);
+        __m256 y = catmullRom(data, at, t);
+        if (frames > 1) {
+            const __m256 tf = _mm256_set1_ps(p - static_cast<float>(f));
+            const __m256 b = catmullRom(data, _mm256_add_epi32(at, strideV), t);
+            y = _mm256_add_ps(y, _mm256_mul_ps(tf, _mm256_sub_ps(b, y)));
+        }
+        _mm256_maskstore_ps(wtRow_.data() + static_cast<size_t>(i * kPolySlots + pkFirst_[voice]), lanes8.live, y);
+        tableAdvance(lanes8);
+    }
+    _mm256_store_pd(ph, lanes8.phA);
+    _mm256_store_pd(ph + 4, lanes8.phB);
+    for (int k = 0; k < lanesOf; ++k) wtPh_[liveSlot_[voice][k]] = ph[k];
+}
+#endif
 
 void Poly::lowPassCoefs(int voice, double damping)
 {

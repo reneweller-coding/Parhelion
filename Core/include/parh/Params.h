@@ -422,6 +422,12 @@ public:
     bool getBool(int id) const { return get(id) >= 0.5f; }
     /** @brief Sets a real value, clamped to the range (and rounded for discrete curves). */
     void set(int id, float value);
+    /**
+     * @brief Counts the writes to the values (set, resetDefaults, copyValuesFrom). A reader that sees the same count as
+     *        before its last read of the values saw no write since (the Deck's cell cache): the count is raised after
+     *        the value is stored (release) and read before the values are (acquire).
+     */
+    uint32_t version() const { return version_.load(std::memory_order_acquire); }
     /** @brief Sets from a normalised 0..1 position. */
     void setNormalised(int id, float norm) { set(id, fromNormalised(id, norm)); }
 
@@ -472,6 +478,7 @@ private:
     };
     std::vector<Entry> entries_;
     std::unique_ptr<std::atomic<float>[]> values_;
+    std::atomic<uint32_t> version_{ 0 };   ///< version()
     std::vector<float> defaults_;
     std::unordered_map<std::string, int> index_;
     static constexpr int kMaxInstances = 16;

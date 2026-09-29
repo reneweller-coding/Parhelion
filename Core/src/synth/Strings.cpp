@@ -74,12 +74,15 @@ void StringSection::prepare(double sampleRate, uint64_t seed)
             }
             const double wn = 2.0 * kPiD * hz, sigma = wn / (2.0 * q);
             const cd lam(-sigma, wn), p = std::exp(lam * T), g = (p - 1.0) / lam;
-            b.pr[m] = static_cast<float>(p.real());
-            b.pi[m] = static_cast<float>(p.imag());
-            b.gr[m] = static_cast<float>(g.real());
-            b.gi[m] = static_cast<float>(g.imag());
-            // A resonator's peak on a unit force is 1 / (2 sigma): 2 sigma w makes its peak w.
-            b.w[m] = static_cast<float>(2.0 * sigma * w);
+            for (int c = 0; c < 2; ++c) {
+                const int lane = 2 * f + c;
+                bpr_[m][lane] = static_cast<float>(p.real());
+                bpi_[m][lane] = static_cast<float>(p.imag());
+                bgr_[m][lane] = static_cast<float>(g.real());
+                bgi_[m][lane] = static_cast<float>(g.imag());
+                // A resonator's peak on a unit force is 1 / (2 sigma): 2 sigma w makes its peak w.
+                bw_[m][lane] = static_cast<float>(2.0 * sigma * w);
+            }
         }
         static const float kGain[kStringFamilies] = { 1.0f, 0.35f, 0.2f, 0.1f };
         b.gain = kGain[f];
@@ -116,8 +119,9 @@ void StringSection::reset()
             release_[m][l] = 1.0f;
         }
     for (int l = 0; l < kStringLanes; ++l) { lane_[l] = Lane{}; y_[l] = 1.0f; }
+    for (int m = 0; m < kBodyModes; ++m)
+        for (int lane = 0; lane < kBodyLanes; ++lane) bzr_[m][lane] = bzi_[m][lane] = 0.0f;
     for (Body& b : body_) {
-        for (int c = 0; c < 2; ++c) for (int m = 0; m < kBodyModes; ++m) b.zr[c][m] = b.zi[c][m] = 0.0f;
         b.active = false;
         b.quiet = 0;
     }
@@ -379,6 +383,20 @@ void StringSection::processWith(float* L, float* R, int n)
     while (done < n) {
         const int into = static_cast<int>(pos_ % kMaxBlock);
         const int seg = std::min(n - done, kMaxBlock - into);
+        // At rest (the optimisation pass, 29.09.2026): no player, no body ringing, the low cut's states at zero. Then
+        // the section's output is exactly zero and nothing in it moves -- the cell has no lane to update, the bow no
+        // group, the bodies nothing, and the low cut of zero is zero -- so the segment is only counted. It cost 0.3 %
+        // of a core in every track without an orchestra.
+        bool rest = lowCut_[0].ic1 == 0.0f && lowCut_[0].ic2 == 0.0f && lowCut_[1].ic1 == 0.0f && lowCut_[1].ic2 == 0.0f;
+        for (int lane = 0; rest && lane < kStringLanes; ++lane) rest = !lane_[lane].on;
+        for (int f = 0; rest && f < kStringFamilies; ++f) rest = !body_[f].active;
+        if (rest) {
+            std::fill(L + done, L + done + seg, 0.0f);
+            std::fill(R + done, R + done + seg, 0.0f);
+            pos_ += seg;
+            done += seg;
+            continue;
+        }
         if (into == 0) cellUpdate();
         // The players' bows, sample by sample (scalar): speed and force along their envelopes, rosin noise on the force.
         for (int lane = 0; lane < kStringLanes; ++lane) {
@@ -410,12 +428,13 @@ void StringSection::processWith(float* L, float* R, int n)
             for (int i = 0; i < seg; ++i) peak = std::max(peak, std::fabs(out_[i][lane]));
             l.peak = peak;
         }
-        // The bodies: each family's players, left and right by where they sit.
+        // The bodies: each family's players, left and right by where they sit -- the eight (family, channel) lanes
+        // mode by mode, each lane summing its modes in order (see bzr_).
+        constexpr int W = laneWidth<V>();
         for (int i = 0; i < seg; ++i) {
-            float outL = 0.0f, outR = 0.0f;
+            alignas(32) float in8[kBodyLanes] = {}, y8[kBodyLanes];
             for (int f = 0; f < kStringFamilies; ++f) {
-                Body& b = body_[f];
-                if (!b.active) continue;
+                if (!body_[f].active) continue;
                 float inL = 0.0f, inR = 0.0f;
                 for (int lane = 0; lane < kStringLanes; ++lane) {
                     const Lane& l = lane_[lane];
@@ -423,18 +442,29 @@ void StringSection::processWith(float* L, float* R, int n)
                     inL += out_[i][lane] * l.panL;
                     inR += out_[i][lane] * l.panR;
                 }
-                float yl = 0.0f, yr = 0.0f;
+                in8[2 * f] = inL;
+                in8[2 * f + 1] = inR;
+            }
+            for (int h = 0; h < kBodyLanes; h += W) {
+                const V in = loadLanes<V>(in8 + h);
+                V y = lanes<V>(0.0f);
                 for (int m = 0; m < kBodyModes; ++m) {
-                    const float rl = b.pr[m] * b.zr[0][m] - b.pi[m] * b.zi[0][m] + b.gr[m] * inL;
-                    const float il = b.pr[m] * b.zi[0][m] + b.pi[m] * b.zr[0][m] + b.gi[m] * inL;
-                    const float rr = b.pr[m] * b.zr[1][m] - b.pi[m] * b.zi[1][m] + b.gr[m] * inR;
-                    const float ir = b.pr[m] * b.zi[1][m] + b.pi[m] * b.zr[1][m] + b.gi[m] * inR;
-                    b.zr[0][m] = rl; b.zi[0][m] = il; b.zr[1][m] = rr; b.zi[1][m] = ir;
-                    yl += b.w[m] * rl;
-                    yr += b.w[m] * rr;
+                    const V pr = loadLanes<V>(bpr_[m] + h), pi = loadLanes<V>(bpi_[m] + h);
+                    const V zr = loadLanes<V>(bzr_[m] + h), zi = loadLanes<V>(bzi_[m] + h);
+                    const V r = pr * zr - pi * zi + loadLanes<V>(bgr_[m] + h) * in;
+                    const V im = pr * zi + pi * zr + loadLanes<V>(bgi_[m] + h) * in;
+                    vstore(bzr_[m] + h, r);
+                    vstore(bzi_[m] + h, im);
+                    y = y + loadLanes<V>(bw_[m] + h) * r;
                 }
-                outL += (yl + b.direct * inL) * b.gain;
-                outR += (yr + b.direct * inR) * b.gain;
+                vstore(y8 + h, y);
+            }
+            float outL = 0.0f, outR = 0.0f;
+            for (int f = 0; f < kStringFamilies; ++f) {
+                const Body& b = body_[f];
+                if (!b.active) continue;
+                outL += (y8[2 * f] + b.direct * in8[2 * f]) * b.gain;
+                outR += (y8[2 * f + 1] + b.direct * in8[2 * f + 1]) * b.gain;
             }
             float lp, bp, hp;
             lowCut_[0].tick(outL * level_ * 0.24f, lp, bp, hp);
@@ -456,11 +486,12 @@ void StringSection::processWith(float* L, float* R, int n)
                 bool players = false;
                 for (const Lane& l : lane_) players = players || (l.on && l.family == f);
                 double e = 0.0;
-                for (int m = 0; m < kBodyModes; ++m) e += static_cast<double>(b.zr[0][m]) * b.zr[0][m] + static_cast<double>(b.zr[1][m]) * b.zr[1][m];
+                for (int m = 0; m < kBodyModes; ++m)
+                    e += static_cast<double>(bzr_[m][2 * f]) * bzr_[m][2 * f] + static_cast<double>(bzr_[m][2 * f + 1]) * bzr_[m][2 * f + 1];
                 b.quiet = !players && e < 1e-18 ? b.quiet + 1 : 0;
                 if (b.quiet > 20) {
                     b.active = false;
-                    for (int c = 0; c < 2; ++c) for (int m = 0; m < kBodyModes; ++m) b.zr[c][m] = b.zi[c][m] = 0.0f;
+                    for (int c = 0; c < 2; ++c) for (int m = 0; m < kBodyModes; ++m) bzr_[m][2 * f + c] = bzi_[m][2 * f + c] = 0.0f;
                 }
             }
         }

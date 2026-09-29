@@ -7,6 +7,8 @@
  */
 #include "parh/fx/Reverb.h"
 #include "parh/Clock.h"
+#include "parh/Dsp.h"
+#include "parh/Vec.h"
 #include <algorithm>
 #include <cmath>
 
@@ -49,10 +51,10 @@ void Reverb::prepare(double sampleRate)
     // The longest line at size 3 plus the pre-delay of up to half a second.
     const int size = pow2At(static_cast<int>(0.1 * 3.0 * sr_ + 0.6 * sr_) + 64);
     mask_ = size - 1;
-    for (auto& l : line_) l.assign(static_cast<size_t>(size), 0.0f);
+    lines_.assign(static_cast<size_t>(kLines) * static_cast<size_t>(size), 0.0f);
     for (auto& a : ap_) a.assign(static_cast<size_t>(size), 0.0f);
     for (auto& a : apR_) a.assign(static_cast<size_t>(size), 0.0f);
-    for (auto& s : sc_) s.assign(static_cast<size_t>(size), 0.0f);
+    scs_.assign(static_cast<size_t>(kLines) * static_cast<size_t>(size), 0.0f);
     pre_.assign(static_cast<size_t>(size), 0.0f);
     preR_.assign(static_cast<size_t>(size), 0.0f);
     static const float kApMs[kAllpasses] = { 5.1f, 7.3f, 11.3f, 13.7f };
@@ -68,10 +70,10 @@ void Reverb::prepare(double sampleRate)
 
 void Reverb::reset()
 {
-    for (auto& l : line_) std::fill(l.begin(), l.end(), 0.0f);
+    std::fill(lines_.begin(), lines_.end(), 0.0f);
     for (auto& a : ap_) std::fill(a.begin(), a.end(), 0.0f);
     for (auto& a : apR_) std::fill(a.begin(), a.end(), 0.0f);
-    for (auto& s : sc_) std::fill(s.begin(), s.end(), 0.0f);
+    std::fill(scs_.begin(), scs_.end(), 0.0f);
     std::fill(pre_.begin(), pre_.end(), 0.0f);
     std::fill(preR_.begin(), preR_.end(), 0.0f);
     w_ = 0;
@@ -110,6 +112,27 @@ void Reverb::process(const float* inL, const float* inR, float* outL, float* out
 {
     const float lpc = 1.0f - 0.92f * damp_;
     constexpr float inGain = 0.5f, glide = 0.0005f;
+#if PARH_VEC_PATH == 1
+    // The eight lines on the eight lanes of an AVX2 register (the optimisation pass, 29.09.2026): the scalar loop's
+    // operations lane by lane, in its order and precision -- the modulation's phase and the read position in double,
+    // the rest in float, sin01 and ringRead spelled out --, the reads gathered from the one buffer of the lines and of
+    // their allpasses, the writes stored one by one. Bit for bit the scalar reverb below (the renders compare equal).
+    const int size = mask_ + 1;
+    const __m256i lineAt = _mm256_setr_epi32(0, size, 2 * size, 3 * size, 4 * size, 5 * size, 6 * size, 7 * size);
+    const __m256i maskV = _mm256_set1_epi32(mask_), oneI = _mm256_set1_epi32(1);
+    const __m256i scLenV = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(scLen_));
+    const __m256 lenTarget = _mm256_loadu_ps(lenTarget_), glideV = _mm256_set1_ps(glide), lpcV = _mm256_set1_ps(lpc);
+    const __m256 half = _mm256_set1_ps(0.5f);
+    __m256 lenCur = _mm256_loadu_ps(lenCur_), lp = _mm256_loadu_ps(lp_);
+    __m256d phA = _mm256_loadu_pd(modPh_), phB = _mm256_loadu_pd(modPh_ + 4);
+    alignas(32) double inc[kLines];
+    for (int l = 0; l < kLines; ++l) inc[l] = modRate_[l] / sr_;
+    const __m256d incA = _mm256_load_pd(inc), incB = _mm256_load_pd(inc + 4), oneD = _mm256_set1_pd(1.0);
+    const __m256d nD = _mm256_set1_pd(static_cast<double>(SineTable::N));
+    const float* sine = sineTable().v;
+    const float* lines = lines_.data();
+    const float* scs = scs_.data();
+#endif
     for (int i = 0; i < n; ++i) {
         const float xl0 = inL[i] - dcX_[0] + dcR_ * dcY_[0]; dcX_[0] = inL[i]; dcY_[0] = xl0;
         const float xr0 = inR[i] - dcX_[1] + dcR_ * dcY_[1]; dcX_[1] = inR[i]; dcY_[1] = xr0;
@@ -130,15 +153,55 @@ void Reverb::process(const float* inL, const float* inR, float* outL, float* out
             xl = y;
             xr = yr;
         }
-        float o[kLines];
+        alignas(32) float o[kLines];
         float sum = 0.0f;
+#if PARH_VEC_PATH == 1
+        {
+            lenCur = _mm256_add_ps(lenCur, _mm256_mul_ps(_mm256_sub_ps(lenTarget, lenCur), glideV));
+            phA = _mm256_add_pd(phA, incA);
+            phB = _mm256_add_pd(phB, incB);
+            phA = _mm256_blendv_pd(phA, _mm256_sub_pd(phA, oneD), _mm256_cmp_pd(phA, oneD, _CMP_GE_OQ));
+            phB = _mm256_blendv_pd(phB, _mm256_sub_pd(phB, oneD), _mm256_cmp_pd(phB, oneD, _CMP_GE_OQ));
+            // sin01: x = phase N, i = int(x), t[i] + f (t[i + 1] - t[i]) with f = float(x - i)
+            const __m256d xA = _mm256_mul_pd(phA, nD), xB = _mm256_mul_pd(phB, nD);
+            const __m128i iA = _mm256_cvttpd_epi32(xA), iB = _mm256_cvttpd_epi32(xB);
+            const __m256i si = _mm256_set_m128i(iB, iA);
+            const __m256 sf = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_sub_pd(xB, _mm256_cvtepi32_pd(iB))),
+                                              _mm256_cvtpd_ps(_mm256_sub_pd(xA, _mm256_cvtepi32_pd(iA))));
+            const __m256 s0 = _mm256_i32gather_ps(sine, si, 4), s1 = _mm256_i32gather_ps(sine, _mm256_add_epi32(si, oneI), 4);
+            const __m256 s = _mm256_add_ps(s0, _mm256_mul_ps(sf, _mm256_sub_ps(s1, s0)));
+            const __m256 d = _mm256_add_ps(_mm256_add_ps(lenCur, _mm256_mul_ps(_mm256_set1_ps(1.5f), s)), _mm256_set1_ps(2.0f));
+            // ringRead: pos = w - d in double, its floor, the fraction in float, the two samples around it
+            const __m256d wD = _mm256_set1_pd(static_cast<double>(w_));
+            const __m256d posA = _mm256_sub_pd(wD, _mm256_cvtps_pd(_mm256_castps256_ps128(d)));
+            const __m256d posB = _mm256_sub_pd(wD, _mm256_cvtps_pd(_mm256_extractf128_ps(d, 1)));
+            const __m256d flA = _mm256_floor_pd(posA), flB = _mm256_floor_pd(posB);
+            const __m256 frac = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_sub_pd(posB, flB)), _mm256_cvtpd_ps(_mm256_sub_pd(posA, flA)));
+            const __m256i i0 = _mm256_and_si256(_mm256_set_m128i(_mm256_cvttpd_epi32(flB), _mm256_cvttpd_epi32(flA)), maskV);
+            const __m256i i1 = _mm256_and_si256(_mm256_add_epi32(i0, oneI), maskV);
+            const __m256 a0 = _mm256_i32gather_ps(lines, _mm256_add_epi32(i0, lineAt), 4);
+            const __m256 a1 = _mm256_i32gather_ps(lines, _mm256_add_epi32(i1, lineAt), 4);
+            __m256 v = _mm256_add_ps(a0, _mm256_mul_ps(frac, _mm256_sub_ps(a1, a0)));
+            // the allpass: its read gathered, its write stored lane by lane
+            const __m256i sAt = _mm256_add_epi32(_mm256_and_si256(_mm256_sub_epi32(_mm256_set1_epi32(w_), scLenV), maskV), lineAt);
+            const __m256 sd = _mm256_i32gather_ps(scs, sAt, 4);
+            const __m256 sy = _mm256_sub_ps(sd, _mm256_mul_ps(half, v));
+            alignas(32) float sw[kLines];
+            _mm256_store_ps(sw, _mm256_add_ps(v, _mm256_mul_ps(half, sy)));
+            for (int l = 0; l < kLines; ++l) sc(l)[w_ & mask_] = sw[l];
+            v = sy;
+            lp = _mm256_add_ps(lp, _mm256_mul_ps(lpcV, _mm256_sub_ps(v, lp)));
+            _mm256_store_ps(o, lp);
+            for (int l = 0; l < kLines; ++l) sum += o[l];
+        }
+#else
         for (int l = 0; l < kLines; ++l) {
             lenCur_[l] += (lenTarget_[l] - lenCur_[l]) * glide;
             modPh_[l] += modRate_[l] / sr_;
             if (modPh_[l] >= 1.0) modPh_[l] -= 1.0;
             const float d = lenCur_[l] + 1.5f * sin01(modPh_[l]) + 2.0f;
-            float v = ringRead(line_[l].data(), mask_, w_, d);
-            float* sb = sc_[l].data();
+            float v = ringRead(line(l), mask_, w_, d);
+            float* sb = sc(l);
             const float sd = sb[(w_ - scLen_[l]) & mask_];
             const float sy = sd - 0.5f * v;
             sb[w_ & mask_] = v + 0.5f * sy;
@@ -147,11 +210,12 @@ void Reverb::process(const float* inL, const float* inR, float* outL, float* out
             o[l] = lp_[l];
             sum += o[l];
         }
+#endif
         const float hh = sum * (2.0f / static_cast<float>(kLines));   // Householder reflection
         float wl = 0.0f, wr = 0.0f;
         for (int l = 0; l < kLines; ++l) {
             const float in = kLeft[l] ? xl : xr;
-            line_[l][static_cast<size_t>(w_ & mask_)] = gain_[l] * (o[l] - hh) + ((l & 1) ? -inGain : inGain) * in;
+            line(l)[w_ & mask_] = gain_[l] * (o[l] - hh) + ((l & 1) ? -inGain : inGain) * in;
             const float tap = (l & 1) ? -o[l] : o[l];
             if (kLeft[l] != 0) wl += tap; else wr += tap;
         }
@@ -167,6 +231,12 @@ void Reverb::process(const float* inL, const float* inR, float* outL, float* out
         outR[i] = aR - lcR2_;
         w_ = (w_ + 1) & mask_;
     }
+#if PARH_VEC_PATH == 1
+    _mm256_storeu_ps(lenCur_, lenCur);
+    _mm256_storeu_ps(lp_, lp);
+    _mm256_storeu_pd(modPh_, phA);
+    _mm256_storeu_pd(modPh_ + 4, phB);
+#endif
 }
 
 void Reverb::setDuck(float depth, float thresholdDb, float attackS, float releaseS)

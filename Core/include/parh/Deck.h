@@ -178,8 +178,32 @@ private:
     double knobGroup_ = -1.0;
     bool newGroup_ = false;
     const float* shown_ = nullptr;
-    /** @brief Takes the knob settings due up to @p beat (a group's replaces the last group's). */
-    void applyKnobs(double beat);
+    /** @brief Takes the knob settings due up to @p beat (a group's replaces the last group's); whether it took any. */
+    bool applyKnobs(double beat);
+    /**
+     * @name The cell's parameter cache (the optimisation pass, 29.09.2026)
+     * Most cells change nothing: the knobs stand and no curve moves, yet every cell read all 1670 parameters and handed
+     * every module to its engine again -- 2 % of a core, an eighth of a track's render. The played value of every
+     * parameter is now kept from the cell before and read again only where it can have changed: all of them after a
+     * write to the store (ParamStore::version), a knob setting of the score, a load, a seek or a new quality level;
+     * otherwise only those whose curve moved. A module instance whose values stayed bit for bit what they were is not
+     * handed to its engine again -- the engines' update() are functions of their values (and of the key, the scale
+     * and the tempo, which are compared as well), so a second call with the same values changes nothing, and every
+     * render is the render it was (the check: the WAVs of five styles and a set, desktop and Quest, bit for bit).
+     * @{ */
+    std::vector<float> cellValue_;      ///< every parameter as played at the last cell
+    std::vector<int> firstOf_;          ///< parameter id -> the first id of its module instance
+    std::vector<uint8_t> instChanged_;  ///< by a module instance's first id: its values changed since it was last read
+    std::vector<int> staleIds_;         ///< the parameters whose curve moved at this cell
+    uint32_t seenVersion_ = 0;          ///< the store's version() the cache was read at
+    bool cellFresh_ = true;             ///< the next cell reads every parameter and hands every module over
+    int cellKey_ = -1, cellScale_ = -1; ///< the key and the scale the modules were last handed over with
+    double cellBpm_ = -1.0;             ///< and the tempo
+    /** @brief Brings the cache to this cell: every parameter when @p all, else the stale ones. */
+    void refreshCell(bool all);
+    /** @brief Module instance @p m / @p instance as played at this cell into @p out; whether it changed since last read. */
+    bool readCell(Module m, int instance, float* out);
+    /** @} */
     uint32_t mutes_ = 0;   ///< the performer's muted groups (perform::MuteKick ..), bit k for group k
     bool muted(int param) const { return ((mutes_ >> (param - perform::MuteKick)) & 1u) != 0; }
     Score score_;

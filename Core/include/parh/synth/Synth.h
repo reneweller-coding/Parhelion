@@ -46,6 +46,12 @@ public:
      */
     void update(const float* v, float minLowCut);
     /**
+     * @brief The part of update() that is not a function of the values: the modulated values back to the knobs', and
+     *        the matrix applied again where a note sounds. update() ends with it; the deck calls it alone at a cell whose
+     *        values did not change (Deck.h, the cell cache), so every cell does what it did before the cache.
+     */
+    void refreshModulation();
+    /**
      * @brief Starts a note.
      * @param pitch    MIDI note
      * @param velocity 0..1
@@ -97,6 +103,8 @@ private:
     float driveKnob_ = 0.25f, panKnob_ = 0.0f, levelKnob_ = 0.3f;
     float pwNow_ = 0.5f, resNow_ = 0.2f, kNow_ = 0.0f, cutOct_ = 0.0f, envAdd_ = 0.0f;
     double pitchMul_ = 1.0;
+    double trackHz_ = -1.0, track_ = 1.0;   ///< the key tracking's factor for the pitch trackHz_ (kept while the pitch stands)
+    float trackKt_ = -1.0f;                 ///< and the key tracking it was taken at
 };
 
 } // namespace parh

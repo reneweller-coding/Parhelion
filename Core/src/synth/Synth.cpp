@@ -74,6 +74,11 @@ void MonoSynth::update(const float* v, float minLowCut)
     duck_.set(1.0f - dbToGain(-v[synth::Duck]), 1.0f, 30.0f, v[synth::DuckRelease]);
     // The modulation's settings; where no slot is live the voice plays its knobs as they are.
     mod_.set(readModCore(v + synth::ModFirst, kSynthModDests, static_cast<int>(std::size(kSynthModDests))));
+    refreshModulation();
+}
+
+void MonoSynth::refreshModulation()
+{
     pwNow_ = pw_;
     resNow_ = res_;
     kNow_ = FilterVoicing::feedback(model_, res_);
@@ -163,7 +168,14 @@ void MonoSynth::process(float* L, float* R, int n)
             subPhase_ -= std::floor(subPhase_);
             x += sub_ * (subPhase_ < 0.5 ? 1.0f : -1.0f);
             x = std::tanh(x * drive_) * driveNorm_;
-            const double track = std::pow(hzm / 110.0, static_cast<double>(keyTrack_));
+            // The key tracking's factor, taken again only where the pitch or the knob moved: the same pow of the same
+            // numbers, one of three transcendental calls a sample fewer (the optimisation pass, 29.09.2026).
+            if (hzm != trackHz_ || keyTrack_ != trackKt_) {
+                trackHz_ = hzm;
+                trackKt_ = keyTrack_;
+                track_ = std::pow(hzm / 110.0, static_cast<double>(keyTrack_));
+            }
+            const double track = track_;
             const double fc = std::min(0.42 * sr2, cutoff_ * track * std::pow(2.0, static_cast<double>(cutOct_)
                                                                                   + (envAmt_ + envAdd_ + accentOct) * fenv_));
             const float g = static_cast<float>(std::tan(kPiD * fc / sr2));

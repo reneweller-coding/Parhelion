@@ -108,8 +108,12 @@ private:
     static constexpr int kLines = 8;
     static constexpr int kAllpasses = 4;
     double sr_ = 48000.0;
-    std::vector<float> line_[kLines], sc_[kLines], ap_[kAllpasses], apR_[kAllpasses], pre_, preR_;
+    // The eight lines and their allpasses each in one buffer, line l at l * (mask_ + 1): the lanes of the vector path
+    // read them with one gather (the optimisation pass, 29.09.2026).
+    std::vector<float> lines_, scs_, ap_[kAllpasses], apR_[kAllpasses], pre_, preR_;
     int mask_ = 0, w_ = 0;
+    float* line(int l) { return lines_.data() + static_cast<size_t>(l) * static_cast<size_t>(mask_ + 1); }
+    float* sc(int l) { return scs_.data() + static_cast<size_t>(l) * static_cast<size_t>(mask_ + 1); }
     int apLen_[kAllpasses] = {}, scLen_[kLines] = {};
     float lenTarget_[kLines] = {}, lenCur_[kLines] = {}, gain_[kLines] = {}, lp_[kLines] = {};
     double modPh_[kLines] = {};

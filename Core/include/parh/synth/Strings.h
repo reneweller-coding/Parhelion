@@ -49,6 +49,10 @@ constexpr int kStringModes = 24;                                        ///< par
 constexpr int kStringFamilies = 4;                                      ///< violins, violas, cellos, basses
 constexpr int kBodyModes = 24;                                          ///< resonators of a body
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4324)   // padded to its 32-byte lanes on purpose (the bodies)
+#endif
 class StringSection {
 public:
     static constexpr int kMaxBlock = 32;   ///< samples per decision cell (vibrato, envelopes' targets)
@@ -130,16 +134,29 @@ private:
     float out_[kMaxBlock][kStringLanes] = {};
     // The bodies: per family two inputs (left, right), a bank each.
     struct Body {
-        float pr[kBodyModes] = {}, pi[kBodyModes] = {}, gr[kBodyModes] = {}, gi[kBodyModes] = {}, w[kBodyModes] = {};
         float direct = 0.3f;       ///< the broadband share
         float gain = 1.0f;         ///< the family levelled to the violins
-        float zr[2][kBodyModes] = {}, zi[2][kBodyModes] = {};
         bool active = false;
         int quiet = 0;
     };
     Body body_[kStringFamilies];
+    /**
+     * @name The bodies' resonators on eight lanes (the optimisation pass, 29.09.2026)
+     * Lane 2 f + c is family f's channel c (0 left, 1 right), mode by mode: the four families' two channels are the
+     * eight lanes of one AVX2 register (two NEON ones), and each lane still sums its modes in their order -- the scalar
+     * loop's arithmetic, lane by lane. A family at rest holds zeros and is fed zero, so it stays zero.
+     * @{ */
+    static constexpr int kBodyLanes = 2 * kStringFamilies;
+    alignas(32) float bpr_[kBodyModes][kBodyLanes] = {}, bpi_[kBodyModes][kBodyLanes] = {};   ///< the poles
+    alignas(32) float bgr_[kBodyModes][kBodyLanes] = {}, bgi_[kBodyModes][kBodyLanes] = {};   ///< the input gains
+    alignas(32) float bw_[kBodyModes][kBodyLanes] = {};                                       ///< the output weights
+    alignas(32) float bzr_[kBodyModes][kBodyLanes] = {}, bzi_[kBodyModes][kBodyLanes] = {};   ///< the states
+    /** @} */
     // The modulation (Phase 5b, Modulation.h): a Modulator per note slot.
     NoteModulation<kStringNotes> mod_;
 };
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 } // namespace parh

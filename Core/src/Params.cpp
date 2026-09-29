@@ -834,6 +834,7 @@ void ParamStore::set(int id, float value)
     float v = value < d.minValue ? d.minValue : (value > d.maxValue ? d.maxValue : value);
     if (isDiscrete(d.curve)) v = std::round(v);
     values_[static_cast<size_t>(id)].store(v, std::memory_order_relaxed);
+    version_.fetch_add(1, std::memory_order_release);
 }
 
 float ParamStore::toNormalised(int id, float value) const
@@ -860,6 +861,7 @@ float ParamStore::fromNormalised(int id, float norm) const
 void ParamStore::resetDefaults()
 {
     for (int i = 0; i < count(); ++i) values_[static_cast<size_t>(i)].store(defaults_[static_cast<size_t>(i)], std::memory_order_relaxed);
+    version_.fetch_add(1, std::memory_order_release);
 }
 
 int ParamStore::moduleCount(Module m)
@@ -880,6 +882,7 @@ void ParamStore::copyValuesFrom(const ParamStore& other)
 {
     const int n = count() < other.count() ? count() : other.count();
     for (int i = 0; i < n; ++i) values_[static_cast<size_t>(i)].store(other.get(i), std::memory_order_relaxed);
+    version_.fetch_add(1, std::memory_order_release);
 }
 
 bool ParamStore::parseText(std::string_view text, std::string* error)

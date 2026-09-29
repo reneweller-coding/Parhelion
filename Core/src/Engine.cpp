@@ -419,7 +419,7 @@ bool Engine::process(float* L, float* R, int n)
         const bool cell = cellDirty_ || atRaster || atStep;
         for (int d = 0; d < kDecks; ++d) {
             const bool plays = decks_[d].loaded() && decks_[d].playsAt(sample_);
-            if (plays && (cell || !playing_[d])) decks_[d].updateCell(sample_);
+            if (plays && (cell || !playing_[d])) { PARH_PROF(Cells); decks_[d].updateCell(sample_); }
             playing_[d] = plays;
         }
         // The knobs show the knob settings of the track that began last on deck A or B (the loops' deck C only while
@@ -432,8 +432,8 @@ bool Engine::process(float* L, float* R, int n)
             for (Deck& d : decks_) d.takeNewGroup();
             if (lead >= 0 && (lead != lead_ || decks_[lead].knobGroup() != leadGroup_)) showKnobs(lead);
         }
-        if (cell) updateCell();
-        for (int d = 0; d < kDecks; ++d) if (playing_[d]) decks_[d].dispatchUntil(sample_);
+        if (cell) { PARH_PROF(Cells); updateCell(); }
+        { PARH_PROF(Events); for (int d = 0; d < kDecks; ++d) if (playing_[d]) decks_[d].dispatchUntil(sample_); }
         int64_t end = std::min<int64_t>(sample_ + (n - done), (sample_ / kRaster + 1) * kRaster);
         for (const Deck& d : decks_) {
             if (!d.loaded()) continue;

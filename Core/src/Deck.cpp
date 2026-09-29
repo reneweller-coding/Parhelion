@@ -9,6 +9,7 @@
 #include "parh/Profile.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace parh {
 
@@ -29,6 +30,12 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
     params_ = params;
     sampleRate_ = sampleRate;
     index_ = index;
+    const int count = params_->count();
+    cellValue_.assign(static_cast<size_t>(count), 0.0f);
+    firstOf_.resize(static_cast<size_t>(count));
+    for (int id = 0; id < count; ++id) firstOf_[static_cast<size_t>(id)] = params_->base(params_->moduleOf(id), params_->instanceOf(id));
+    instChanged_.assign(static_cast<size_t>(count), 0);
+    cellFresh_ = true;
     kick_.prepare(sampleRate);
     sub_.prepare(sampleRate);
     kit_.prepare(sampleRate);
@@ -74,6 +81,7 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
 
 void Deck::setQuest(bool on)
 {
+    cellFresh_ = true;   // (the engines' limits are set; the next cell hands every module over again)
     // The Quest's share (PLAN 10): three unison oscillators and four voices a voice, the pad five and six.
     for (int i = 0; i < kPolyInstances; ++i) {
         const bool pad = i == static_cast<int>(PolyInstance::Pad);
@@ -102,6 +110,7 @@ void Deck::clear()
     knobGroup_ = -1.0;
     newGroup_ = false;
     evCursor_ = 0;
+    cellFresh_ = true;
 }
 
 void Deck::load(const Score& score)
@@ -207,6 +216,7 @@ void Deck::seek(int64_t sample)
     knobCursor_ = 0;
     knobGroup_ = -1.0;
     newGroup_ = false;
+    cellFresh_ = true;   // the engines are reset below: every module is handed over again at the next cell
     kick_.reset();
     sub_.reset();
     kit_.reset();
@@ -268,9 +278,10 @@ float Deck::played(int id) const
     return params_->fromNormalised(id, params_->toNormalised(id, value) + off);
 }
 
-void Deck::applyKnobs(double beat)
+bool Deck::applyKnobs(double beat)
 {
     // One beat early: a track's sounds are in place before its first note (its deck rests until then).
+    const size_t was = knobCursor_;
     while (knobCursor_ < score_.knobs.size() && score_.knobs[knobCursor_].beat <= beat + 1.0) {
         const KnobSet& k = score_.knobs[knobCursor_++];
         if (k.beat != knobGroup_) {
@@ -280,6 +291,7 @@ void Deck::applyKnobs(double beat)
         }
         if (k.param >= 0 && static_cast<size_t>(k.param) < base_.size()) base_[static_cast<size_t>(k.param)] = k.value;
     }
+    return knobCursor_ != was;
 }
 
 void Deck::readPlayed(Module m, int instance, float* out) const
@@ -289,28 +301,71 @@ void Deck::readPlayed(Module m, int instance, float* out) const
     for (int i = 0; i < n; ++i) out[i] = played(b + i);
 }
 
+void Deck::refreshCell(bool all)
+{
+    // Bit for bit: a value that went from 0 to -0 is a change as well (what an engine makes of it is its business).
+    auto put = [this](int id) {
+        const size_t k = static_cast<size_t>(id);
+        const float v = played(id);
+        if (std::memcmp(&v, &cellValue_[k], sizeof v) != 0) {
+            cellValue_[k] = v;
+            instChanged_[static_cast<size_t>(firstOf_[k])] = 1;
+        }
+    };
+    if (all) {
+        for (int id = 0; id < params_->count(); ++id) put(id);
+        if (cellFresh_) std::fill(instChanged_.begin(), instChanged_.end(), uint8_t{ 1 });
+    } else {
+        for (int id : staleIds_) put(id);
+    }
+    staleIds_.clear();
+    cellFresh_ = false;
+}
+
+bool Deck::readCell(Module m, int instance, float* out)
+{
+    const int b = params_->base(m, instance);
+    const int n = ParamStore::moduleCount(m);
+    std::memcpy(out, cellValue_.data() + b, static_cast<size_t>(n) * sizeof(float));
+    const bool changed = instChanged_[static_cast<size_t>(b)] != 0;
+    instChanged_[static_cast<size_t>(b)] = 0;
+    return changed;
+}
+
 void Deck::updateCell(int64_t sample)
 {
     const double seconds = static_cast<double>(sample) / sampleRate_;
     const double beat = score_.tempo.beatAt(seconds);
-    applyKnobs(beat);
+    const bool knobsTaken = applyKnobs(beat);
+    // The store's count before its values are read (ParamStore::version): a write during the read is read at the next cell.
+    const uint32_t version = params_->version();
     for (Track& t : tracks_) {
         const size_t none = t.gestures.size();
         size_t c = t.cursor, next = c == none ? 0 : c + 1;
         while (next < t.gestures.size() && t.gestures[next].beat <= beat) { c = next; ++next; }
         t.cursor = c;
+        const float was = t.offset;
         t.offset = c == none ? 0.0f : gestureValue(t.gestures[c], beat);
+        if (std::memcmp(&was, &t.offset, sizeof was) != 0) staleIds_.push_back(t.param);
     }
+    refreshCell(cellFresh_ || knobsTaken || version != seenVersion_);
+    seenVersion_ = version;
     mutes_ = 0;
     if (live_)
         for (int k = 0; k < perform::kMutes; ++k)
             if (params_->getBool(params_->id(Module::Perform, 0, perform::MuteKick + k))) mutes_ |= 1u << k;
 
     float c[compose::Count];
-    readPlayed(Module::Compose, 0, c);
+    readCell(Module::Compose, 0, c);
     keyRoot_ = static_cast<int>(std::lround(c[compose::Key]));
     scale_ = static_cast<int>(std::lround(c[compose::Scale]));
     const double bpm = score_.tempo.bpmAt(beat);
+    // What the modules are handed over with besides their values: a change of it hands them over again.
+    const bool keyMoved = keyRoot_ != cellKey_ || scale_ != cellScale_;
+    const bool bpmMoved = bpm != cellBpm_;
+    cellKey_ = keyRoot_;
+    cellScale_ = scale_;
+    cellBpm_ = bpm;
     beat_ = beat;
     cellSample_ = sample;
     beatsPerSample_ = bpm / (60.0 * sampleRate_);
@@ -324,7 +379,7 @@ void Deck::updateCell(int64_t sample)
     ModGlobals glob;
     {
         float perf[perform::Count];
-        readPlayed(Module::Perform, 0, perf);
+        readCell(Module::Perform, 0, perf);
         glob.wheel = std::clamp(perf[perform::Wheel], 0.0f, 1.0f);
         glob.pressure = std::clamp(perf[perform::Pressure], 0.0f, 1.0f);
         for (const Section& s : score_.sections)
@@ -334,40 +389,46 @@ void Deck::updateCell(int64_t sample)
                 break;
             }
     }
-    readPlayed(Module::Kick, 0, v);
-    Kick::constrain(v, 0.0, keyRoot_);
-    kick_.update(v, keyRoot_);
+    if (readCell(Module::Kick, 0, v) || keyMoved) {
+        Kick::constrain(v, 0.0, keyRoot_);
+        kick_.update(v, keyRoot_);
+    }
 
     float pump[pump::Count];
-    readPlayed(Module::Pump, 0, pump);
+    const bool pumpMoved = readCell(Module::Pump, 0, pump);
 
-    readPlayed(Module::Sub, 0, v);
-    sub_.update(v);
+    if (readCell(Module::Sub, 0, v)) sub_.update(v);
 
     kit_.setTempo(bpm);
     for (int l = 0; l < kPercLanes; ++l) {
-        readPlayed(Module::Perc, l, v);
+        if (!readCell(Module::Perc, l, v) && !keyMoved) continue;
         const PercRole r = static_cast<PercRole>(std::lround(v[perc::Role]));
         kit_.update(l, v, keyRoot_, scale_);
         laneIsHat_[l] = r == PercRole::ClosedHat || r == PercRole::RollingHat || r == PercRole::OpenHat
                      || r == PercRole::Ride || r == PercRole::Shaker || r == PercRole::Tambourine || r == PercRole::Crash;
     }
 
-    readPlayed(Module::Bass, 0, v);
+    const bool bassMoved = readCell(Module::Bass, 0, v);
     bass_.setModGlobals(glob);
     bass_.setClock(beat, beatsPerSample_);
-    bass_.update(v, kBassMinCut);
+    if (bassMoved) bass_.update(v, kBassMinCut);
+    else bass_.refreshModulation();   // (update's tail: every cell re-applies the matrix, as it always did)
     bassSends_ = Sends{ v[synth::RoomSend], v[synth::PlateSend], 0.0f };
-    readPlayed(Module::Acid, 0, v);
+    const bool acidMoved = readCell(Module::Acid, 0, v);
     acid_.setModGlobals(glob);
     acid_.setClock(beat, beatsPerSample_);
-    acid_.update(v, kBassMinCut);
+    if (acidMoved) acid_.update(v, kBassMinCut);
+    else acid_.refreshModulation();
     acidSends_ = Sends{ v[synth::RoomSend], v[synth::PlateSend], 0.0f };
 
     for (int i = 0; i < kPolyInstances; ++i) {
-        readPlayed(Module::Poly, i, v);
+        const bool moved = readCell(Module::Poly, i, v);
         poly_[i].setModGlobals(glob);
-        poly_[i].update(v, bpm);
+        // update() gives every voice the written envelope times at every cell -- which also takes back, within a cell,
+        // the attack a voice's drift gave it at its note (Poly::noteOn). Kept exactly as it was: done here alone where the
+        // values stand.
+        if (moved || bpmMoved) poly_[i].update(v, bpm);
+        else poly_[i].refreshEnvelopeTimes();
         poly_[i].setClock(beat, beatsPerSample_);
         PolyStrip& s = strip_[i];
         s.gate = v[poly::Gate] >= 0.5f;
@@ -379,53 +440,37 @@ void Deck::updateCell(int64_t sample)
         s.tone = v[poly::GateTone];
         s.sends = Sends{ v[poly::RoomSend], v[poly::PlateSend], v[poly::HallSend] };
         // The pump's depth on this voice (poly.duck, dB) along the shared curve.
-        polyDuck_[i].set(1.0f - dbToGain(-v[poly::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+        if (moved || pumpMoved)
+            polyDuck_[i].set(1.0f - dbToGain(-v[poly::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
     }
-    retDuck_.set(1.0f - dbToGain(-pump[pump::ReturnDuck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
-    readPlayed(Module::Piano, 0, v);
-    piano_.setModGlobals(glob);
-    piano_.setClock(beat, beatsPerSample_);
-    piano_.update(v);
-    pianoSends_ = Sends{ v[piano::RoomSend], v[piano::PlateSend], v[piano::HallSend] };
-    pianoDuck_.set(1.0f - dbToGain(-v[piano::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
-    readPlayed(Module::Strings, 0, v);
-    strings_.setModGlobals(glob);
-    strings_.setClock(beat, beatsPerSample_);
-    strings_.update(v);
-    orchSends_[0] = Sends{ v[strings::RoomSend], v[strings::PlateSend], v[strings::HallSend] };
-    orchDuck_[0].set(1.0f - dbToGain(-v[strings::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
-    readPlayed(Module::Choir, 0, v);
-    choir_.setModGlobals(glob);
-    choir_.setClock(beat, beatsPerSample_);
-    choir_.update(v);
-    orchSends_[1] = Sends{ v[choir::RoomSend], v[choir::PlateSend], v[choir::HallSend] };
-    orchDuck_[1].set(1.0f - dbToGain(-v[choir::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
-    readPlayed(Module::Brass, 0, v);
-    brass_.setModGlobals(glob);
-    brass_.setClock(beat, beatsPerSample_);
-    brass_.update(v);
-    orchSends_[2] = Sends{ v[brass::RoomSend], v[brass::PlateSend], v[brass::HallSend] };
-    orchDuck_[2].set(1.0f - dbToGain(-v[brass::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
-    readPlayed(Module::Cloud, 0, v);
-    cloud_.update(v);
+    if (pumpMoved) retDuck_.set(1.0f - dbToGain(-pump[pump::ReturnDuck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    // The keys and the orchestra: the same, a module handed over where it changed.
+    auto voice = [&](Module m, auto& engine, Sends& sends, Ducker& duck, int room, int plate, int hall, int duckKnob) {
+        const bool moved = readCell(m, 0, v);
+        engine.setModGlobals(glob);
+        engine.setClock(beat, beatsPerSample_);
+        if (moved) engine.update(v);
+        sends = Sends{ v[room], v[plate], v[hall] };
+        if (moved || pumpMoved) duck.set(1.0f - dbToGain(-v[duckKnob]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    };
+    voice(Module::Piano, piano_, pianoSends_, pianoDuck_, piano::RoomSend, piano::PlateSend, piano::HallSend, piano::Duck);
+    voice(Module::Strings, strings_, orchSends_[0], orchDuck_[0], strings::RoomSend, strings::PlateSend, strings::HallSend, strings::Duck);
+    voice(Module::Choir, choir_, orchSends_[1], orchDuck_[1], choir::RoomSend, choir::PlateSend, choir::HallSend, choir::Duck);
+    voice(Module::Brass, brass_, orchSends_[2], orchDuck_[2], brass::RoomSend, brass::PlateSend, brass::HallSend, brass::Duck);
+    if (readCell(Module::Cloud, 0, v)) cloud_.update(v);
     cloudPad_ = v[cloud::PadSend];
     cloudKeys_ = v[cloud::KeysSend];
     cloudPlate_ = v[cloud::PlateSend];
-    readPlayed(Module::Timpani, 0, v);
-    timpani_.setModGlobals(glob);
-    timpani_.setClock(beat, beatsPerSample_);
-    timpani_.update(v);
-    orchSends_[3] = Sends{ v[timpani::RoomSend], v[timpani::PlateSend], v[timpani::HallSend] };
-    orchDuck_[3].set(1.0f - dbToGain(-v[timpani::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
-    readPlayed(Module::Sfx, 0, v);
-    sfx_.update(v, keyRoot_);
+    voice(Module::Timpani, timpani_, orchSends_[3], orchDuck_[3], timpani::RoomSend, timpani::PlateSend, timpani::HallSend, timpani::Duck);
+    const bool fxMoved = readCell(Module::Sfx, 0, v);
+    if (fxMoved || keyMoved) sfx_.update(v, keyRoot_);
     sfx_.setScale(scale_);
     fxSends_ = Sends{ v[sfx::RoomSend], v[sfx::PlateSend], v[sfx::HallSend] };
-    fxDuck_.set(1.0f - dbToGain(-v[sfx::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
-    subDropDuck_.set(v[sfx::SubDuck], 0.5f, 60.0f, 90.0f);
+    if (fxMoved || pumpMoved) fxDuck_.set(1.0f - dbToGain(-v[sfx::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    if (fxMoved) subDropDuck_.set(v[sfx::SubDuck], 0.5f, 60.0f, 90.0f);
 
     const float fs = static_cast<float>(sampleRate_);
-    readPlayed(Module::Mix, 0, v);
+    const bool mixMoved = readCell(Module::Mix, 0, v);
     hatsGain_ = dbToGain(v[mix::HatsLevel]);
     percGain_ = dbToGain(v[mix::PercLevel]);
     // The Leveler's correction of the breakdowns (LevelMark::breakDb) on the synths and the effects, where one plays.
@@ -445,33 +490,38 @@ void Deck::updateCell(int64_t sample)
     fxTarget_ = breakGain;
     percGain_ *= percBuild_;
     if (snapFaders_) { synthGain_ = synthTarget_; fxGain_ = fxTarget_; snapFaders_ = false; }
-    for (Svf& f : hatsLp_) f.setQ(std::min(v[mix::HatsCut], 0.45f * fs), 0.7071f, fs);
-    for (Svf& f : percLp_) f.setQ(std::min(v[mix::PercCut], 0.45f * fs), 0.7071f, fs);
+    if (mixMoved) {
+        for (Svf& f : hatsLp_) f.setQ(std::min(v[mix::HatsCut], 0.45f * fs), 0.7071f, fs);
+        for (Svf& f : percLp_) f.setQ(std::min(v[mix::PercCut], 0.45f * fs), 0.7071f, fs);
+    }
     drumSat_ = v[mix::DrumSat];
     groupHpOn_ = v[mix::LowCut] > 20.5f;
     if (!groupHpOn_) {
         for (auto& ch : groupHp_) for (Svf& f : ch) f.reset();
         for (StemBus& s : stemBus_) for (auto& ch : s.hp) for (Svf& f : ch) f.reset();
     }
-    for (auto& ch : groupHp_) {
-        ch[0].setK(v[mix::LowCut], 1.8477590f, fs);
-        ch[1].setK(v[mix::LowCut], 0.7653669f, fs);
+    if (mixMoved) {
+        for (auto& ch : groupHp_) {
+            ch[0].setK(v[mix::LowCut], 1.8477590f, fs);
+            ch[1].setK(v[mix::LowCut], 0.7653669f, fs);
+        }
     }
 
-    readPlayed(Module::Sends, 0, v);
+    const bool sendsMoved = readCell(Module::Sends, 0, v);
     const float lowCut = v[sends::LowCut], highCut = std::min(v[sends::HighCut], 0.45f * fs);
-    room_.set(v[sends::RoomSize], v[sends::RoomDecay], 0.5f, 0.008f * fs, lowCut, highCut);
-    plate_.set(v[sends::PlateDecay], v[sends::PlateDamping], v[sends::PlatePreDelay] * 0.001f * fs, lowCut, highCut);
-    hall_.set(v[sends::HallSize], v[sends::HallDecay], v[sends::HallDamping], v[sends::HallPreDelay] * 0.001f * fs, lowCut,
-              highCut);
+    if (sendsMoved) {
+        room_.set(v[sends::RoomSize], v[sends::RoomDecay], 0.5f, 0.008f * fs, lowCut, highCut);
+        plate_.set(v[sends::PlateDecay], v[sends::PlateDamping], v[sends::PlatePreDelay] * 0.001f * fs, lowCut, highCut);
+        hall_.set(v[sends::HallSize], v[sends::HallDecay], v[sends::HallDamping], v[sends::HallPreDelay] * 0.001f * fs, lowCut,
+                  highCut);
+    }
     roomReturn_ = v[sends::RoomReturn] <= -59.9f ? 0.0f : dbToGain(v[sends::RoomReturn] + kRoomMakeupDb);
     plateReturn_ = v[sends::PlateReturn] <= -59.9f ? 0.0f : dbToGain(v[sends::PlateReturn] + kPlateMakeupDb);
     hallReturn_ = v[sends::HallReturn] <= -59.9f ? 0.0f : dbToGain(v[sends::HallReturn] + kHallMakeupDb);
     hatsSend_ = v[sends::HatsSend];
     percSend_ = v[sends::PercSend];
 
-    readPlayed(Module::Master, 0, v);
-    glue_.set(v[master::Threshold], v[master::Ratio], 6.0f, 20.0f, 200.0f);
+    if (readCell(Module::Master, 0, v)) glue_.set(v[master::Threshold], v[master::Ratio], 6.0f, 20.0f, 200.0f);
     tiltHigh_ = dbToGain(v[master::Tilt]);
 
     float trim = score_.trimAt(beat);
