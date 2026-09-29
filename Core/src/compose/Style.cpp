@@ -38,7 +38,7 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .minor = 0.85f, .scales = Sc{ 0.75f, 0.05f, 0.15f, 0.0f, 0.05f, 0.0f }, .progressions = Pr{ 0.5f, 0.15f, 0.0f, 0.15f, 0.2f },
       .barsPerChord = 1, .barsPerChordBreak = 2, .keyChange = 0.25f,
       .bass = Ba{ 0.6f, 0.35f, 0.05f, 0.0f, 0.0f, 0.0f }, .hats16 = 0.7f, .ride = 0.8f, .perc = 0.5f, .shaker = 0.4f,
-      .lead = LeadKind::Supersaw, .pluck = 0.8f, .arp = 0.5f, .stab = 0.3f, .counter = 0.5f, .gate = 0.6f,
+      .lead = LeadKind::Supersaw, .pluck = 0.8f, .arp = 0.5f, .stab = 0.3f, .counter = 0.5f, .gate = 0.6f, .orchestra = 0.5f,
       .hallBreakS = 6.0f, .hallDropS = 1.5f, .bassDuckDb = 10.0f, .padDuckDb = 4.0f, .targetLufs = -8.0f },
     { .name = "Progressive", .bpmLow = 128.0f, .bpmHigh = 138.0f, .minutesLow = 7.0f, .minutesHigh = 9.5f,
       .breakdownLow = 0.07f, .breakdownHigh = 0.24f, .forms = Fo{ 0.1f, 0, 0, 0.9f, 0 }, .introBars = 32, .outroBars = 32, .introLong = 0.5f,
@@ -46,7 +46,7 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .minor = 0.85f, .scales = Sc{ 0.55f, 0.3f, 0.05f, 0.0f, 0.1f, 0.0f }, .progressions = Pr{ 0.2f, 0.4f, 0.0f, 0.2f, 0.2f },
       .barsPerChord = 2, .barsPerChordBreak = 4, .keyChange = 0.0f,
       .bass = Ba{ 0.35f, 0.2f, 0.0f, 0.45f, 0.0f, 0.0f }, .hats16 = 0.5f, .ride = 0.5f, .perc = 0.8f, .shaker = 0.6f,
-      .lead = LeadKind::PluckArp, .pluck = 0.9f, .arp = 0.8f, .stab = 0.3f, .counter = 0.2f, .gate = 0.5f,
+      .lead = LeadKind::PluckArp, .pluck = 0.9f, .arp = 0.8f, .stab = 0.3f, .counter = 0.2f, .gate = 0.5f, .orchestra = 0.0f,
       .hallBreakS = 3.0f, .hallDropS = 1.2f, .bassDuckDb = 8.0f, .padDuckDb = 4.0f, .targetLufs = -8.0f },
     { .name = "Dream House", .bpmLow = 134.0f, .bpmHigh = 140.0f, .minutesLow = 6.0f, .minutesHigh = 8.0f,
       .breakdownLow = 0.0f, .breakdownHigh = 0.12f, .forms = Fo{ 0, 1, 0, 0, 0 }, .introBars = 16, .outroBars = 16, .introLong = 0.3f,
@@ -54,7 +54,7 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .minor = 0.8f, .scales = Sc{ 0.8f, 0.1f, 0.1f, 0.0f, 0.0f, 0.0f }, .progressions = Pr{ 0.3f, 0.2f, 0.1f, 0.4f, 0.0f },
       .barsPerChord = 1, .barsPerChordBreak = 2, .keyChange = 0.0f,
       .bass = Ba{ 0.9f, 0.0f, 0.0f, 0.1f, 0.0f, 0.0f }, .hats16 = 0.3f, .ride = 0.3f, .perc = 0.3f, .shaker = 0.3f, .kickSoft = 0.3f,
-      .lead = LeadKind::Piano, .pluck = 0.3f, .arp = 0.3f, .stab = 0.2f, .counter = 0.2f, .gate = 0.3f,
+      .lead = LeadKind::Piano, .pluck = 0.3f, .arp = 0.3f, .stab = 0.2f, .counter = 0.2f, .gate = 0.3f, .orchestra = 0.25f,
       .hallBreakS = 3.0f, .hallDropS = 1.2f, .bassDuckDb = 8.0f, .padDuckDb = 3.0f, .targetLufs = -10.0f },
     { .name = "Acid", .bpmLow = 130.0f, .bpmHigh = 140.0f, .minutesLow = 6.0f, .minutesHigh = 9.0f,
       .breakdownLow = 0.04f, .breakdownHigh = 0.16f, .forms = Fo{ 0, 0, 1, 0, 0 }, .introBars = 32, .outroBars = 32, .introLong = 0.5f,
@@ -62,7 +62,7 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .minor = 0.7f, .scales = Sc{ 0.4f, 0.2f, 0.0f, 0.1f, 0.3f, 0.0f }, .progressions = Pr{ 0.2f, 0.6f, 0.0f, 0.1f, 0.1f },
       .barsPerChord = 16, .barsPerChordBreak = 16, .keyChange = 0.0f,
       .bass = Ba{ 0.3f, 0.0f, 0.0f, 0.0f, 0.7f, 0.0f }, .hats16 = 0.7f, .ride = 0.5f, .perc = 0.6f, .shaker = 0.3f,
-      .lead = LeadKind::Acid, .pluck = 0.1f, .arp = 0.1f, .stab = 0.3f, .counter = 0.0f, .gate = 0.2f,
+      .lead = LeadKind::Acid, .pluck = 0.1f, .arp = 0.1f, .stab = 0.3f, .counter = 0.0f, .gate = 0.2f, .orchestra = 0.0f,
       .hallBreakS = 1.5f, .hallDropS = 0.8f, .bassDuckDb = 6.0f, .padDuckDb = 3.0f, .targetLufs = -8.5f },
     { .name = "Deep", .bpmLow = 126.0f, .bpmHigh = 134.0f, .minutesLow = 6.5f, .minutesHigh = 10.0f,
       .breakdownLow = 0.1f, .breakdownHigh = 0.32f, .forms = Fo{ 0, 0, 0, 0, 1 }, .introBars = 16, .outroBars = 16, .introLong = 0.5f,
@@ -70,7 +70,7 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .minor = 0.75f, .scales = Sc{ 0.5f, 0.35f, 0.0f, 0.15f, 0.0f, 0.0f }, .progressions = Pr{ 0.3f, 0.3f, 0.0f, 0.4f, 0.0f },
       .barsPerChord = 2, .barsPerChordBreak = 4, .keyChange = 0.0f,
       .bass = Ba{ 0.2f, 0.0f, 0.0f, 0.4f, 0.0f, 0.4f }, .hats16 = 0.2f, .ride = 0.1f, .perc = 0.6f, .shaker = 0.8f, .kickSoft = 0.8f,
-      .beatless = 0.1f, .lead = LeadKind::Pad, .pluck = 0.5f, .arp = 0.8f, .stab = 0.0f, .counter = 0.2f, .gate = 0.4f,
+      .beatless = 0.1f, .lead = LeadKind::Pad, .pluck = 0.5f, .arp = 0.8f, .stab = 0.0f, .counter = 0.2f, .gate = 0.4f, .orchestra = 0.15f,
       .hallBreakS = 9.0f, .hallDropS = 3.0f, .bassDuckDb = 3.0f, .padDuckDb = 2.0f, .targetLufs = -9.0f },
 };
 
@@ -125,6 +125,7 @@ StyleProfile morphProfile(const StyleProfile& a, const StyleProfile& b, float t)
     o.stab = lerp(a.stab, b.stab, t);
     o.counter = lerp(a.counter, b.counter, t);
     o.gate = lerp(a.gate, b.gate, t);
+    o.orchestra = lerp(a.orchestra, b.orchestra, t);
     o.hallBreakS = std::exp(lerp(std::log(a.hallBreakS), std::log(b.hallBreakS), t));
     o.hallDropS = std::exp(lerp(std::log(a.hallDropS), std::log(b.hallDropS), t));
     o.bassDuckDb = lerp(a.bassDuckDb, b.bassDuckDb, t);

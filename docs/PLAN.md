@@ -24,7 +24,7 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 4a gebaut (29.09.2026).**
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 4b gebaut (29.09.2026).**
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
@@ -179,6 +179,47 @@ Stem `piano`, MIDI-Kanal 11, im Leveler eine eigene Spur (Fenster −9 bis −3 
   nach Blockgrenzen — gefunden durch den neuen Blockgrößen-Test mit Piano). Skalar, AVX2 und NEON bitgleich.
 - **Tests**: testPiano (10 Prüfungen), testPianoBlocks (Dream House bei Blockgröße 1, 37, 512), vectest testPiano;
   ctest 24/24. Hörfiles: `out/hoeren_p4a` (Einzeltöne je Instrument, Dream House Seed 7 und 3 mit Stems).
+
+**Phase 4b, das Orchester (29.09.2026).** Nach 5.9 gebaut, Module `strings`, `choir`, `brass`, `timpani`, je Part,
+Stem, Balance-Spur (Fenster [I]) und MIDI-Spur; Messwerkzeug `parh_orchprobe` (`--measure`, `--others`, `--demo`).
+- **Streicher** (synth/Strings.h): je Spieler eine modale Saite (24 Partialtöne) unter einem Bogen mit hyperbolischer
+  Reibungskennlinie (Smith 1986, Woodhouse); je Sample erst die freien Moden, dann die Kraft: Haften, wenn die
+  Haftreibung die nötige Kraft (v_Bogen − v_h)/Y aufbringt, sonst Gleiten mit der einen positiven Wurzel einer
+  quadratischen Gleichung — geschlossen, ohne Iteration, ohne Mehrdeutigkeit (Demoucron 2008: modale Saite unter dem
+  Bogen in Echtzeit). Sechs Spieler je Note (Quest drei) mit eigener Intonation, eigenem Einsatz und Vibrato; Familie
+  nach Lage (Kontrabass, Cello, Bratsche, Violine), höchste leere Saite unter dem Ton, gegriffen; Korpus je Familie
+  mit den Signaturmoden A0, CBR, B1−, B1+ (Bissinger 2008) skaliert, 44 statistischen Moden mit Stegberg und einem
+  Breitbandanteil. Befund [M]: mit einem Drittel der Schelleng-Obergrenze blieben die tiefen Cellotöne in einem
+  Oberflächenklang mit fehlendem vierten Partialton; mit der Hälfte Helmholtz-Bewegung in allen Familien. Einzelspieler
+  innerhalb weniger Cent (plus seiner Intonation); Kosten 2.7 % eines Kerns für vier Noten mit sechs Spielern (AVX2).
+- **Chor** (synth/Choir.h): LF-Quelle nach Fant, Liljencrants und Lin mit Rd-Parametrisierung (Fant 1995), in
+  normierter Zeit für 64 Rd-Werte gelöst (ε per Newton, α per Bisektion auf die geschlossene Periode; Selbsttest: die
+  Fläche verschwindet auf 1e−6), in der Periode als rotierender Zeiger und abklingende Exponentielle gerechnet; Jitter,
+  Shimmer, Vibrato, Wandern, Hauchgeräusch; fünf Formanten parallel nach den Sängertabellen der Formantsynthese (Bass,
+  Tenor, Alt, Sopran auf a, o, u), zwei Trakte je Note (±3 %) für Streuung und Stereo. Tonhöhe ±6 Cent, 30 Sänger
+  1.2 % eines Kerns.
+- **Blech** (synth/Brass.h): Lippe als nach außen schlagendes Ein-Massen-Ventil (Adachi und Sato 1996, eindimensional)
+  mit Bernoulli-Fluss in geschlossener Form, Bohrung als Wellenleiter mit Schalltrichter-Tiefpass, nicht invertierend
+  (die ganze Obertonreihe wie beim Kegel). Befunde [M, Simulation]: Lippenfrequenz 1.02 über dem Ton und die
+  Streuknoten-Reduktion des Synthesis ToolKit rasteten nicht ein; Lippe bei 0.8 des Tons, Q 7, zwei Unterschritte je
+  Sample rasten über den Umfang 10 bis 45 Cent zu hoch ein; das "Ohr des Spielers" (Periode an den Nulldurchgängen,
+  Verzögerung der Bohrung nachgeführt) bringt sie auf ±4 Cent. Mehr Atemdruck für höhere Töne (f^0.3); das Schmettern
+  als Aufsteilung auf der abgestrahlten Welle (in der Schleife schaukelte es sich auf). Heller mit mehr Druck [M:
+  Schwerpunkt B♭2 517 → 613 Hz].
+- **Pauken** (synth/Timpani.h): 12 Moden nach Rossings Messungen (luftbelastet, 1 : 1.5 : 1.98 : 2.44 : 2.9), darüber
+  20 Moden der idealen Membran (Nullstellen von J_m, ×1.12), Formen J_m(j r/a) am Schlagpunkt, Schlägel als
+  Filzkontakt mit Potenzgesetz auf Unterschritten; vier Kessel. (1,1) auf 0.2 Cent, (2,1)/(1,1) = 1.500. Der
+  Anschlag macht den Klang nur wenig heller (Schwerpunkt +4 bis +8 %) — Hörrunde.
+- **Im Arrangement** (Cinematic): Uplifting mit Wahrscheinlichkeit 0.5, Dream House 0.25, Deep 0.15. Streicher-Akkorde
+  ab dem Tease des Haupt-Breakdowns, am Peak die Violinen mit der Melodie, der Chor am Peak und in der zweiten Hälfte
+  des Haupt-Drops; an jedem Drop ein Braam (Grundton tief, Quinte, Oktave) und die Pauke, in den letzten zwei Takten
+  davor ein Wirbel (16tel, dann 32tel, anschwellend).
+- **Tests**: testOrchestra (Tonhöhe aller Instrumente, LF-Fläche, Blech heller mit Druck, Paukenmoden),
+  testOrchestraBlocks (Uplifting mit Orchester bei 1, 37, 512 bitgleich — fand eine Spitzenmessung, die nur das letzte
+  Segment einer Zelle sah), vectest testStrings (Skalar/AVX2/NEON bitgleich); ctest 26/26. Im Mix [M, Uplifting Seed 1]:
+  Streicher −8, Blech −6, Pauken −10 dB gegen die Kick, der Breakdown 1.8 LU unter dem Drop (zuerst lagen die
+  Streicher 8 dB **über** der Kick und der Breakdown über dem Drop: die Pegel der Instrumente um 16, 6 und 6 dB
+  gesenkt). Hörfiles: `out/hoeren_p4b` (Orchester-Demo, Uplifting Seed 1 mit Stems).
 
 ## 0. Kurzfassung
 

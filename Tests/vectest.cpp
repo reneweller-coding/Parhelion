@@ -14,6 +14,7 @@
 #include "parh/Vec.h"
 #include "parh/synth/Kit.h"
 #include "parh/synth/Piano.h"
+#include "parh/synth/Strings.h"
 #include "parh/synth/Poly.h"
 #include "TestSupport.h"
 #include <algorithm>
@@ -293,6 +294,39 @@ void testPiano()
     }
     check(bad == 0 && energy > 0.1, "strings, board, high bank and sympathetic strings identical to scalar", fmt("%d differing samples, energy %.2f", bad, energy));
 }
+
+/**
+ * @brief Vector test (Phase 4b): the string section's players on the lanes against the scalar reference -- the bow's
+ *        stick and slip solved with selects, legato and staccato strokes, vibrato, lifts, calls of odd sizes.
+ */
+void testStrings()
+{
+    section("the string section's players against the scalar engine");
+    const DenormalGuard guard;
+    auto a = std::make_unique<StringSection>(), b = std::make_unique<StringSection>();
+    ParamStore ps;
+    std::vector<float> v(static_cast<size_t>(strings::Count));
+    ps.readModule(Module::Strings, 0, v.data());
+    for (StringSection* s : { a.get(), b.get() }) { s->prepare(48000.0, 11); s->update(v.data()); }
+    int bad = 0;
+    double energy = 0.0;
+    std::vector<float> aL(64), aR(64), bL(64), bR(64);
+    static const int kNotes[5] = { 38, 50, 57, 64, 76 };
+    for (int block = 0; block < 3000; ++block) {
+        if (block % 300 == 0)
+            for (int k = 0; k < 5; ++k) { const bool st = (block / 300) % 2 == 1; a->noteOn(kNotes[k] + (block / 300) % 3, 0.7f, st, 0.0); b->noteOn(kNotes[k] + (block / 300) % 3, 0.7f, st, 0.0); }
+        if (block % 300 == 200)
+            for (int k = 0; k < 5; ++k) { a->noteOff(kNotes[k] + (block / 300) % 3); b->noteOff(kNotes[k] + (block / 300) % 3); }
+        const int n = 5 + block % 40;
+        a->processWith<float>(aL.data(), aR.data(), n);
+        b->processWith<VecF>(bL.data(), bR.data(), n);
+        for (int i = 0; i < n; ++i) {
+            if (!sameBits(aL[static_cast<size_t>(i)], bL[static_cast<size_t>(i)]) || !sameBits(aR[static_cast<size_t>(i)], bR[static_cast<size_t>(i)])) ++bad;
+            energy += static_cast<double>(aL[static_cast<size_t>(i)]) * aL[static_cast<size_t>(i)];
+        }
+    }
+    check(bad == 0 && energy > 0.01, "the players' strings and bows identical to scalar", fmt("%d differing samples, energy %.3f", bad, energy));
+}
 } // namespace
 
 int main()
@@ -307,5 +341,6 @@ int main()
     testPoly();
     testPolyModels();
     testPiano();
+    testStrings();
     return finish();
 }

@@ -48,7 +48,11 @@
 #include "parh/mix/TranceGate.h"
 #include "parh/synth/Kick.h"
 #include "parh/synth/Kit.h"
+#include "parh/synth/Brass.h"
+#include "parh/synth/Choir.h"
 #include "parh/synth/Piano.h"
+#include "parh/synth/Strings.h"
+#include "parh/synth/Timpani.h"
 #include "parh/synth/Poly.h"
 #include "parh/synth/Sfx.h"
 #include "parh/synth/SubBass.h"
@@ -64,7 +68,8 @@ class Deck {
 public:
     /** @brief The stems, in the order Engine::setStems() takes them. */
     enum Stem : int { kStemKick = 0, kStemSub, kStemBass, kStemAcid, kStemHats, kStemPerc, kStemLead, kStemCounter, kStemPluck,
-                      kStemArp, kStemPad, kStemStab, kStemPiano, kStemRoom, kStemPlate, kStemHall, kStemFx, kStems };
+                      kStemArp, kStemPad, kStemStab, kStemPiano, kStemStrings, kStemChoir, kStemBrass, kStemTimpani, kStemRoom,
+                      kStemPlate, kStemHall, kStemFx, kStems };
     static constexpr int kRaster = 32;   ///< the engine's parameter raster, samples
     static constexpr int64_t kNever = std::numeric_limits<int64_t>::max();
 
@@ -194,6 +199,14 @@ private:
     Piano piano_;              ///< the physical piano (PLAN 5.8)
     Ducker pianoDuck_;
     Sends pianoSends_;
+    // The orchestra (PLAN 5.9): four instruments, each with its duck and sends, in BalPart order from Strings.
+    StringSection strings_;
+    Choir choir_;
+    Brass brass_;
+    Timpani timpani_;
+    static constexpr int kOrch = 4;
+    Ducker orchDuck_[kOrch];
+    Sends orchSends_[kOrch];
     Sfx sfx_;                  ///< the effects (PLAN 5.10)
     Ducker fxDuck_, subDropDuck_;   ///< the effects' pump and the sub drop's own (sfx.sub_duck)
     Sends fxSends_;
@@ -245,6 +258,7 @@ private:
 
     std::vector<float> kickBuf_, bodyBuf_, subBuf_, bassL_, bassR_, acidL_, acidR_;
     std::vector<float> polyL_[kPolyInstances], polyR_[kPolyInstances], pianoL_, pianoR_;
+    std::vector<float> orchL_[kOrch], orchR_[kOrch];
     std::vector<float> roomInL_, roomInR_, plateInL_, plateInR_, hallInL_, hallInR_, roomL_, roomR_, plateL_, plateR_, hallL_, hallR_;
     std::vector<float> drumL_, drumR_, synthL_, synthR_, fxL_, fxR_, fxSub_, fxWetL_, fxWetR_;
 

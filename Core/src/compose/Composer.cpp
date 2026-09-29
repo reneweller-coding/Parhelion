@@ -224,6 +224,78 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
     writeLead(mc, stream("melody"));
     writeCounter(mc, stream("melody") ^ 0x434F55ull);
 
+
+    // ------------------------------------------------------------------------------------------ the orchestra
+    // Cinematic (PLAN 5.9, 6.6): the strings and the choir carry the main breakdown's full phrase -- chords from the
+    // tease on, the violins with the melody at the peak -- and the main drop; brass (a braam) and timpani mark every
+    // drop, the timpani roll into it over the build's last two bars.
+    Rng orr;
+    orr.seed(stream("chords") ^ 0x4F524348ull);   // "ORCH"
+    const bool orchestra = orr.uniform() < prof.orchestra;
+    if (info != nullptr) info->orchestra = orchestra;
+    if (orchestra) {
+        const int mbIndex = plan.mainBreakdown;
+        const BreakdownParts* main = nullptr;
+        if (mbIndex >= 0)
+            for (const BreakdownParts& b : plan.breakdowns)
+                if (static_cast<double>(b.start) * 4.0 == plan.sections[static_cast<size_t>(mbIndex)].beat) main = &b;
+        const Section* mainDrop = plan.mainDrop >= 0 ? &plan.sections[static_cast<size_t>(plan.mainDrop)] : nullptr;
+        // Held chords from bar a to bar b (a note each chord, at most four bars), voiced from the pad's voicing.
+        auto chords = [&](Part part, int a, int b, float vel, int shift, bool bassNote) {
+            std::array<int, 4> prev{ 57, 60, 64, 69 };
+            bool first = true;
+            int bar = a;
+            while (bar < b) {
+                int len = 1;
+                while (bar + len < b && len < 4 && harm.pc(bar + len, 0) == harm.pc(bar, 0) && harm.pc(bar + len, 1) == harm.pc(bar, 1)) ++len;
+                const std::array<int, 4> v = voicePad(harm, bar, prev, first);
+                first = false;
+                prev = v;
+                for (int k = 0; k < 4; ++k) note(4.0 * bar, 4.0 * len - 0.1, part, v[static_cast<size_t>(k)] + shift, vel);
+                if (bassNote) note(4.0 * bar, 4.0 * len - 0.1, part, atOrAbove(harm.pc(bar, 0), 36), vel);
+                bar += len;
+            }
+        };
+        if (main != nullptr) {
+            chords(Part::Strings, main->tease, main->end, 0.6f, 0, true);
+            chords(Part::Choir, main->peak, main->end, 0.7f, 0, false);
+            // The violins with the melody at the peak (an octave up where it lies low).
+            std::vector<NoteEvent> melody;
+            for (const NoteEvent& n : sc.notes)
+                if ((n.part == Part::Lead || n.part == Part::Piano) && n.beat >= 4.0 * main->peak && n.beat < 4.0 * main->end) melody.push_back(n);
+            for (const NoteEvent& n : melody) note(n.beat, std::max(n.length, 0.3), Part::Strings, n.pitch < 67 ? n.pitch + 12 : n.pitch, 0.7f);
+            // A soft stroke on the timpani where the peak begins.
+            note(4.0 * main->peak, 1.0, Part::Timpani, atOrAbove(harm.pc(main->peak, 0), 40), 0.5f);
+        }
+        if (mainDrop != nullptr) {
+            const int a = static_cast<int>(mainDrop->beat / 4.0), b = static_cast<int>((mainDrop->beat + mainDrop->length) / 4.0);
+            chords(Part::Strings, a, b, 0.75f, 12, true);
+            chords(Part::Choir, a + (b - a) / 2, b, 0.75f, 0, false);
+        }
+        for (size_t si = 1; si < plan.sections.size(); ++si) {
+            const Section& s = plan.sections[si];
+            if (s.kind != SectionKind::Drop) continue;
+            const int bar = static_cast<int>(s.beat / 4.0);
+            // The braam: the root low, its fifth and octave, loud and blaring; the timpani on the root.
+            const int root = atOrAbove(harm.pc(bar, 0), 33);
+            for (int iv : { 0, 7, 12 }) note(s.beat, 1.6, Part::Brass, root + iv, 0.95f);
+            note(s.beat, 1.0, Part::Timpani, atOrAbove(harm.pc(bar, 0), 40), 1.0f);
+            // The roll: the build's (or the break's) last two bars, sixteenths then thirty-seconds, growing.
+            const Section& before = plan.sections[si - 1];
+            if (before.kind == SectionKind::Build || before.kind == SectionKind::Break) {
+                const int rollPitch = atOrAbove(harm.pc(bar - 1, 0), 40);
+                for (double t = s.beat - 8.0; t < s.beat - 1e-9; ) {
+                    const double pos = (t - (s.beat - 8.0)) / 8.0;
+                    const double step = pos < 0.5 ? 0.25 : 0.125;
+                    note(t, step * 0.9, Part::Timpani, rollPitch, static_cast<float>(0.3 + 0.6 * pos));
+                    t += step;
+                }
+            }
+        }
+    }
+    // The orchestra's sound (set with the other knobs below): the choir on "aah" or "ooh", the brass's blare.
+    const float orchVowel = orr.uniform() < 0.6f ? 0.0f : 0.5f, orchBlare = 0.35f + 0.4f * orr.uniform();
+
     // ------------------------------------------------------------------------------------------ effects
     auto fx = [&](SfxType t, double beat, double len, float v) {
         sc.notes.push_back(NoteEvent{ beat, len, Part::Fx, kSfxBaseNote + static_cast<int>(t), v, 0, false, false });
@@ -272,6 +344,10 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
                 ramp(pedal, 4.0 * bar - 0.05, 0.04, 0.0f, -1.0f, GestureShape::Linear);
                 ramp(pedal, 4.0 * bar + 0.5, 0.1, -1.0f, 0.0f, GestureShape::Linear);
             }
+    }
+    if (orchestra) {
+        knob(p.id(Module::Choir, 0, choir::Vowel), orchVowel);
+        knob(p.id(Module::Brass, 0, brass::Brassiness), orchBlare);
     }
     knob(p.id(Module::Bass, 0, synth::Duck), prof.bassDuckDb);
     knob(p.id(Module::Acid, 0, synth::Duck), prof.bassDuckDb);

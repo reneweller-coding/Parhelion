@@ -24,7 +24,11 @@
 #include "parh/compose/Study.h"
 #include "parh/mix/TranceGate.h"
 #include "parh/synth/Kick.h"
+#include "parh/synth/Brass.h"
+#include "parh/synth/Choir.h"
 #include "parh/synth/Piano.h"
+#include "parh/synth/Strings.h"
+#include "parh/synth/Timpani.h"
 #include "parh/synth/PianoDesign.h"
 #include "TestSupport.h"
 #include <algorithm>
@@ -984,6 +988,180 @@ void testPianoBlocks()
           fmt("%zu and %zu samples differ, the first at %zu (%.4f s after bar %.0f)", diffB, diffC, firstB, firstB / 48000.0, from / 4.0));
 }
 
+/** @brief One note of an orchestral instrument (held @p hold s) over @p secs s, the channels' mean. */
+template <class Instr>
+std::vector<float> orchNote(Instr& ins, int pitch, float vel, double hold, double secs)
+{
+    const int total = static_cast<int>(secs * 48000.0), off = static_cast<int>(hold * 48000.0);
+    std::vector<float> out(static_cast<size_t>(total));
+    float L[32], R[32];
+    ins.noteOn(pitch, vel, false, 0.0);
+    for (int i = 0; i < total; i += 32) {
+        if (i <= off && off < i + 32) ins.noteOff(pitch);
+        const int n = std::min(32, total - i);
+        ins.process(L, R, n);
+        for (int k = 0; k < n; ++k) out[static_cast<size_t>(i + k)] = 0.5f * (L[k] + R[k]);
+    }
+    return out;
+}
+
+/** @brief The spectral centroid (Hz) of @p x over 2^14 samples from @p a seconds (Hann). */
+double centroidHz(const std::vector<float>& x, double a)
+{
+    const size_t n = 16384, s0 = static_cast<size_t>(a * 48000.0);
+    std::vector<std::complex<double>> f(n);
+    for (size_t i = 0; i < n; ++i) f[i] = (s0 + i < x.size() ? x[s0 + i] : 0.0f) * (0.5 - 0.5 * std::cos(2.0 * 3.14159265358979 * i / (n - 1)));
+    for (size_t i = 1, j = 0; i < n; ++i) {
+        size_t bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) std::swap(f[i], f[j]);
+    }
+    for (size_t len = 2; len <= n; len <<= 1) {
+        const std::complex<double> wl = std::polar(1.0, -2.0 * 3.14159265358979 / static_cast<double>(len));
+        for (size_t i = 0; i < n; i += len) {
+            std::complex<double> w(1.0);
+            for (size_t j = 0; j < len / 2; ++j) {
+                const auto u = f[i + j], v = f[i + j + len / 2] * w;
+                f[i + j] = u + v;
+                f[i + j + len / 2] = u - v;
+                w *= wl;
+            }
+        }
+    }
+    double num = 0.0, den = 0.0;
+    for (size_t k = 1; k < n / 2; ++k) { const double pw = std::norm(f[k]); num += pw * k * 48000.0 / n; den += pw; }
+    return num / (den + 1e-30);
+}
+
+/**
+ * The orchestra (PLAN 5.9): every instrument sounds its note -- the bowed strings of every family, the choir, the brass
+ * (the lips and the bore agreeing on it), the timpani's principal mode with its air-loaded neighbours -- the LF source
+ * closes its flow over the period, the brass is brighter the harder it is blown.
+ */
+void testOrchestra()
+{
+    section("the orchestra");
+    const DenormalGuard guard;
+    ParamStore ps;
+    std::vector<float> v(64);
+    {
+        auto s = std::make_unique<StringSection>();
+        s->prepare(48000.0, 7);
+        ps.readModule(Module::Strings, 0, v.data());
+        v[strings::Players] = 1.0f;
+        v[strings::Vibrato] = 0.0f;
+        s->update(v.data());
+        double worst = 0.0;
+        bool sounds = true;
+        for (int pitch : { 36, 50, 57, 69, 81 }) {
+            s->reset();
+            const std::vector<float> x = orchNote(*s, pitch, 0.7f, 2.0, 1.6);
+            const double f = midiToHz(pitch);
+            worst = std::max(worst, std::fabs(1200.0 * std::log2(peakHz(x, 0.8, f) / f)));
+            sounds = sounds && levelDb(x, 0.8, 1.5) > -60.0 && std::isfinite(levelDb(x, 0.8, 1.5));
+        }
+        // The player's own intonation (2.5 cents standard deviation) and the bow's pull come on top of the note.
+        check(worst < 16.0 && sounds, "a bowed string of every family plays its note", fmt("within %.1f cents", worst));
+    }
+    {
+        auto c = std::make_unique<Choir>();
+        c->prepare(48000.0, 3);
+        ps.readModule(Module::Choir, 0, v.data());
+        v[choir::Vibrato] = 0.0f;
+        c->update(v.data());
+        double area = 0.0;
+        for (double rd : { 0.4, 1.0, 1.7, 2.6 }) {
+            std::vector<float> per(2000);
+            c->lfPeriod(rd, 2000, per.data());
+            double sum = 0.0;
+            for (float y : per) sum += y;
+            area = std::max(area, std::fabs(sum / 2000.0));
+        }
+        check(area < 1e-4, "the LF source's flow returns to zero over a period at every Rd", fmt("worst mean %.1e", area));
+        double worst = 0.0;
+        for (int pitch : { 45, 57, 64, 72 }) {
+            c->reset();
+            const std::vector<float> x = orchNote(*c, pitch, 0.7f, 2.0, 1.6);
+            const double f = midiToHz(pitch);
+            worst = std::max(worst, std::fabs(1200.0 * std::log2(peakHz(x, 0.8, f) / f)));
+        }
+        check(worst < 12.0, "the choir sings its notes (bass to soprano)", fmt("within %.1f cents", worst));
+    }
+    {
+        auto b = std::make_unique<Brass>();
+        b->prepare(48000.0, 5);
+        ps.readModule(Module::Brass, 0, v.data());
+        v[brass::Players] = 1.0f;
+        v[brass::Vibrato] = 0.0f;
+        b->update(v.data());
+        double worst = 0.0;
+        bool brighter = true;
+        for (int pitch : { 41, 48, 55, 62, 69 }) {
+            double zc[2];
+            int k = 0;
+            for (float vel : { 0.3f, 0.95f }) {
+                b->reset();
+                const std::vector<float> x = orchNote(*b, pitch, vel, 2.0, 1.4);
+                const double f = midiToHz(pitch);
+                if (vel > 0.5f) worst = std::max(worst, std::fabs(1200.0 * std::log2(peakHz(x, 0.7, f) / f)));
+                zc[k++] = centroidHz(x, 0.7);
+            }
+            brighter = brighter && zc[1] >= zc[0];
+        }
+        check(worst < 15.0, "the lips and the bore agree on the note (the player's ear)", fmt("within %.1f cents", worst));
+        check(brighter, "blown harder, the brass is brighter");
+    }
+    {
+        auto t = std::make_unique<Timpani>();
+        t->prepare(48000.0, 9);
+        ps.readModule(Module::Timpani, 0, v.data());
+        t->update(v.data());
+        const std::vector<float> x = orchNote(*t, 45, 0.8f, 0.1, 2.5);
+        const double f = midiToHz(45), p11 = peakHz(x, 0.3, f), p21 = peakHz(x, 0.3, 1.5 * f);
+        check(std::fabs(1200.0 * std::log2(p11 / f)) < 3.0 && std::fabs(p21 / p11 - 1.5) < 0.02 && std::fabs(Timpani::ratio(2) - 1.98) < 1e-9,
+              "the timpani: the principal mode on the note, the next a fifth above", fmt("(1,1) %.2f Hz, (2,1)/(1,1) %.3f", p11, p21 / p11));
+    }
+}
+
+/** The orchestra in the engine: an Uplifting track with it at block sizes 1, 37 and 512, bit for bit, at the peak. */
+void testOrchestraBlocks()
+{
+    section("the orchestra at any block size");
+    auto p = std::make_unique<ParamStore>();
+    p->parseText("compose.style=Uplifting");
+    Score sc;
+    double from = -1.0;
+    for (uint64_t seed = 1; seed < 12 && from < 0.0; ++seed) {
+        sc = composeTrack(*p, seed);
+        for (const NoteEvent& n : sc.notes) if (n.part == Part::Choir) { from = std::floor(n.beat / 4.0) * 4.0; break; }
+    }
+    check(from >= 0.0, "a seed with the orchestra");
+    if (from < 0.0) return;
+    auto render = [&](int block) {
+        auto e = std::make_unique<Engine>();
+        e->params().copyValuesFrom(*p);
+        e->prepare(48000.0, block);
+        e->load(sc);
+        e->seek(from);
+        std::vector<float> out, L(static_cast<size_t>(block)), R(static_cast<size_t>(block));
+        const int n = static_cast<int>(5.0 * 48000.0);
+        for (int done = 0; done < n; done += block) {
+            const int m = std::min(block, n - done);
+            e->process(L.data(), R.data(), m);
+            for (int i = 0; i < m; ++i) out.push_back(L[static_cast<size_t>(i)]);
+        }
+        return out;
+    };
+    const std::vector<float> a = render(512), b = render(37), c = render(1);
+    size_t diffB = 0, diffC = 0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        diffB += std::memcmp(&a[i], &b[i], sizeof(float)) != 0;
+        diffC += std::memcmp(&a[i], &c[i], sizeof(float)) != 0;
+    }
+    check(diffB == 0 && diffC == 0, "37 and 1 equal 512, bit for bit", fmt("%zu and %zu samples differ", diffB, diffC));
+}
+
 struct TestSection {
     const char* name;
     std::function<void()> fn;
@@ -1011,6 +1189,8 @@ const TestSection kSections[] = {
     { "testMelody", testMelody },
     { "testPiano", testPiano },
     { "testPianoBlocks", testPianoBlocks },
+    { "testOrchestra", testOrchestra },
+    { "testOrchestraBlocks", testOrchestraBlocks },
 };
 
 } // namespace

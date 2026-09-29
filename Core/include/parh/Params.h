@@ -62,6 +62,8 @@ enum class Module : int { Compose = 0, Kick, Sub, Perc,
                           Sfx,
                           /** The physical piano (PLAN 5.8, Piano.h). */
                           Piano,
+                          /** The orchestra (PLAN 5.9): the bowed string section, the choir, the brass, the timpani. */
+                          Strings, Choir, Brass, Timpani,
                           /** The sidechain's shape (PLAN 7.3): the ghost kick's curve, shared by every bus. */
                           Pump,
                           /** The three rooms (PLAN 5.11): a short room, a plate, a hall, on sends. */
@@ -232,6 +234,46 @@ enum : int { Instrument,   ///< PianoInstrument: Grand, Baby Grand, Upright, Sof
              Duck,         ///< dB under the pump
              RoomSend, PlateSend, HallSend, Count };
 constexpr int kFirstPlayKnob = Level;   ///< the knobs before it change the design
+}
+/** @brief Parameters of the string section (PLAN 5.9, Strings.h). */
+namespace strings {
+enum : int { Level,        ///< dB
+             Players,      ///< players on a note, 1 .. 6
+             Vibrato,      ///< factor on the players' vibrato depth
+             Pressure,     ///< factor on the bow force (1: half of Schelleng's upper limit)
+             Position,     ///< the bow's place, -1 sul tasto .. 0 (a tenth of the string) .. 1 sul ponticello
+             Speed,        ///< factor on the bow speed
+             Attack, Release,   ///< ms: the stroke's start, the bow's lift
+             Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
+}
+/** @brief Parameters of the choir (PLAN 5.9, Choir.h). */
+namespace choir {
+enum : int { Level,        ///< dB
+             Singers,      ///< singers on a note, 1 .. 6
+             Vowel,        ///< 0 "aah" .. 0.5 "ooh" (o) .. 1 "uuh"
+             Vibrato,      ///< factor on the singers' vibrato depth
+             Breath,       ///< the aspiration noise in the glottal flow
+             Tension,      ///< the voice quality: 0 lax and breathy (Rd 2.7) .. 1 pressed (Rd 0.8)
+             Attack, Release,   ///< ms
+             Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
+}
+/** @brief Parameters of the brass (PLAN 5.9, Brass.h). */
+namespace brass {
+enum : int { Level,        ///< dB
+             Players,      ///< players on a note, 1 .. 4
+             Pressure,     ///< factor on the blowing pressure (the dynamic and the brightness)
+             Brassiness,   ///< the nonlinear steepening in the bore (the fortissimo's blare)
+             Attack, Release,   ///< ms
+             Vibrato,      ///< cents
+             Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
+}
+/** @brief Parameters of the timpani (PLAN 5.9, Timpani.h). */
+namespace timpani {
+enum : int { Level,        ///< dB
+             Hardness,     ///< factor on the mallet felt's stiffness
+             Decay,        ///< factor on the modes' decay times
+             Strike,       ///< the strike point, the fraction of the radius from the centre
+             Width, LowCut, Duck, RoomSend, PlateSend, HallSend, Count };
 }
 /**
  * @brief The sidechain (PLAN 7.3, Dok. 7): the curve every bus ducks along when the ghost kick triggers -- the attack,

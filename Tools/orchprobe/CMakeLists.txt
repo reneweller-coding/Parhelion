@@ -1,0 +1,6 @@
+add_executable(parh_orchprobe main.cpp)
+target_link_libraries(parh_orchprobe PRIVATE ParhelionCore)
+if(MSVC)
+    target_compile_options(parh_orchprobe PRIVATE /W4 /permissive- /utf-8)
+    target_compile_definitions(parh_orchprobe PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()

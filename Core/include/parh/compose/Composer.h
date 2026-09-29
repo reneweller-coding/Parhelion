@@ -61,6 +61,7 @@ struct TrackInfo {
     int mainDropBar = -1;        ///< the main drop's first bar
     int breakdownBar = -1;       ///< the main breakdown's first bar
     int firstLeadBar = -1;       ///< where the lead is first heard
+    bool orchestra = false;      ///< the orchestra plays (Cinematic)
     int keyChangeBar = -1;       ///< the Cinematic key change (-1: none)
     std::string progression;     ///< "i-VI-III-VII"
     std::string bass;            ///< the bass figure

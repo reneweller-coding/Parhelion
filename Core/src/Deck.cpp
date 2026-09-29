@@ -42,6 +42,11 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
     retDuck_.prepare(sampleRate);
     piano_.prepare(sampleRate);
     pianoDuck_.prepare(sampleRate);
+    strings_.prepare(sampleRate, 0x5354524Eull + static_cast<uint64_t>(index));   // "STRN"
+    choir_.prepare(sampleRate, 0x43484F49ull + static_cast<uint64_t>(index));     // "CHOI"
+    brass_.prepare(sampleRate, 0x42524153ull + static_cast<uint64_t>(index));     // "BRAS"
+    timpani_.prepare(sampleRate, 0x54494D50ull + static_cast<uint64_t>(index));   // "TIMP"
+    for (Ducker& d : orchDuck_) d.prepare(sampleRate);
     sfx_.prepare(sampleRate);
     fxDuck_.prepare(sampleRate);
     subDropDuck_.prepare(sampleRate);
@@ -61,6 +66,7 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
     for (int i = 0; i < kPolyInstances; ++i) { polyL_[i].assign(n, 0.0f); polyR_[i].assign(n, 0.0f); }
     pianoL_.assign(n, 0.0f);
     pianoR_.assign(n, 0.0f);
+    for (int o = 0; o < kOrch; ++o) { orchL_[o].assign(n, 0.0f); orchR_[o].assign(n, 0.0f); }
     clear();
 }
 
@@ -72,6 +78,10 @@ void Deck::setQuest(bool on)
         poly_[i].setQuality(on ? (pad ? 5 : 3) : kPolyUnison, on ? (pad ? 6 : 4) : kPolyVoices);
     }
     piano_.setVoiceLimit(on ? 10 : Piano::kVoices);
+    // The orchestra's share: half the players and singers.
+    strings_.setPlayers(on ? 3 : kStringPlayers);
+    choir_.setSingers(on ? 3 : kChoirSingers);
+    brass_.setPlayers(on ? 2 : 3);
 }
 
 void Deck::clear()
@@ -201,6 +211,10 @@ void Deck::seek(int64_t sample)
     bass_.reset();
     acid_.reset();
     piano_.reset();
+    strings_.reset();
+    choir_.reset();
+    brass_.reset();
+    timpani_.reset();
     for (int i = 0; i < kPolyInstances; ++i) {
         poly_[i].reset();
         // The same start phases and drift walks whatever came before (Poly.h): a render is a function of the score.
@@ -348,6 +362,22 @@ void Deck::updateCell(int64_t sample)
     piano_.update(v);
     pianoSends_ = Sends{ v[piano::RoomSend], v[piano::PlateSend], v[piano::HallSend] };
     pianoDuck_.set(1.0f - dbToGain(-v[piano::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    readPlayed(Module::Strings, 0, v);
+    strings_.update(v);
+    orchSends_[0] = Sends{ v[strings::RoomSend], v[strings::PlateSend], v[strings::HallSend] };
+    orchDuck_[0].set(1.0f - dbToGain(-v[strings::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    readPlayed(Module::Choir, 0, v);
+    choir_.update(v);
+    orchSends_[1] = Sends{ v[choir::RoomSend], v[choir::PlateSend], v[choir::HallSend] };
+    orchDuck_[1].set(1.0f - dbToGain(-v[choir::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    readPlayed(Module::Brass, 0, v);
+    brass_.update(v);
+    orchSends_[2] = Sends{ v[brass::RoomSend], v[brass::PlateSend], v[brass::HallSend] };
+    orchDuck_[2].set(1.0f - dbToGain(-v[brass::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
+    readPlayed(Module::Timpani, 0, v);
+    timpani_.update(v);
+    orchSends_[3] = Sends{ v[timpani::RoomSend], v[timpani::PlateSend], v[timpani::HallSend] };
+    orchDuck_[3].set(1.0f - dbToGain(-v[timpani::Duck]), pump[pump::Attack], pump[pump::Hold], pump[pump::Release]);
     readPlayed(Module::Sfx, 0, v);
     sfx_.update(v, keyRoot_);
     sfx_.setScale(scale_);
@@ -445,6 +475,7 @@ void Deck::dispatch(const Ev& e)
         acid_.kick(e.late);
         for (Ducker& d : polyDuck_) d.trigger(e.late);
         pianoDuck_.trigger(e.late);
+        for (Ducker& d : orchDuck_) d.trigger(e.late);
         retDuck_.trigger(e.late);
         fxDuck_.trigger(e.late);
         subDropDuck_.trigger(e.late);
@@ -486,6 +517,26 @@ void Deck::dispatch(const Ev& e)
         if (muted(perform::MuteBass)) return;
         bass_.noteOn(e.pitch, e.velocity, e.late, e.accent, e.slide);
         bassNote_ = e.id;
+        return;
+    case Part::Strings:
+        if (e.on == 0) { strings_.noteOff(e.pitch); return; }
+        if (muted(perform::MutePads)) return;
+        strings_.noteOn(e.pitch, e.velocity, e.lengthBeats < 0.5, e.late);   // a short note is bitten staccato
+        return;
+    case Part::Choir:
+        if (e.on == 0) { choir_.noteOff(e.pitch); return; }
+        if (muted(perform::MutePads)) return;
+        choir_.noteOn(e.pitch, e.velocity, false, e.late);
+        return;
+    case Part::Brass:
+        if (e.on == 0) { brass_.noteOff(e.pitch); return; }
+        if (muted(perform::MuteSynths)) return;
+        brass_.noteOn(e.pitch, e.velocity, false, e.late);
+        return;
+    case Part::Timpani:
+        if (e.on == 0) return;
+        if (muted(perform::MutePerc)) return;
+        timpani_.noteOn(e.pitch, e.velocity, false, e.late);
         return;
     case Part::Piano:
         if (e.on == 0) { piano_.noteOff(e.pitch); return; }
@@ -533,6 +584,10 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
     { PARH_PROF(Bass); bass_.process(bassL_.data(), bassR_.data(), n); acid_.process(acidL_.data(), acidR_.data(), n); }
     { PARH_PROF(Poly); for (int i = 0; i < kPolyInstances; ++i) poly_[i].process(polyL_[i].data(), polyR_[i].data(), n); }
     piano_.process(pianoL_.data(), pianoR_.data(), n);
+    strings_.process(orchL_[0].data(), orchR_[0].data(), n);
+    choir_.process(orchL_[1].data(), orchR_[1].data(), n);
+    brass_.process(orchL_[2].data(), orchR_[2].data(), n);
+    timpani_.process(orchL_[3].data(), orchR_[3].data(), n);
     sfx_.processSplit(fxL_.data(), fxR_.data(), fxSub_.data(), fxWetL_.data(), fxWetR_.data(), n);
     PARH_PROF_BEGIN(Buses);
 
@@ -588,6 +643,24 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
             sl += l;
             sr += r;
             if (watch_) most(partPeak_[static_cast<int>(BalPart::Piano)], l, r);
+        }
+        for (int o = 0; o < kOrch; ++o) {
+            // The orchestra: as the piano (the timpani outside the synth fader: they are percussion).
+            const int bp = static_cast<int>(BalPart::Strings) + o;
+            const float go = balGain_[bp] * (o == 3 ? 1.0f : synthGain_);
+            float l = orchL_[o][k] * go, r = orchR_[o][k] * go;
+            const Sends& s = orchSends_[o];
+            rl += l * s.room; rr += r * s.room;
+            pl += l * s.plate; pr += r * s.plate;
+            hl += l * s.hall; hr += r * s.hall;
+            const float g = orchDuck_[o].next();
+            l *= g;
+            r *= g;
+            orchL_[o][k] = l;
+            orchR_[o][k] = r;
+            sl += l;
+            sr += r;
+            if (watch_) most(partPeak_[bp], l, r);
         }
         synthL_[k] = sl;
         synthR_[k] = sr;
@@ -675,6 +748,7 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
             put(kStemPerc, busP[0][i] * satGain_[0][i], busP[1][i] * satGain_[1][i]);
             for (int v = 0; v < kPolyInstances; ++v) put(kStemLead + v, polyL_[v][k], polyR_[v][k]);
             put(kStemPiano, pianoL_[k], pianoR_[k]);
+            for (int o = 0; o < kOrch; ++o) put(kStemStrings + o, orchL_[o][k], orchR_[o][k]);
             put(kStemRoom, roomL_[k], roomR_[k]);
             put(kStemPlate, plateL_[k], plateR_[k]);
             put(kStemHall, hallL_[k], hallR_[k]);

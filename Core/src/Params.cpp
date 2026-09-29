@@ -422,6 +422,73 @@ const ParamDesc kPianoParams[piano::Count] = {
     { "hall_send",    "Hall Send",    "",      0.0f,   1.0f,   0.35f, Curve::Linear },
 };
 
+/** The string section (PLAN 5.9): six players a note, the bow at half Schelleng's upper force, the hall behind it. */
+const ParamDesc kStringsParams[strings::Count] = {
+    { "level",      "Level",      "dB", -36.0f,   6.0f,  -6.0f, Curve::Linear },
+    { "players",    "Players",    "",     1.0f,   6.0f,   6.0f, Curve::Int },
+    { "vibrato",    "Vibrato",    "",     0.0f,   2.0f,   1.0f, Curve::Linear },
+    { "pressure",   "Bow Force",  "",     0.3f,   3.0f,   1.0f, Curve::Log },
+    { "position",   "Bow Position", "",  -1.0f,   1.0f,   0.0f, Curve::Linear },
+    { "speed",      "Bow Speed",  "",     0.3f,   3.0f,   1.0f, Curve::Log },
+    { "attack",     "Attack",     "ms",   5.0f, 800.0f,  90.0f, Curve::Log },
+    { "release",    "Release",    "ms",  10.0f, 1500.0f, 180.0f, Curve::Log },
+    { "width",      "Width",      "",     0.0f,   1.0f,   0.8f, Curve::Linear },
+    { "low_cut",    "Low Cut",    "Hz",  20.0f, 400.0f,  60.0f, Curve::Log },
+    { "duck",       "Duck",       "dB",   0.0f,  18.0f,   3.0f, Curve::Linear },
+    { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.05f, Curve::Linear },
+    { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.1f, Curve::Linear },
+    { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.45f, Curve::Linear },
+};
+
+/** The choir (PLAN 5.9): six singers a note on "aah", a modal voice (Rd 1.5), the hall behind it. */
+const ParamDesc kChoirParams[choir::Count] = {
+    { "level",      "Level",      "dB", -36.0f,   6.0f,  -6.0f, Curve::Linear },
+    { "singers",    "Singers",    "",     1.0f,   6.0f,   6.0f, Curve::Int },
+    { "vowel",      "Vowel",      "",     0.0f,   1.0f,   0.0f, Curve::Linear },
+    { "vibrato",    "Vibrato",    "",     0.0f,   2.0f,   1.0f, Curve::Linear },
+    { "breath",     "Breath",     "",     0.0f,   1.0f,   0.25f, Curve::Linear },
+    { "tension",    "Tension",    "",     0.0f,   1.0f,   0.4f, Curve::Linear },
+    { "attack",     "Attack",     "ms",   5.0f, 1500.0f, 250.0f, Curve::Log },
+    { "release",    "Release",    "ms",  10.0f, 2000.0f, 400.0f, Curve::Log },
+    { "width",      "Width",      "",     0.0f,   1.0f,   0.8f, Curve::Linear },
+    { "low_cut",    "Low Cut",    "Hz",  20.0f, 400.0f,  90.0f, Curve::Log },
+    { "duck",       "Duck",       "dB",   0.0f,  18.0f,   3.0f, Curve::Linear },
+    { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.0f, Curve::Linear },
+    { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.1f, Curve::Linear },
+    { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.55f, Curve::Linear },
+};
+
+/** The brass (PLAN 5.9): three players a note, mezzo-forte, a little blare. */
+const ParamDesc kBrassParams[brass::Count] = {
+    { "level",      "Level",      "dB", -36.0f,   6.0f,  -6.0f, Curve::Linear },
+    { "players",    "Players",    "",     1.0f,   4.0f,   3.0f, Curve::Int },
+    { "pressure",   "Pressure",   "",     0.3f,   2.0f,   1.0f, Curve::Log },
+    { "brassiness", "Brassiness", "",     0.0f,   1.0f,   0.35f, Curve::Linear },
+    { "attack",     "Attack",     "ms",   5.0f, 800.0f,  40.0f, Curve::Log },
+    { "release",    "Release",    "ms",  10.0f, 1500.0f, 150.0f, Curve::Log },
+    { "vibrato",    "Vibrato",    "ct",   0.0f,  40.0f,   6.0f, Curve::Linear },
+    { "width",      "Width",      "",     0.0f,   1.0f,   0.6f, Curve::Linear },
+    { "low_cut",    "Low Cut",    "Hz",  20.0f, 400.0f,  50.0f, Curve::Log },
+    { "duck",       "Duck",       "dB",   0.0f,  18.0f,   3.0f, Curve::Linear },
+    { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.05f, Curve::Linear },
+    { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.1f, Curve::Linear },
+    { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.45f, Curve::Linear },
+};
+
+/** The timpani (PLAN 5.9): a felt mallet a third of the radius in from the rim. */
+const ParamDesc kTimpaniParams[timpani::Count] = {
+    { "level",      "Level",      "dB", -36.0f,   6.0f,  -6.0f, Curve::Linear },
+    { "hardness",   "Hardness",   "",     0.25f,  4.0f,   1.0f, Curve::Log },
+    { "decay",      "Decay",      "",     0.3f,   3.0f,   1.0f, Curve::Log },
+    { "strike",     "Strike Point", "",   0.3f,   0.9f,   0.68f, Curve::Linear },
+    { "width",      "Width",      "",     0.0f,   1.0f,   0.5f, Curve::Linear },
+    { "low_cut",    "Low Cut",    "Hz",  20.0f, 400.0f,  35.0f, Curve::Log },
+    { "duck",       "Duck",       "dB",   0.0f,  18.0f,   0.0f, Curve::Linear },
+    { "room_send",  "Room Send",  "",     0.0f,   1.0f,   0.05f, Curve::Linear },
+    { "plate_send", "Plate Send", "",     0.0f,   1.0f,   0.05f, Curve::Linear },
+    { "hall_send",  "Hall Send",  "",     0.0f,   1.0f,   0.4f, Curve::Linear },
+};
+
 /**
  * The sidechain's curve (PLAN 7.3, Dok. 7): the fastest attack, a short hold, a release of 80 to 150 ms so a bass on the
  * off-beat is back when it plays; the rooms' returns ducked 3 to 5 dB.
@@ -607,6 +674,10 @@ const ModuleSpec kModules[static_cast<int>(Module::Count)] = {
     { "poly",    kPolyParams,    poly::Count,    kPolyInstances, kPolyInstanceNames },
     { "sfx",     kSfxParams,     sfx::Count,     1 },
     { "piano",   kPianoParams,   piano::Count,   1 },
+    { "strings", kStringsParams, strings::Count, 1 },
+    { "choir",   kChoirParams,   choir::Count,   1 },
+    { "brass",   kBrassParams,   brass::Count,   1 },
+    { "timpani", kTimpaniParams, timpani::Count, 1 },
     { "pump",    kPumpParams,    pump::Count,    1 },
     { "sends",   kSendsParams,   sends::Count,   1 },
     { "mix",     kMixParams,     mix::Count,     1 },

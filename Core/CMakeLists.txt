@@ -16,6 +16,10 @@ add_library(ParhelionCore STATIC
     src/synth/Kit.cpp
     src/synth/Synth.cpp
     src/synth/Piano.cpp
+    src/synth/Strings.cpp
+    src/synth/Choir.cpp
+    src/synth/Brass.cpp
+    src/synth/Timpani.cpp
     src/synth/PianoDesign.cpp
     src/synth/Poly.cpp
     src/synth/Sfx.cpp

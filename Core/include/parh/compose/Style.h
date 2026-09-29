@@ -80,6 +80,7 @@ struct StyleProfile {
     // Voices (Dok. 5, 10).
     LeadKind lead = LeadKind::Supersaw;
     float pluck = 0.8f, arp = 0.5f, stab = 0.3f, counter = 0.4f, gate = 0.5f;   ///< chances
+    float orchestra = 0.0f;                             ///< chance of the orchestra (Cinematic, PLAN 5.9)
     // Space and pump (Dok. 7, 10).
     float hallBreakS = 4.0f, hallDropS = 1.5f;          ///< the hall's decay in the breakdown and in the drop
     float bassDuckDb = 8.0f;                            ///< the mid-bass's duck (the sub's is 3 dB more)
