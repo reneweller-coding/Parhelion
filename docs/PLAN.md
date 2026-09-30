@@ -568,6 +568,9 @@ des Nutzers.
   MSVC, statische Laufzeit, Tests, pluginval Strenge 10, Screenshots, Vorschaubild und Handbuch aus diesem Build, Stage
   mit Prüfung (keine Laufzeit-DLL), SHA256SUMS, portables Zip, Setup (Inno Setup 7; neue AppId), mit `-Quest` das APK
   daneben. docs/RELEASE_NOTES.md. Version 1.0.0 (die project()-Zeile: Plugin, Renderer, Rekordbox-Export, Quest).
+  **Gebaut** (30.09.2026, icx 2026.1): ctest 36/36, pluginval Strenge 10 bestanden, keine Laufzeit-DLL in den drei
+  Programmen; Deploy/out: Setup 12,1 MB, portables Zip 14,5 MB, Quest-APK 6,8 MB (unsigniert bzw. Debug-Schlüssel;
+  nicht veröffentlicht, das bleibt dem Nutzer).
 - Nicht gebaut: das "Jetzt" des Plugins über die Übergabe der Quest (der Parameterspeicher des Plugins gehört der einen
   Engine; Host-Sprünge, Tempowechsel und das Laden eines Sets müssten eine laufende Übergabe abbrechen).
 
