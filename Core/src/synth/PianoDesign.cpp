@@ -551,7 +551,7 @@ void scaleStrings(PianoDesign& d, const Instrument& ins)
         key.hammerP = overKeys(kk, { { 0, 2.3 }, { 39, 2.5 }, { 87, 3.2 } });
         const double logK = overKeys(kk, { { 15, 8.6 }, { 39, 9.65 }, { 75, 11.0 } });
         key.hammerEps = 0.85;
-        key.q0 = std::pow(10.0, logK) * d.spec.hardness * ins.hardness / (1.0 - key.hammerEps);
+        key.q0 = std::pow(10.0, logK) * d.spec.hardness * d.spec.felt * ins.hardness / (1.0 - key.hammerEps);
         key.hammerTau = std::exp(overKeys(kk, { { 0, std::log(15e-6) }, { 87, std::log(4e-6) } }));
         key.oversample = key.midi >= 84 ? 8 : 4;
     }
@@ -642,7 +642,7 @@ void designBoard(PianoDesign& d, const Instrument& ins, const PlateModes& pm, ui
                          { ins.micR[0] * ins.width, ins.micR[1] * ins.depth } };
     for (int n = 0; n < count; ++n) {
         const double f = pm.freq[static_cast<size_t>(n)], w = 2.0 * kPiD * f;
-        const double eta = ins.loss0 + ins.loss1 * f / 1000.0;
+        const double eta = (ins.loss0 + ins.loss1 * f / 1000.0) * d.spec.boardLoss;
         b.freq[static_cast<size_t>(n)] = f;
         b.loss[static_cast<size_t>(n)] = eta;
         const double sigma = 0.5 * eta * w;
@@ -656,7 +656,8 @@ void designBoard(PianoDesign& d, const Instrument& ins, const PlateModes& pm, ui
             b.shape[static_cast<size_t>(r * P + n)] = static_cast<float>(pm.shape(n, region[r][0], region[r][1]));
         // Radiation: the far field of a baffled plate is its acceleration, heard here at three listening points
         // (referred to 500 Hz), the lowest modes (little net volume) held back.
-        const double rad = f * f / (f * f + 100.0 * 100.0) / (2.0 * kPiD * 500.0);
+        const double corner = static_cast<double>(d.spec.bodyCorner);
+        const double rad = f * f / (f * f + corner * corner) / (2.0 * kPiD * 500.0);
         b.micL[static_cast<size_t>(n)] = static_cast<float>(pm.shape(n, mics[0][0], mics[0][1]) * rad);
         b.micC[static_cast<size_t>(n)] = static_cast<float>(pm.shape(n, mics[1][0], mics[1][1]) * rad);
         b.micR[static_cast<size_t>(n)] = static_cast<float>(pm.shape(n, mics[2][0], mics[2][1]) * rad);
@@ -704,7 +705,7 @@ void designBoard(PianoDesign& d, const Instrument& ins, const PlateModes& pm, ui
             b.highShape[static_cast<size_t>(q * HP + j)] = static_cast<float>(std::cos(2.0 * kPiD * (kb * pos[q] + psi)));
         // A resonator's peak on a unit force is 1 / (2 sigma) of its state: 2 sigma Y_inf makes the bank's mean the
         // plate's mobility; the listening points see it with their own signs.
-        const double c = 2.0 * sigma * b.yInf * f / 500.0;   // and the acceleration, as the modes
+        const double c = 2.0 * sigma * b.yInf * f / 500.0 * std::pow(10.0, d.spec.highBank / 20.0);   // and the acceleration, as the modes
         b.highL[static_cast<size_t>(j)] = static_cast<float>(c * (0.5 + 0.5 * r.uniform()) * (r.uniform() < 0.5f ? -1.0 : 1.0));
         b.highR[static_cast<size_t>(j)] = static_cast<float>(c * (0.5 + 0.5 * r.uniform()) * (r.uniform() < 0.5f ? -1.0 : 1.0));
     }
@@ -749,9 +750,9 @@ double sinc(double x) { return std::fabs(x) < 1e-9 ? 1.0 : std::sin(x) / x; }
  *        partial cannot lose it faster than the board's own mode does. The course's share of the bridge's losses
  *        (N Re kappa) is held under half the board's modal decay rate at that frequency, the phase kept.
  */
-cd boundedCoupling(cd kappa, int strings, double hz, const Instrument& ins)
+cd boundedCoupling(cd kappa, int strings, double hz, const Instrument& ins, double lossFactor)
 {
-    const double boardSigma = 0.5 * (ins.loss0 + ins.loss1 * hz / 1000.0) * 2.0 * kPiD * hz;
+    const double boardSigma = 0.5 * (ins.loss0 + ins.loss1 * hz / 1000.0) * lossFactor * 2.0 * kPiD * hz;
     const double cap = 0.5 * boardSigma / strings;
     // The same bound on the frequency's shift: near a board mode the string's partial is pulled, but by no more than
     // the coupling can carry.
@@ -792,8 +793,8 @@ void designKey(PianoDesign& d, const Instrument& ins, int k, Rng& r)
         const int parts = pol == 0 ? key.partials : KH;
         for (int kk = 1; kk <= parts; ++kk) {
             const double fk = kk * key.f0 * std::sqrt(1.0 + key.B * kk * kk), wk = 2.0 * kPiD * fk;
-            const cd Y = admittanceAt(d.board, shape, fk) * static_cast<double>(d.spec.impedance) * (pol == 0 ? 1.0 : 0.25);
-            const cd kappa = boundedCoupling(2.0 * key.f0 * key.z0 * Y, N, fk, ins);
+            const cd Y = admittanceAt(d.board, shape, fk) * static_cast<double>(d.spec.impedance) * static_cast<double>(d.spec.coupling) * (pol == 0 ? 1.0 : 0.25);
+            const cd kappa = boundedCoupling(2.0 * key.f0 * key.z0 * Y, N, fk, ins, d.spec.boardLoss);
             const double sigmaInt = b1 + b3 * wk * wk;
             cd s[3], lam[3];
             for (int j = 0; j < N; ++j) s[j] = cd(-sigmaInt, wk * std::pow(2.0, cents[j] / 1200.0));
@@ -834,7 +835,8 @@ void designKey(PianoDesign& d, const Instrument& ins, int k, Rng& r)
                 key.di[q] = static_cast<float>(disp.imag());
                 key.omegaT[q] = static_cast<float>(lam[m].imag() * T);
                 // The damper (Lehtonen et al. 2007): tens of dB per second, less on the high partials and the long strings.
-                key.damperSigma[q] = key.damper ? static_cast<float>(25.0 * std::sqrt(0.6 / key.length) / (1.0 + fk / 2500.0)) : 0.0f;
+                key.damperSigma[q] = key.damper ? static_cast<float>(d.spec.damperRate * std::pow(0.6 / key.length, static_cast<double>(d.spec.damperLength))
+                                                                     / (1.0 + fk / 2500.0)) : 0.0f;
             }
         }
     }
@@ -866,8 +868,8 @@ void designKey(PianoDesign& d, const Instrument& ins, int k, Rng& r)
     key.symDamper.assign(static_cast<size_t>(key.sym.padded), 0.0f);
     for (int kk = 1; kk <= S; ++kk) {
         const double fk = kk * key.f0 * std::sqrt(1.0 + key.B * kk * kk), wk = 2.0 * kPiD * fk;
-        const cd Y = admittanceAt(d.board, shape, fk) * static_cast<double>(d.spec.impedance);
-        const cd lam = cd(-(b1 + b3 * wk * wk), wk) - static_cast<double>(N) * boundedCoupling(2.0 * key.f0 * key.z0 * Y, N, fk, ins);
+        const cd Y = admittanceAt(d.board, shape, fk) * static_cast<double>(d.spec.impedance) * static_cast<double>(d.spec.coupling);
+        const cd lam = cd(-(b1 + b3 * wk * wk), wk) - static_cast<double>(N) * boundedCoupling(2.0 * key.f0 * key.z0 * Y, N, fk, ins, d.spec.boardLoss);
         const cd p = std::exp(lam * T), g = (p - 1.0) / lam;
         const size_t q = static_cast<size_t>(kk - 1);
         key.sym.pr[q] = static_cast<float>(p.real());
@@ -875,7 +877,8 @@ void designKey(PianoDesign& d, const Instrument& ins, int k, Rng& r)
         key.sym.gr[q] = static_cast<float>(g.real());
         key.sym.gi[q] = static_cast<float>(g.imag());
         key.symOutI[q] = static_cast<float>(-2.0 * N * key.tension / (key.length * wk));
-        key.symDamper[q] = key.damper ? static_cast<float>(25.0 * std::sqrt(0.6 / key.length) / (1.0 + fk / 2500.0)) : 0.0f;
+        key.symDamper[q] = key.damper ? static_cast<float>(d.spec.damperRate * std::pow(0.6 / key.length, static_cast<double>(d.spec.damperLength))
+                                                           / (1.0 + fk / 2500.0)) : 0.0f;
     }
     // Where the key meets the board: between two region points of its bridge.
     if (key.midi >= kPianoBassBreak) {
@@ -905,6 +908,17 @@ std::shared_ptr<PianoDesign> build(const PianoSpec& spec, double sampleRate)
     Rng r;
     r.seed(mixSeed(seed, 0x4B455953ull));   // "KEYS"
     for (int k = 0; k < kPianoKeys; ++k) designKey(*d, ins, k, r);
+    // The voicing (PianoSpec::voiceBass, voiceTreble): the force a key's strings put into the bridge, in dB linear over
+    // the keys from C4 to either end -- what a technician does with the felt and the regulation, here on the output.
+    for (int k = 0; k < kPianoKeys; ++k) {
+        PianoKey& key = d->keys[static_cast<size_t>(k)];
+        const double db = key.midi < 60 ? d->spec.voiceBass * (60.0 - key.midi) / (60.0 - kPianoLowKey)
+                                        : d->spec.voiceTreble * (key.midi - 60.0) / (108.0 - 60.0);
+        if (db == 0.0) continue;
+        const float g = static_cast<float>(std::pow(10.0, db / 20.0));
+        for (float& x : key.br) x *= g;
+        for (float& x : key.bi) x *= g;
+    }
     d->outGain = 50.0f;   // a mezzo-forte C4 at about -13 dBFS with the level at -6 dB
     return d;
 }
@@ -930,7 +944,7 @@ std::complex<double> pianoAdmittance(const PianoDesign& d, int key, double hz)
 {
     const int count = static_cast<int>(d.board.freq.size());
     return admittanceAt(d.board, &d.board.keyShape[static_cast<size_t>(std::clamp(key, 0, kPianoKeys - 1) * count)], hz)
-         * static_cast<double>(d.spec.impedance);
+         * static_cast<double>(d.spec.impedance) * static_cast<double>(d.spec.coupling);
 }
 
 std::vector<double> pianoPlateTest(double a, double b, double dx, double dy, double d12, double d66, double massPerArea, int count)

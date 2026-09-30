@@ -7,7 +7,7 @@ its detuned neighbours, which is what the JP-8000's supersaw is.
 
 ![Parhelion](docs/screenshot.png)
 
-**State (29.09.2026): Phases 0 to 6.** The frame (copied modules with their origin in every header), the parameter
+**State (30.09.2026): Phases 0 to 6.** The frame (copied modules with their origin in every header), the parameter
 system, the score with sections, the layer matrix and the ghost kick, the deck with kick, sub, mid-bass, 303, a
 twelve-lane kit, six polyphonic voices (Phosphene's JP-8000 supersaw, VA, FM and wavetable, the circuit filters, the
 trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master.
@@ -19,7 +19,8 @@ from the tease to the main drop, and checked bar by bar against 144250 windows o
 that no known motif comes out -- the effects and the automation, and a leveler that sets the drop's loudness and the
 breakdown's distance to it. A physical piano after Pianoteq's principle (the soundboard solved from plate physics,
 coupled strings as complex modes, a hysteretic hammer, the strings' tension and longitudinal modes, dampers, half pedal,
-the strings ringing along under the pedal) plays Dream House's motif. An orchestra for the Cinematic side of
+the strings ringing along under the pedal) plays Dream House's motif, voiced note by note against Pianoteq's Steinway D
+(Tools/pianoref: the level over the keyboard and the velocity, the brightness, the two decays, the knock, the damper). An orchestra for the Cinematic side of
 Uplifting, synthesised as well: a string section of bowed modal strings (every player his own bow, stick and slip
 solved in closed form, the bodies of violins to basses), a choir from the Liljencrants-Fant glottal source and
 formants, brass from lips on a bore, timpani from a membrane's modes under a felt mallet. The five styles are
@@ -97,7 +98,8 @@ build/Tools/orchprobe/Release/parh_orchprobe --demo orchestra.wav
 `parh_orchprobe` measures the orchestra (pitch, the bowed string's spectrum, the LF source, the brass's brightness,
 the timpani's modes, the cost) and renders a short demo of all four. `parh_pianoprobe` shows the piano's design (the board's modes, every register's strings), measures what phase 4a asks
 for (inharmonicity, the two-stage decay, the brightness over the velocity, the pitch glide, the cost) and renders single
-notes. `parh_render` prints the plan (sections and the layer matrix), the loudness of the whole and of every section, and the
+notes; `--notes` with the list of `Tools/pianoref/notes_mid.py --list` plays the notes a reference piano is rendered with
+(`compare.py` measures both note by note, `fit.py` fits the design's voicing to them). `parh_render` prints the plan (sections and the layer matrix), the loudness of the whole and of every section, and the
 distance between the breakdown's and the drop's loudest three seconds (the research document's 4 to 8 LU). The WAV
 carries a cue marker at every section; `--stems dir` writes a WAV per part, their sum the mix before the master;
 `--list` prints every parameter, `--set "key=value; ..."` changes them.

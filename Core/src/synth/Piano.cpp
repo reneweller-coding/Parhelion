@@ -23,9 +23,11 @@ constexpr float kLongCoupling = 0.08f; ///< the longitudinal force's share in th
  * bridge, so where a partial of theirs meets one of the played note's exactly (the octaves and fifths of a stretched
  * tuning) it takes energy the note never loses; a coupled solution would share the note's energy among them instead.
  * The drive is scaled down to where that bound puts them -- together about 12 dB under the note once it is released
- * with the pedal down (measured, testPiano) -- and piano.sympathetic scales it from there.
+ * with the pedal down (measured, testPiano) -- and piano.sympathetic scales it from there. 30.09.2026: 0.03 -> 0.017, since
+ * the voicing against Pianoteq (PianoDesign.h) lets the board ring longer and knocks it a hundred times harder, and the
+ * free strings listen to the board: at 0.03 they rang 4 dB under the note.
  */
-constexpr float kSymDrive = 0.03f;
+constexpr float kSymDrive = 0.017f;
 
 /** @brief The damper's contact for a released key at pedal @p p (0 up .. 1 down; the middle is the half pedal). */
 float damperContact(float p)
@@ -94,6 +96,20 @@ void Piano::prepare(double sampleRate)
 
 void Piano::setSpec(const PianoSpec& spec)
 {
+    // The radiation shelf: H(s) = (wp / wz) (s + wz) / (s + wp), unity at DC and wp / wz above wz (a first-order low pass
+    // where radiationEnd is 0), by the bilinear transform. At radiation 0 it passes the acceleration as it is.
+    if (spec.radiation > 0.0f) {
+        const double K = 2.0 * sampleRate_, wp = 2.0 * kPiD * spec.radiation;
+        const double wz = spec.radiationEnd > spec.radiation ? 2.0 * kPiD * spec.radiationEnd : 0.0;
+        const double b0s = wz > 0.0 ? wp / wz : 0.0, b1s = wp, a1s = wp;
+        const double den = K + a1s;
+        radB0_ = static_cast<float>((b0s * K + b1s) / den);
+        radB1_ = static_cast<float>((b1s - b0s * K) / den);
+        radA1_ = static_cast<float>((a1s - K) / den);
+    } else {
+        radB0_ = 1.0f;
+        radB1_ = radA1_ = 0.0f;
+    }
     spec_ = spec;
     specSet_ = true;
     design_ = designPiano(spec, sampleRate_);
@@ -161,6 +177,7 @@ void Piano::reset()
     for (int k = 0; k < kPianoKeys; ++k) { held_[k] = 0; symOn_[k] = false; symDamper_[k] = 1.0f; symPeak_[k] = 0.0f; }
     symBoardOn_ = false;
     for (Svf& f : lowCut_) f.ic1 = f.ic2 = 0.0f;
+    radX_[0] = radX_[1] = radY_[0] = radY_[1] = 0.0f;
     pos_ = 0;
     mod_.reset();
 }
@@ -170,7 +187,7 @@ void Piano::modVoice(int i, bool strike)
     Voice& v = voices_[i];
     const PianoKey& k = design_->keys[static_cast<size_t>(v.key)];
     mod_.evaluate(i, pos_);
-    if (strike) v.hardMul = std::exp2(std::clamp(mod_.get(i, ModDest::Hardness), -2.0f, 2.0f));
+    if (strike) v.hardMul = v.velHard * std::exp2(std::clamp(mod_.get(i, ModDest::Hardness), -2.0f, 2.0f));
     v.bend = std::clamp(static_cast<double>(mod_.get(i, ModDest::Pitch)), -2.0, 2.0);
     v.modGain = std::clamp(1.0f + mod_.get(i, ModDest::Level), 0.0f, 2.0f);
     if (mod_.targets(ModDest::Pan)) {
@@ -251,7 +268,10 @@ void Piano::startVoice(Voice& v, int key, float velocity, double late)
     }
     v.key = key;
     v.bend = 0.0;
-    v.hardMul = v.modGain = 1.0f;
+    // The felt stiffens with the blow (PianoSpec::hardVelocity): soft for a pianissimo, hard for a fortissimo.
+    v.velHard = spec_.hardVelocity != 0.0f ? std::pow(std::max(velocity, 0.02f) / 0.75f, spec_.hardVelocity) : 1.0f;
+    v.hardMul = v.velHard;
+    v.modGain = 1.0f;
     v.region = k.region;
     v.w0 = k.regionW0;
     v.w1 = k.regionW1;
@@ -273,7 +293,7 @@ void Piano::startVoice(Voice& v, int key, float velocity, double late)
     v.age = clock_++;
     // The key's thump on the keybed (Askenfelt and Jansson 1990): a short force pulse into the board.
     v.thump = 0;
-    v.thumpGain = 3.0f * velocity * velocity;
+    v.thumpGain = 3.0f * velocity * velocity * spec_.knock;
     v.damperNoise = -1;
 }
 
@@ -602,9 +622,17 @@ void Piano::renderSegment(float* L, float* R, int n, bool cellStart, bool cellEn
     const float gain = d.outGain * level_;
     for (int i = 0; i < n; ++i) {
         float lp, bp, hp;
-        lowCut_[0].tick(bl[i] * gain, lp, bp, hp);
+        float x[2] = { bl[i] * gain, br[i] * gain };
+        // The radiation (PianoSpec::radiation): a shelf from the board's acceleration to its velocity.
+        for (int c = 0; c < 2; ++c) {
+            const float y = radB0_ * x[c] + radB1_ * radX_[c] - radA1_ * radY_[c];
+            radX_[c] = x[c];
+            radY_[c] = y;
+            x[c] = y;
+        }
+        lowCut_[0].tick(x[0], lp, bp, hp);
         L[i] = hp;
-        lowCut_[1].tick(br[i] * gain, lp, bp, hp);
+        lowCut_[1].tick(x[1], lp, bp, hp);
         R[i] = hp;
     }
 }

@@ -5,7 +5,7 @@
  *        pitch glide, the cost).
  *
  *     parh_pianoprobe --info [--instrument n]
- *     parh_pianoprobe --notes "60:0.7:2,36:1.0:4" --out notes.wav [--pedal 1] [--instrument n]
+ *     parh_pianoprobe --notes "60:0.7:2,36:1.0:4" --out notes.wav [--pedal 1] [--instrument n] [--lead s] [--gap s]
  *     parh_pianoprobe --measure
  */
 #include "parh/Dsp.h"
@@ -299,7 +299,8 @@ int main(int argc, char** argv)
     const DenormalGuard guard;   // as the engine runs: decayed partials are zero, not subnormal
     int instrument = 0;
     std::string notes, out = "piano.wav";
-    float pedal = 0.0f;
+    float pedal = 0.0f, lead = 0.0f, gap = 1.0f;
+    PianoSpec tune;   // the design's knobs (30.09.2026: the comparison with a reference piano, Tools/pianoref)
     bool doInfo = false, doMeasure = false;
     for (int i = 1; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--info")) doInfo = true;
@@ -310,11 +311,31 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--notes") && i + 1 < argc) notes = argv[++i];
         else if (!std::strcmp(argv[i], "--out") && i + 1 < argc) out = argv[++i];
         else if (!std::strcmp(argv[i], "--pedal") && i + 1 < argc) pedal = static_cast<float>(std::atof(argv[++i]));
+        // The timing of Tools/pianoref/notes_mid.py (30.09.2026): silence before the first note, and after each release.
+        else if (!std::strcmp(argv[i], "--lead") && i + 1 < argc) lead = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--gap") && i + 1 < argc) gap = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--hardness") && i + 1 < argc) tune.hardness = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--impedance") && i + 1 < argc) tune.impedance = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--strike") && i + 1 < argc) tune.strike = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--unison") && i + 1 < argc) tune.unison = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--radiation") && i + 1 < argc) tune.radiation = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--radiation-end") && i + 1 < argc) tune.radiationEnd = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--voice-bass") && i + 1 < argc) tune.voiceBass = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--voice-treble") && i + 1 < argc) tune.voiceTreble = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--damper") && i + 1 < argc) tune.damperRate = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--hard-velocity") && i + 1 < argc) tune.hardVelocity = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--knock") && i + 1 < argc) tune.knock = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--body-corner") && i + 1 < argc) tune.bodyCorner = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--high-bank") && i + 1 < argc) tune.highBank = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--board-loss") && i + 1 < argc) tune.boardLoss = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--damper-length") && i + 1 < argc) tune.damperLength = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--felt") && i + 1 < argc) tune.felt = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--coupling") && i + 1 < argc) tune.coupling = static_cast<float>(std::atof(argv[++i]));
     }
     if (doInfo) info(instrument);
     if (doMeasure) measure();
     if (!notes.empty()) {
-        PianoSpec spec;
+        PianoSpec spec = tune;
         spec.instrument = instrument;
         auto piano = std::make_unique<Piano>();
         piano->prepare(kRate);
@@ -326,7 +347,14 @@ int main(int argc, char** argv)
         piano->update(v.data());
         WavWriter wav;
         if (!wav.open(out.c_str(), static_cast<int>(kRate), 2, WavFormat::Float32)) return 1;
-        // "midi:velocity:seconds" one after another, each held for its seconds, then a second of silence.
+        // "midi:velocity:seconds" one after another, each held for its seconds, then --gap seconds (one by default).
+        {
+            float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
+            for (int i = 0; i < static_cast<int>(lead * kRate); i += Piano::kMaxBlock) {
+                piano->process(L, R, Piano::kMaxBlock);
+                wav.write(L, R, Piano::kMaxBlock);
+            }
+        }
         size_t pos = 0;
         while (pos < notes.size()) {
             const size_t end = notes.find(',', pos);
@@ -337,7 +365,7 @@ int main(int argc, char** argv)
             std::sscanf(item.c_str(), "%d:%f:%f", &midi, &vel, &secs);
             piano->noteOn(midi, vel, 0.0);
             float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
-            const int total = static_cast<int>((secs + 1.0f) * kRate), off = static_cast<int>(secs * kRate);
+            const int total = static_cast<int>((secs + gap) * kRate), off = static_cast<int>(secs * kRate);
             for (int i = 0; i < total; i += Piano::kMaxBlock) {
                 if (i <= off && off < i + Piano::kMaxBlock) piano->noteOff(midi);
                 piano->process(L, R, Piano::kMaxBlock);

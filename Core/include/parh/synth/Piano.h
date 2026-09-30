@@ -110,6 +110,7 @@ private:
         // The modulation's values (Phase 5b): the key's own where no slot reaches them.
         double bend = 0.0;         ///< semitones
         float hardMul = 1.0f, modGain = 1.0f;
+        float velHard = 1.0f;      ///< the felt's stiffness at this note's velocity (PianoSpec::hardVelocity)
         int region = 0;            ///< the bridge region its force goes to (and the next)
         float w0 = 1.0f, w1 = 0.0f;
     };
@@ -142,6 +143,8 @@ private:
     float level_ = 1.0f, pedal_ = 0.0f, sympathetic_ = 1.0f, phantom_ = 1.0f, damperNoise_ = 0.3f, mechanics_ = 0.3f;
     float width_ = 0.7f;
     Svf lowCut_[2];
+    /** @brief The radiation shelf (PianoSpec::radiation): first order, per channel. */
+    float radB0_ = 1.0f, radB1_ = 0.0f, radA1_ = 0.0f, radX_[2] = {}, radY_[2] = {};
     float lowCutHz_ = 80.0f;
     std::vector<float> micL_, micR_;     ///< the board's listening weights for the width
     // The board and its copy for the sympathetic strings.

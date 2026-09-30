@@ -77,6 +77,30 @@ struct PianoSpec {
     float impedance = 1.0f;    ///< factor on the bridge's admittance (more: louder and shorter)
     float stretch = 1.0f;      ///< factor on the stretch of the tuning
     float condition = 0.0f;    ///< random mistuning of each string, cents (standard deviation)
+    /**
+     * @name The voicing against a reference piano (30.09.2026; Tools/pianoref, the user: "Du kannst es gerne mit Pianoteq
+     *       vergleichen und daran abstimmen")
+     * Not knobs of the page: the design's own numbers, fitted note by note to Pianoteq 8's Steinway D (NY Steinway Model
+     * D) -- 48 notes, C1 to C7 at four velocities, by Nelder-Mead on the level over the keyboard and the velocity, the
+     * octave spectra per register, the brightness and how it grows with the blow, the two decays, the knock and the body
+     * of the first 400 ms, the damper (Tools/pianoref/compare.py; PLAN, "Das Piano gegen Pianoteq"). The defaults are the
+     * fit; the neutral values (no shelf, 0 dB, 25/s and 0.5, 0, 1, 100 Hz, 0 dB, 1, 1, 1) are the design before it.
+     * @{ */
+    float felt = 0.7f;            ///< factor on every hammer's stiffness, under the page's hardness (the fit: 1.16; 0.7 for the brightness)
+    float coupling = 0.296f;      ///< factor on the bridge's admittance, under the page's impedance (a looser coupling: a slower prompt sound)
+    float radiation = 372.7f;     ///< Hz: the sound is the board's acceleration below, its velocity above (a shelf; 0 none)
+    float radiationEnd = 4505.0f; ///< Hz: where the shelf's fall stops (0: it falls on)
+    float voiceBass = 3.64f;      ///< dB on the lowest key's bridge force, linear over the keys to none at C4
+    float voiceTreble = 7.54f;    ///< dB on the highest key's, linear from C4
+    float damperRate = 11.0f;     ///< the damper's added decay at full contact on a 0.6 m string, 1/s
+    float damperLength = 0.2f;    ///< how the damper's decay goes with the string's length: (0.6 m / L)^damperLength
+                                  ///< (0.2 by hand: the Steinway damps evenly, 20..30 dB in 0.3 s; the fit's 0.5: bass 15, treble 34)
+    float hardVelocity = 0.646f;  ///< the felt's stiffness over the velocity: times (velocity / 0.75)^hardVelocity
+    float knock = 100.2f;         ///< factor on the key's thump into the board (the action's knock)
+    float bodyCorner = 50.9f;     ///< Hz: under it the board's modes are held back in the sound (little net volume)
+    float highBank = 7.95f;       ///< dB on the high bank (the board above its computed modes) against the modes
+    float boardLoss = 0.539f;     ///< factor on the board's loss factor (less: the body rings longer)
+    /** @} */
     bool operator==(const PianoSpec&) const = default;
 };
 

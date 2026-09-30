@@ -68,6 +68,15 @@ groove and plateau before the breakdown and the main drop. Every section is a mu
 multiple of thirty-two; every 8-bar block changes something against the one before it; the bar before a drop empties
 -- the last beat, the last two, the whole bar, or the kick alone on four -- so that the drop lands.
 
+The intro opens on an atmosphere. The pad plays from the first bar, filtered dark, and opens over the intro; the
+effects lay a long atmosphere under it (a swell of detuned saws and noise in the key) with reverse swells into the
+16-bar lines, and in the intro's second half the arp's pattern ghosts through, filtered. Under that the DJ intro builds
+as a DJ needs it: the kick, the hats, the bass, the open hat, the percussion. A track that stands alone -- not in a set
+-- may open without the kick altogether, on the pad and the atmosphere (Progressive, Dream House and Deep often,
+Uplifting and Acid now and then); a set's tracks always start with the kick, so they can be mixed. How much sustained
+sound an intro carries was measured on the references (the sustained energy between 200 Hz and 5 kHz in the first 16
+and 32 bars against the drop) and the intros are held to it.
+
 The harmony: a key the profile favours (the roots from D to A most often), one of five progressions (i-VI-III-VII and
 its relatives; the major keys through their relative minors), the harmonic rhythm of the section, the VII in the two
 bars before every drop and its resolution on i. Acid stays on its chord and moves a fourth or a fifth every 16 bars;
@@ -191,15 +200,19 @@ time; the voice buttons switch between them.
 
 The lead plays the motif; the counter answers in the lead's held notes an octave above; the pluck plays the chords in
 syncopated sixteenths; the arp breaks them up; the pad holds them, gated in the drops and opening over the breakdown;
-the stab hits them. Which voices play in which block is the layer matrix's.
+the stab hits them in the drops (every other block of the first drop, the main drop from its second block on). Which
+voices play in which block is the layer matrix's.
 
 == Keys | piano cloud | 5 ==
 
 The piano is a physical model, not a sample: for every key a string of the length, tension and stiffness of a real
 instrument (four of them: Grand, Baby Grand, Upright and Soft, the slightly muffled piano of Dream House), one to three
 strings per note, a felt hammer, a soundboard solved as a ribbed orthotropic plate, the damper, the pedal and the
-sympathetic strings. Its stretched tuning comes from the strings' stiffness. In Dream House it plays the motif, the
-pedal down and lifted at every chord change.
+sympathetic strings. Its stretched tuning comes from the strings' stiffness. Its voicing was set note by note
+against a concert grand (Pianoteq's Steinway D): the level over the keyboard and the velocity, how bright a note is and
+how much brighter a harder blow makes it, the two stages of its decay, the action's knock and the body in the first
+moments, how fast the damper takes a note away. In Dream House it plays the motif, the pedal down and lifted at every
+chord change.
 
 The grain cloud hears the pad, the pluck and the piano and scatters them in grains into the plate -- Deep's haze and
 Dream House's breath.

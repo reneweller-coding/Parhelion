@@ -453,6 +453,40 @@ sechs Knöpfe (die Kit-Lanes ebenso).
   Progressive 14, Dream House 9, Acid 14, Deep 13 von 23. Stab jetzt 12 bis 13 % der Blöcke in Uplifting und Acid, Arp
   15 bis 16 %; Pad und Atmosphäre in jedem Intro.
 
+**Das Piano gegen Pianoteq (30.09.2026, auf Wunsch des Nutzers: "Ich befürchte, das Piano klingt noch nicht so richtig
+gut. Du kannst es gerne mit Pianoteq vergleichen und daran abstimmen").** Referenz: Pianoteq 8 (auf dem Rechner, per
+Kommandozeile `--headless --preset "NY Steinway Model D" --midi --wav`), 48 Einzeltöne C1 bis C7 bei Velocity 32, 64, 96,
+124, je 3 s gehalten, 2 s nach dem Loslassen (Tools/pianoref/notes_mid.py); Parhelion spielt dieselbe Liste mit
+parh_pianoprobe. Die Aufnahmen bleiben außerhalb des Repositorys, eingecheckt sind nur die Werkzeuge.
+- **Gemessen** (Tools/pianoref/compare.py, je Ton, beide gleich): Pegel über Tastatur und Velocity gegen C4, Schwerpunkt in
+  vier Fenstern, zweistufiger Abfall (0,3 bis 1 s, 1,5 bis 2,9 s), Partialtöne 1 bis 12 und ihr Abklingen, B, der Knock
+  der ersten 40 ms, der Abfall nach dem Loslassen, die Breite. Dazu (fit.py) die Oktavspektren je Register und der Korpus
+  (45 bis 180 Hz) der ersten 400 ms.
+- **Befund vorher**: der Dämpfer viel zu stark (28 dB mehr Abfall in 0,3 s als der Steinway), der Anschlag ohne Korpus
+  (Knock −3,9 dB, 45 bis 180 Hz ~20 dB zu leise), der Klang ab C4 zu hell und zu kurz, Bass und Diskant zu leise, die
+  Helligkeit wuchs mit der Velocity zu wenig.
+- **Geändert** (PianoDesign.h, `PianoSpec`, keine Knöpfe der Seite, sondern die eigenen Zahlen des Entwurfs; die neutralen
+  Werte dokumentiert): Filz-Faktor 0,7 und Filzhärte mit der Velocity (^0,646), Kopplung an den Steg ×0,296 (langsamerer
+  Sofortklang), Abstrahlung als Kuhschwanz (Beschleunigung unter 373 Hz, Schnelle darüber, Ende 4,5 kHz), Voicing +3,6 dB
+  am tiefsten und +7,5 dB am höchsten Ton (linear ab C4), Dämpfer 11/s bei 0,6 m und ^0,2 über die Saitenlänge (vorher
+  25/s, ^0,5), Knock ×100, Korpus-Haltepunkt 51 statt 100 Hz, hohe Bank +8 dB, Bodenverlust ×0,54. Gefittet mit
+  Nelder-Mead (12 Knöpfe, 320 Renderings, bestes Gesamtmaß 9,8; Tools/pianoref/fit.py), danach zwei von Hand: der Filz
+  1,16 → 0,7 (der Schwerpunkt näher an der Referenz, 0,54 → 0,48 Oktaven, um den Preis der Oktavspektren 6,9 → 8,0 dB und
+  der Velocity 0,23 → 0,31) und die Dämpferlänge ^0,5 → ^0,2 (der Steinway dämpft über die Tastatur fast gleich, 20 bis
+  30 dB in 0,3 s; mit ^0,5 der Bass 15, der Diskant 34 dB -- im Mittel gleich, darum sah es das Gesamtmaß nicht). Die
+  freien Saiten hören den länger klingenden Boden: kSymDrive 0,03 → 0,017 (sonst nur 4 dB unter dem Ton, der Test
+  verlangt mehr Abstand).
+- **Ergebnis** [M, Abweichung vom Steinway, vorher → nachher]: Gesamt 24,9 → 10,7; Pegelkurve 5,2 → 3,8 dB rms,
+  Schwerpunkt 0,89 → 0,48 Oktaven (spät 1,06 → 0,67), Abfall früh 7,0 → 4,1 dB/s, spät 5,3 → 3,7, Knock −3,9 → +0,2 dB,
+  Loslassen +28,3 → −0,9 dB, Oktavspektren 10,5 → 8,0 dB, Korpus 19,7 → 2,5 dB; die Velocity-Helligkeit 0,19 → 0,31
+  (etwas schlechter, der Preis für den Filz). Im Mix (Dream House Seed 7) das Piano 1 dB leiser, die Summe unverändert.
+  Die Pegelausgleiche aller Presets neu gemessen: nur die Piano-Bank ändert sich (957 von 1024, im Mittel 0,0 dB,
+  höchstens 2,1 dB), die übrigen 17 Bänke bitgleich; Handbuch und Bilder neu (die sechs Stimmen-Knöpfe, das Intro).
+  selftest 127/127, ctest 34/34.
+- **Offen**: in der Mittellage sind die Partialtöne 2 bis 5 gegen den Grundton 10 bis 15 dB stärker als beim Steinway (ein
+  Kuhschwanz erster Ordnung trifft das nicht; ob es der Boden oder Pianoteqs Mikrofonierung ist, lässt die Messung offen),
+  E4 bis C5 3 bis 7 dB zu laut, der Diskant klingt früh zu langsam ab. Hörvergleich in `out/hoeren_piano` (ignoriert).
+
 ## 0. Kurzfassung
 
 Ein Instrument, das aus einem Seed, einem Stilprofil und einer Set-Dramaturgie Trance komponiert und in Echtzeit
@@ -1050,7 +1084,8 @@ abgeschaltet. Auf der Quest weniger Partialtöne, Kopplung nur für die ersten, 
 **Messung statt Samples.** Das Modell wird an Aufnahmen **gemessen**, nicht aus ihnen gespielt: Inharmonizität,
 Abklingzeiten je Partialton, zweistufiger Abfall, Spektralschwerpunkt über der Velocity, Phantompartialtöne im Bass, aus
 Piano-Stellen der Referenzen und frei verfügbaren Einzelton-Aufnahmen (nur Statistiken, wie bei allen Referenzen). Die
-Parameterschätzung darf differenzierbar sein (Simionato et al. 2024), der Klangerzeuger bleibt physikalisch.
+Parameterschätzung darf differenzierbar sein (Simionato et al. 2024), der Klangerzeuger bleibt physikalisch. Umgesetzt
+am 30.09.2026 gegen Pianoteqs Steinway D, Ton für Ton (Tools/pianoref; "Das Piano gegen Pianoteq" im Stand der Umsetzung).
 
 Dazu, im Arrangement: Achtel- oder punktiertes Delay mit 25 bis 35 % Feedback, Hall 2 bis 4 s, ein Oktav-Layer aus dem Pad
 (Dok. 5).
