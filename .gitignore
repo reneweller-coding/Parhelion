@@ -12,3 +12,4 @@ __pycache__/
 Tools/refs_audio/
 Deploy/stage/
 build-release*.log
+Deploy/out/

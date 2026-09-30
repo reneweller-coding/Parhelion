@@ -83,6 +83,7 @@ struct NoteEvent {
     int shift = 0;            ///< a kit hit's pitch shift in semitones
     bool accent = false;      ///< the 303's accent (Synth.h)
     bool slide = false;       ///< slides into the next note (Synth.h)
+    uint8_t voice = 0;        ///< 0 the part's line; 1 an accompaniment under it (the piano's left hand), not its melody
 };
 
 /** @brief How a curve moves between its two values. */

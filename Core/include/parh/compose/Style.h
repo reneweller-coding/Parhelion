@@ -65,6 +65,7 @@ struct StyleProfile {
     int ambientIntroBars = 16;                          ///< how many (16 .. 64; measured: Dream House 40 .. 70)
     float ambientOutro = 0.0f;                          ///< chance the outro ends in bars without a kick
     float gapLu = 2.5f;                                 ///< the main breakdown's loudest 3 s under the drop's (measured, PLAN 13.4)
+    float introSynthDb = 0.0f;                          ///< the synths' bus in the intro against the drop's, dB (Phase 8, measured)
     // Harmony (Dok. 4).
     float minor = 0.85f;                                ///< chance of a minor key (Knees et al.: 84.8 %)
     std::array<float, static_cast<int>(Scale::Count)> scales{};   ///< the minor modes' weights (Ionian: a major key)

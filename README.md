@@ -7,7 +7,7 @@ its detuned neighbours, which is what the JP-8000's supersaw is.
 
 ![Parhelion](docs/screenshot.png)
 
-**State (30.09.2026): Phases 0 to 7.** The frame (copied modules with their origin in every header), the parameter
+**State (30.09.2026): version 1.0.0, Phases 0 to 8** ([release notes](docs/RELEASE_NOTES.md)). The frame (copied modules with their origin in every header), the parameter
 system, the score with sections, the layer matrix and the ghost kick, the deck with kick, sub, mid-bass, 303, a
 twelve-lane kit, six polyphonic voices (Phosphene's JP-8000 supersaw, VA, FM and wavetable, the circuit filters, the
 trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master.
@@ -67,6 +67,14 @@ The manual: `parh_render --dump-params`, the screenshots of every page and `Tool
 python Tools/manual/make_shots.py
 python Tools/manual/make_manual.py
 python Tools/manual/make_preview.py
+```
+
+A release -- the build with Intel's icx where oneAPI is installed (else MSVC), static runtime, the tests, pluginval,
+the screenshots and the manual from that build, a checked stage, checksums, a portable zip and the setup (Inno Setup),
+with `-Quest` the Meta Quest APK beside them -- lands in `Deploy/out`:
+
+```
+powershell -ExecutionPolicy Bypass -File Deploy\build_release.ps1 -Quest
 ```
 
 ## Render

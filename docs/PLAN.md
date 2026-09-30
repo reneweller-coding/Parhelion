@@ -24,8 +24,8 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 7 gebaut (30.09.2026; die Quest ohne Headset: gebaut, auf
-dem Gerät noch nicht gelaufen); als nächstes 8, Qualität und Release.**
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 8 gebaut, Version 1.0.0 (30.09.2026; die Quest ohne Headset:
+gebaut, auf dem Gerät noch nicht gelaufen). Offen: die Hörrunden des Nutzers, die Messung auf der Quest.**
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
@@ -539,6 +539,37 @@ auf dem Gerät und seine Messung bleiben offen (Quest/README.md, "On the headset
   seine Übersetzung ausführt; das AVD des Nutzers schreibgeschützt gestartet) **parh_vectest 10 von 10** -- der vom NDK
   übersetzte NEON-Pfad bitgleich zum skalaren (Kit, Poly-Lanes, neun Filtermodelle mit Modulation, Piano, Streicher).
 - selftest 135/135, ctest 36/36 (neu: testHandover, testQuestSounds), pluginval Strenge 10.
+
+**Phase 8, Qualität und Release (30.09.2026).** Nachkalibrierung, Release-Gerüst, Version 1.0.0. Die Hörrunden sind die
+des Nutzers.
+- **Progressive, der Anstieg ins Tiefe** [M]: die Kick kam nach dem Breakdown 31 bis 44 dB über dem Tiefband (40 bis
+  120 Hz) zurück, die Referenzen 4 bis 20. Nicht der Drop, der Build: der tiefe Grundton des Pads im Breakdown lag
+  E2 .. D#3, Grundtöne über 120 Hz fielen aus dem Band, es schwankte 15 dB mit den Akkorden. Jetzt A1 .. G#2 und der
+  Hochpass des Pads im Breakdown bei 40 statt 70 Hz: **14 dB** (Seeds 1 und 3; Runde 11 alle drei Stile mit Breakdown
+  im Korridor). Verworfen: der Sub gehalten im Höhepunkt des Breakdowns (das gewählte Sub-Preset ist ein Pluck, gehalten
+  klingt er nicht; und er verdrängte den Grundton des Pads).
+- **Dream House, die Tiefmitten** [M]: 150 bis 400 Hz unter dem Korridor auf allen drei Tracks. Befunde: das Piano,
+  Träger der Melodie, lag im Drop 20 dB unter dem Mix -- der Leveler misst es an seiner Spitze, und nach der Abstimmung
+  gegen Pianoteq steht sein Hammer weit über seinem Körper; es spielte nur die Melodie, einstimmig, fast ganz über
+  400 Hz; ein tieflastiges Kick-Preset trug allein 43 % der Energie zwischen 60 und 150 Hz. Geändert: **die linke Hand
+  des Pianos** (Grundton und Quinte im Tenor, C3 .. H3, je Akkord gehalten, als Begleitung markiert:
+  NoteEvent::voice, damit Counter und Geigen nur die Melodie lesen), das Fenster des Pianos gegen die Kick −9..−3 →
+  −5..−1 dB, kickSoft 0,3 → 0,45 (die Kick kürzer, die Stimmen 0,9 dB weiter vorn), die Breite des Pianos 0,7 → 0,4
+  (lauter machte es das Bild breiter als die Referenzen). b150_400 0,106/0,127/0,064 → 0,134/0,147/0,087, die Breite
+  wieder im Korridor (zwei von drei). Offen: das Tiefband der Kick, die obersten Oktaven (Dream House dunkler als seine
+  Referenzen).
+- **Die Intros** [M]: die Synths im Intro unter denen des Drops, je Stil (StyleProfile::introSynthDb: Deep −6,
+  Progressive −3, Uplifting und Dream House −1 dB), über die letzten acht Takte des Intros zurück. Deeps gehaltener
+  Klang im Intro lag bis 8 dB über den Referenzen, jetzt in ihrem Bereich (bis auf einen Track in Takt 17 bis 32).
+- **Kalibrierung Runde 11** (23 Maße, drei Seeds): Uplifting 16 (vorher 14), Progressive 16 (14), Dream House 9 (9),
+  Acid 14 (14), Deep 14 (13). Offen: Deeps Lautheitsspanne (LRA 4,6 bis 5,7, die Referenzen 7,6 bis 12: die DJ-Intros
+  mit Kick tragen die Lautheit, die Referenzen sind dynamischer), Dream House (siehe oben).
+- **Das Release** (Deploy/build_release.ps1, Deploy/Parhelion.iss, nach Totality 459cc33): Build mit icx (oneAPI) oder
+  MSVC, statische Laufzeit, Tests, pluginval Strenge 10, Screenshots, Vorschaubild und Handbuch aus diesem Build, Stage
+  mit Prüfung (keine Laufzeit-DLL), SHA256SUMS, portables Zip, Setup (Inno Setup 7; neue AppId), mit `-Quest` das APK
+  daneben. docs/RELEASE_NOTES.md. Version 1.0.0 (die project()-Zeile: Plugin, Renderer, Rekordbox-Export, Quest).
+- Nicht gebaut: das "Jetzt" des Plugins über die Übergabe der Quest (der Parameterspeicher des Plugins gehört der einen
+  Engine; Host-Sprünge, Tempowechsel und das Laden eines Sets müssten eine laufende Übergabe abbrechen).
 
 ## 0. Kurzfassung
 

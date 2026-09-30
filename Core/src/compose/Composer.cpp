@@ -208,13 +208,15 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
             first = false;
             prev = v;
             for (int k = 0; k < 4; ++k) note(4.0 * bar, 4.0 * len - 0.05, Part::Pad, v[static_cast<size_t>(k)], 0.75f);
-            // In a breakdown without the sub the pad takes the low end the kick and the bass leave: its root an octave
-            // under the chord (E2 .. D#3). (Tools/eval_report.py, 29.09.2026: under 150 Hz the breakdowns were empty,
-            // the drop's low band rose 36 to 51 dB, the references' 3 to 40.)
+            // In a breakdown without the sub the pad takes the low end the kick and the bass leave: its root under the
+            // chord, A1 .. G#2 (Phase 8: E2 .. D#3 before, whose roots over 120 Hz left the low band -- it swung 15 dB
+            // with the chords, and the kick came back 31 to 44 dB over it in Progressive, the references 4 to 20).
+            // (Tools/eval_report.py, 29.09.2026: under 150 Hz the breakdowns were empty, the drop's low band rose 36 to
+            // 51 dB, the references' 3 to 40.)
             const int sec = plan.sectionAt(bar);
             const SectionKind kind = sec >= 0 ? plan.sections[static_cast<size_t>(sec)].kind : SectionKind::Groove;
             if ((kind == SectionKind::Breakdown || kind == SectionKind::Break) && plan.at(bar, Layer::Sub) == LayerState::Off)
-                note(4.0 * bar, 4.0 * len - 0.05, Part::Pad, atOrAbove(harm.pc(bar, 0), 40), 0.6f);
+                note(4.0 * bar, 4.0 * len - 0.05, Part::Pad, atOrAbove(harm.pc(bar, 0), 33), 0.6f);
             bar += len;
         }
     }
@@ -223,6 +225,29 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
     writeArp(mc, stream("arp"), prof.bpmHigh < 125.0f);
     writeLead(mc, stream("motif"), stream("lead"));
     writeCounter(mc, mixSeed(stream("lead"), 0x434F55ull));   // "COU"
+    // The piano's left hand (Phase 8, Dream House: the motif alone left 150 .. 400 Hz under the references' corridor on
+    // every track): where the piano plays its motif (the lead's cell on), the chord's root and fifth held in the tenor,
+    // C3 .. B3, struck again with every chord and every four bars, softer than the melody. Written after the counter,
+    // which answers the melody's held notes, and marked as the accompaniment (NoteEvent::voice) for what reads the
+    // melody later (the violins at the breakdown's peak).
+    if (mc.piano) {
+        int bar = 0;
+        while (bar < plan.bars) {
+            if (plan.at(bar, Layer::Lead) != LayerState::On) { ++bar; continue; }
+            int len = 1;
+            while (bar + len < plan.bars && plan.at(bar + len, Layer::Lead) == LayerState::On && (bar + len) % 4 != 0
+                   && harm.pc(bar + len, 0) == harm.pc(bar, 0) && harm.pc(bar + len, 2) == harm.pc(bar, 2))
+                ++len;
+            const int rootNote = atOrAbove(harm.pc(bar, 0), 48);
+            const int fifthNote = rootNote + (harm.pc(bar, 2) - harm.pc(bar, 0) + 12) % 12;
+            for (const auto& [pitch, vel] : { std::pair<int, float>{ rootNote, 0.5f }, std::pair<int, float>{ fifthNote, 0.45f } }) {
+                const size_t before = sc.notes.size();
+                mc.note(4.0 * bar, 4.0 * len - 0.1, Part::Piano, pitch, vel);
+                if (sc.notes.size() > before) sc.notes.back().voice = 1;
+            }
+            bar += len;
+        }
+    }
 
 
     // ------------------------------------------------------------------------------------------ the orchestra
@@ -262,7 +287,7 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
             // The violins with the melody at the peak (an octave up where it lies low).
             std::vector<NoteEvent> melody;
             for (const NoteEvent& n : sc.notes)
-                if ((n.part == Part::Lead || n.part == Part::Piano) && n.beat >= 4.0 * main->peak && n.beat < 4.0 * main->end) melody.push_back(n);
+                if ((n.part == Part::Lead || n.part == Part::Piano) && n.voice == 0 && n.beat >= 4.0 * main->peak && n.beat < 4.0 * main->end) melody.push_back(n);
             for (const NoteEvent& n : melody) note(n.beat, std::max(n.length, 0.3), Part::Strings, n.pitch < 67 ? n.pitch + 12 : n.pitch, 0.7f);
             // A soft stroke on the timpani where the peak begins.
             note(4.0 * main->peak, 1.0, Part::Timpani, atOrAbove(harm.pc(main->peak, 0), 40), 0.5f);
@@ -406,6 +431,9 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         if (!pickSounds) knob(p.id(Module::Piano, 0, piano::Instrument), u < 0.6f ? 3.0f : u < 0.85f ? 2.0f : 0.0f);
         const int pedal = p.id(Module::Piano, 0, piano::Pedal);
         knob(pedal, 1.0f);
+        // Its listening points closer (Phase 8): at 0.7 the piano, up front with its left hand, made the mix wider above
+        // 200 Hz than the references (side against mid -3 .. -5 dB, theirs -6 .. -10).
+        knob(p.id(Module::Piano, 0, piano::Width), 0.4f);
         for (int bar = 1; bar < plan.bars; ++bar)
             if (harm.pc(bar, 0) != harm.pc(bar - 1, 0) || harm.pc(bar, 1) != harm.pc(bar - 1, 1)) {
                 ramp(pedal, 4.0 * bar - 0.05, 0.04, 0.0f, -1.0f, GestureShape::Linear);
@@ -471,12 +499,12 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         const bool breakdown = s.kind == SectionKind::Breakdown || s.kind == SectionKind::Break;
         // The hall (Dok. 7: 2 to 4 s and more in the breakdown, 0.8 to 1.5 s in the drop).
         step(hallDecay, s.beat, breakdown ? hallBreak : s.kind == SectionKind::Drop ? hallDrop : hallMid);
-        // The pad's high pass: down to 70 Hz where the kick and the sub rest (a breakdown, a break), so its body and its
-        // root there are heard; its floor again where they return.
+        // The pad's high pass: down to 40 Hz where the kick and the sub rest (a breakdown, a break), so its body and its
+        // root there (A1 .. G#2) are heard; its floor again where they return.
         {
             const int padHp = polyId(PolyInstance::Pad, poly::HpFloor);
             const bool open = (s.kind == SectionKind::Breakdown || s.kind == SectionKind::Break) && plan.at(bar, Layer::Sub) == LayerState::Off;
-            step(padHp, s.beat, open ? off(padHp, 70.0f) : 0.0f);
+            step(padHp, s.beat, open ? off(padHp, 40.0f) : 0.0f);
         }
         // The pad's filter: filtered in a groove (its cell says so), opening through a breakdown and its build -- and
         // through the intro (30.09.2026: the atmosphere; a beatless opening and the DJ intro after it one ramp, below).
@@ -488,6 +516,21 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
         const float down = off(synthLevel, p.get(synthLevel) - 3.0f);
         if (breakdown) step(synthLevel, s.beat, down);
         else if (s.kind == SectionKind::Build) ramp(synthLevel, s.beat, s.length, down, 0.0f, GestureShape::EaseIn);
+        else if (s.kind == SectionKind::Intro && prof.introSynthDb < 0.0f) {
+            // The intro under the drop's synths (Phase 8: the sustained sound of the intros -- the pad, the atmosphere --
+            // lay up to 8 dB over the references' in Deep, 3 in Progressive; StyleProfile::introSynthDb), rising over the
+            // last intro's last eight bars to the groove.
+            const float low = off(synthLevel, p.get(synthLevel) + prof.introSynthDb);
+            const bool last = si + 1 >= plan.sections.size() || plan.sections[si + 1].kind != SectionKind::Intro;
+            if (last && s.length > 32.0) {
+                step(synthLevel, s.beat, low);
+                ramp(synthLevel, s.beat + s.length - 32.0, 32.0, low, 0.0f, GestureShape::EaseIn);
+            } else if (last) {
+                ramp(synthLevel, s.beat, s.length, low, 0.0f, GestureShape::EaseIn);
+            } else {
+                step(synthLevel, s.beat, low);
+            }
+        }
         else step(synthLevel, s.beat, 0.0f);
         // The pump.
         if (!kickHere && !plan.beatless) {

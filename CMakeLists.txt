@@ -9,7 +9,7 @@
 #
 # Copied from Totality's root CMakeLists.txt at 4d3c0d2 (29.09.2026), which was built after Ephemeris's; the rules are theirs.
 cmake_minimum_required(VERSION 3.22)
-project(Parhelion VERSION 0.1.0 LANGUAGES C CXX)
+project(Parhelion VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

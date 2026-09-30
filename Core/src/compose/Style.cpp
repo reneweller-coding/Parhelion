@@ -36,7 +36,7 @@ using Mx = std::array<float, 5>;                               // Uplifting, Pro
 const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
     { .name = "Uplifting", .bpmLow = 136.0f, .bpmHigh = 140.0f, .minutesLow = 7.5f, .minutesHigh = 9.5f,
       .breakdownLow = 0.1f, .breakdownHigh = 0.26f, .forms = Fo{ 1, 0, 0, 0, 0 }, .introBars = 32, .outroBars = 32, .introLong = 0.5f,
-      .ambientIntro = 0.25f, .ambientIntroBars = 16, .ambientOutro = 0.1f, .gapLu = 2.0f,
+      .ambientIntro = 0.25f, .ambientIntroBars = 16, .ambientOutro = 0.1f, .gapLu = 2.0f, .introSynthDb = -1.0f,
       .minor = 0.85f, .scales = Sc{ 0.75f, 0.05f, 0.15f, 0.0f, 0.05f, 0.0f }, .progressions = Pr{ 0.5f, 0.15f, 0.0f, 0.15f, 0.2f },
       .barsPerChord = 1, .barsPerChordBreak = 2, .keyChange = 0.25f,
       .bass = Ba{ 0.15f, 0.5f, 0.35f, 0.0f, 0.0f, 0.0f }, .hats16 = 0.7f, .ride = 0.8f, .perc = 0.5f, .shaker = 0.4f,
@@ -44,7 +44,7 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .hallBreakS = 6.0f, .hallDropS = 1.5f, .bassDuckDb = 10.0f, .padDuckDb = 4.0f, .targetLufs = -8.0f, .mix = Mx{ 1, 0, 0, 0, 0 } },
     { .name = "Progressive", .bpmLow = 128.0f, .bpmHigh = 138.0f, .minutesLow = 7.0f, .minutesHigh = 9.5f,
       .breakdownLow = 0.07f, .breakdownHigh = 0.24f, .forms = Fo{ 0.1f, 0, 0, 0.9f, 0 }, .introBars = 32, .outroBars = 32, .introLong = 0.5f,
-      .ambientIntro = 0.6f, .ambientIntroBars = 24, .ambientOutro = 0.6f, .gapLu = 3.0f,
+      .ambientIntro = 0.6f, .ambientIntroBars = 24, .ambientOutro = 0.6f, .gapLu = 3.0f, .introSynthDb = -3.0f,
       .minor = 0.85f, .scales = Sc{ 0.55f, 0.3f, 0.05f, 0.0f, 0.1f, 0.0f }, .progressions = Pr{ 0.2f, 0.4f, 0.0f, 0.2f, 0.2f },
       .barsPerChord = 2, .barsPerChordBreak = 4, .keyChange = 0.0f,
       .bass = Ba{ 0.2f, 0.5f, 0.1f, 0.2f, 0.0f, 0.0f }, .hats16 = 0.5f, .ride = 0.5f, .perc = 0.8f, .shaker = 0.6f,
@@ -52,10 +52,10 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .hallBreakS = 3.0f, .hallDropS = 1.2f, .bassDuckDb = 6.5f, .padDuckDb = 3.0f, .targetLufs = -8.0f, .mix = Mx{ 0, 1, 0, 0, 0 } },
     { .name = "Dream House", .bpmLow = 134.0f, .bpmHigh = 140.0f, .minutesLow = 6.0f, .minutesHigh = 8.0f,
       .breakdownLow = 0.0f, .breakdownHigh = 0.12f, .forms = Fo{ 0, 1, 0, 0, 0 }, .introBars = 16, .outroBars = 16, .introLong = 0.3f,
-      .ambientIntro = 0.85f, .ambientIntroBars = 48, .ambientOutro = 0.1f, .gapLu = 6.3f,
+      .ambientIntro = 0.85f, .ambientIntroBars = 48, .ambientOutro = 0.1f, .gapLu = 6.3f, .introSynthDb = -1.0f,
       .minor = 0.8f, .scales = Sc{ 0.8f, 0.1f, 0.1f, 0.0f, 0.0f, 0.0f }, .progressions = Pr{ 0.3f, 0.2f, 0.1f, 0.4f, 0.0f },
       .barsPerChord = 1, .barsPerChordBreak = 2, .keyChange = 0.0f,
-      .bass = Ba{ 0.2f, 0.5f, 0.3f, 0.0f, 0.0f, 0.0f }, .hats16 = 0.3f, .ride = 0.3f, .perc = 0.3f, .shaker = 0.3f, .kickSoft = 0.3f,
+      .bass = Ba{ 0.2f, 0.5f, 0.3f, 0.0f, 0.0f, 0.0f }, .hats16 = 0.3f, .ride = 0.3f, .perc = 0.3f, .shaker = 0.3f, .kickSoft = 0.45f,
       .lead = LeadKind::Piano, .pluck = 0.3f, .arp = 0.45f, .stab = 0.2f, .counter = 0.2f, .gate = 0.3f, .orchestra = 0.25f, .hatsDb = 4.0f, .tiltDb = 1.5f,
       .hallBreakS = 3.0f, .hallDropS = 1.2f, .bassDuckDb = 8.0f, .padDuckDb = 3.0f, .targetLufs = -10.0f, .mix = Mx{ 0, 0, 1, 0, 0 } },
     { .name = "Acid", .bpmLow = 130.0f, .bpmHigh = 140.0f, .minutesLow = 6.0f, .minutesHigh = 9.0f,
@@ -68,7 +68,7 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .hallBreakS = 1.5f, .hallDropS = 0.8f, .bassDuckDb = 4.5f, .padDuckDb = 3.0f, .targetLufs = -8.5f, .mix = Mx{ 0, 0, 0, 1, 0 } },
     { .name = "Deep", .bpmLow = 128.0f, .bpmHigh = 134.0f, .minutesLow = 6.5f, .minutesHigh = 10.0f,
       .breakdownLow = 0.1f, .breakdownHigh = 0.32f, .forms = Fo{ 0, 0, 0, 0, 1 }, .introBars = 16, .outroBars = 16, .introLong = 0.5f,
-      .ambientIntro = 0.5f, .ambientIntroBars = 16, .ambientOutro = 0.8f, .gapLu = 4.0f,
+      .ambientIntro = 0.5f, .ambientIntroBars = 16, .ambientOutro = 0.8f, .gapLu = 4.0f, .introSynthDb = -6.0f,
       .minor = 0.75f, .scales = Sc{ 0.5f, 0.35f, 0.0f, 0.15f, 0.0f, 0.0f }, .progressions = Pr{ 0.3f, 0.3f, 0.0f, 0.4f, 0.0f },
       .barsPerChord = 2, .barsPerChordBreak = 4, .keyChange = 0.0f,
       .bass = Ba{ 0.2f, 0.5f, 0.0f, 0.2f, 0.0f, 0.1f }, .hats16 = 0.2f, .ride = 0.1f, .perc = 0.6f, .shaker = 0.8f, .kickSoft = 0.8f,
@@ -111,6 +111,7 @@ StyleProfile morphProfile(const StyleProfile& a, const StyleProfile& b, float t)
     o.ambientIntroBars = static_cast<int>(std::lround(lerp(static_cast<float>(a.ambientIntroBars), static_cast<float>(b.ambientIntroBars), t) / 8.0f)) * 8;
     o.ambientOutro = lerp(a.ambientOutro, b.ambientOutro, t);
     o.gapLu = lerp(a.gapLu, b.gapLu, t);
+    o.introSynthDb = lerp(a.introSynthDb, b.introSynthDb, t);
     o.minor = lerp(a.minor, b.minor, t);
     o.scales = mixArrays(a.scales, b.scales, t);
     o.progressions = mixArrays(a.progressions, b.progressions, t);

@@ -232,7 +232,10 @@ void balanceWindow(int part, int role, float& lo, float& hi)
     case BalPart::Arp:     lo = -13.0f; hi = -8.0f;  return;
     case BalPart::Pad:     lo = -13.0f; hi = -8.0f;  return;
     case BalPart::Stab:    lo = -12.0f; hi = -7.0f;  return;
-    case BalPart::Piano:   lo = -9.0f;  hi = -3.0f;  return;
+    // The piano by its loudest sample reads its hammer: after the voicing against Pianoteq (Phase 8; the knock, the
+    // harder felt) its attack stands far over its body, which at -9 .. -3 sat 20 dB under the mix in Dream House, whose
+    // melody it carries (and the low mids, 150 .. 400 Hz, under the references' corridor).
+    case BalPart::Piano:   lo = -5.0f;  hi = -1.0f;  return;
     case BalPart::Strings: lo = -16.0f; hi = -10.0f; return;   // (sustained: their energy is more than their peak says)
     case BalPart::Choir:   lo = -17.0f; hi = -11.0f; return;
     case BalPart::Brass:   lo = -10.0f; hi = -4.0f;  return;
