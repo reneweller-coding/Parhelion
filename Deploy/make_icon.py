@@ -1,6 +1,7 @@
 """Parhelion's icon (Phase 6): the sun with its 22-degree halo and the two sun dogs on it, on a night-blue ground.
 
-    python Deploy/make_icon.py        # writes Deploy/parhelion.png (512), parhelion_256.png and parhelion.ico
+    python Deploy/make_icon.py        # writes Deploy/parhelion.png (512), parhelion_256.png and parhelion.ico,
+                                      # and the Quest's launcher icons, Quest/res/mipmap-*/ic_launcher.png (Phase 7)
 
 Drawn in code from circles and gradients, supersampled four times; nothing is taken from elsewhere.
 """
@@ -74,7 +75,12 @@ def main():
     big.save(HERE / "parhelion.png")
     out.resize((256, 256), Image.LANCZOS).save(HERE / "parhelion_256.png")
     big.save(HERE / "parhelion.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-    print("wrote Deploy/parhelion.png, parhelion_256.png, parhelion.ico")
+    # The Quest's launcher icon at Android's five densities (48 dp).
+    for name, size in (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)):
+        d = HERE.parent / "Quest" / "res" / ("mipmap-" + name)
+        d.mkdir(parents=True, exist_ok=True)
+        out.resize((size, size), Image.LANCZOS).save(d / "ic_launcher.png")
+    print("wrote Deploy/parhelion.png, parhelion_256.png, parhelion.ico and Quest/res/mipmap-*/ic_launcher.png")
 
 
 if __name__ == "__main__":

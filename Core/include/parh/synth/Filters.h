@@ -55,6 +55,13 @@ constexpr int kFilterModels = static_cast<int>(FilterModel::Count);
 #define PARH_FILTER_NEWTON 3
 #endif
 constexpr int kNewton = PARH_FILTER_NEWTON;   ///< Newton iterations per sample (fixed: the same on every lane path)
+/**
+ * @brief The Quest's (Phase 7, Deck::setQuest): one step from the last sample's solution, for the polyphonic voices. On
+ *        the stems of five tracks within 0.3 dB and an octave spectrum within 0.35 dB of kNewton's; the voices' time on
+ *        the NEON lanes 5.5 -> 3.6 % of a core in a set (PLAN, "Die Quest"). Not for the 303: its diode ladder with a
+ *        fast envelope needs the three (one: +3 dB, three times as bright).
+ */
+constexpr int kNewtonLight = 1;
 
 /** @brief tanh by Lambert's continued fraction (7th order), exact to 1e-7 inside +-4.97 and held there. */
 template <class V>
@@ -86,10 +93,10 @@ PARH_FORCE_INLINE V fpow2(V x)
  * @return   the fourth stage
  */
 template <class V>
-PARH_FORCE_INLINE V ladderMoog(V* v, V* s, V x, V g, V k)
+PARH_FORCE_INLINE V ladderMoog(V* v, V* s, V x, V g, V k, int iters = kNewton)
 {
     const V one = lanes<V>(1.0f);
-    for (int it = 0; it < kNewton; ++it) {
+    for (int it = 0; it < iters; ++it) {
         const V tx = ftanh(x - k * v[3]);
         const V t0 = ftanh(v[0]), t1 = ftanh(v[1]), t2 = ftanh(v[2]), t3 = ftanh(v[3]);
         const V F0 = v[0] - s[0] - g * (tx - t0), F1 = v[1] - s[1] - g * (t0 - t1);
@@ -118,11 +125,11 @@ PARH_FORCE_INLINE V ladderMoog(V* v, V* s, V x, V g, V k)
  *        notch phaser; the cascade's input a0 and its four stages), else the fourth stage.
  */
 template <class V>
-PARH_FORCE_INLINE V otaCascade(V* v, V* s, V x, V g, V k, float d, float r, int mix = 0)
+PARH_FORCE_INLINE V otaCascade(V* v, V* s, V x, V g, V k, float d, float r, int mix = 0, int iters = kNewton)
 {
     const V one = lanes<V>(1.0f), D = lanes<V>(d), Di = lanes<V>(1.0f / d), R = lanes<V>(r), Ri = lanes<V>(1.0f / r);
     V a0 = x;
-    for (int it = 0; it < kNewton; ++it) {
+    for (int it = 0; it < iters; ++it) {
         const V tr = ftanh(R * v[3]);
         a0 = x - k * tr * Ri;
         const V e0 = ftanh(D * (a0 - v[0])), e1 = ftanh(D * (v[0] - v[1])), e2 = ftanh(D * (v[1] - v[2])), e3 = ftanh(D * (v[2] - v[3]));
@@ -165,14 +172,14 @@ PARH_FORCE_INLINE V otaCascade(V* v, V* s, V x, V g, V k, float d, float r, int 
  *        (@p toBand).
  */
 template <class V>
-PARH_FORCE_INLINE V svfNonlinear(V* v, V* s, V x, V g, V R, float L, float a, V morph, bool toBand = false)
+PARH_FORCE_INLINE V svfNonlinear(V* v, V* s, V x, V g, V R, float L, float a, V morph, bool toBand = false, int iters = kNewton)
 {
     const V one = lanes<V>(1.0f), Lv = lanes<V>(L), Li = lanes<V>(1.0f / L), A = lanes<V>(a);
     const V off = Lv * ftanh(A);
     const V two = lanes<V>(2.0f);
     const V lb = lanes<V>(1.5f), lbi = lanes<V>(1.0f / 1.5f);
     auto damp = [&](V b) { return two * R * b + b - lb * ftanh(b * lbi); };
-    for (int it = 0; it < kNewton; ++it) {
+    for (int it = 0; it < iters; ++it) {
         const V tq = ftanh(v[0] * lbi);
         const V h = x - damp(v[0]) - v[1];
         const V th = ftanh(vfmadd(h, Li, A)), tb = ftanh(vfmadd(v[0], Li, A));
@@ -201,10 +208,10 @@ PARH_FORCE_INLINE V svfNonlinear(V* v, V* s, V x, V g, V R, float L, float a, V 
  *        v3' = 2 w T(v2 - v3). Linear, it oscillates at k = 17 and sqrt 2 times w: the caller passes w / sqrt 2.
  */
 template <class V>
-PARH_FORCE_INLINE V diodeLadder(V* v, V* s, V x, V g, V k)
+PARH_FORCE_INLINE V diodeLadder(V* v, V* s, V x, V g, V k, int iters = kNewton)
 {
     const V one = lanes<V>(1.0f), g2 = g + g;
-    for (int it = 0; it < kNewton; ++it) {
+    for (int it = 0; it < iters; ++it) {
         const V u = x - k * v[3];
         const V ti = ftanh(u - v[0]), t01 = ftanh(v[0] - v[1]), t12 = ftanh(v[1] - v[2]), t23 = ftanh(v[2] - v[3]);
         const V r0 = -(v[0] - s[0] - g * (ti - t01)), r1 = -(v[1] - s[1] - g * (t01 - t12));
@@ -245,10 +252,10 @@ PARH_FORCE_INLINE V diodeLadder(V* v, V* s, V x, V g, V k)
  *        q1 = B: A = q0 + D(K q1), q0' = w (x - 2A + q1), q1' = w (A - q1). Linear, it oscillates at K = 3.
  */
 template <class V>
-PARH_FORCE_INLINE V korg35(V* v, V* s, V x, V g, V K)
+PARH_FORCE_INLINE V korg35(V* v, V* s, V x, V g, V K, int iters = kNewton)
 {
     const V one = lanes<V>(1.0f), two = lanes<V>(2.0f);
-    for (int it = 0; it < kNewton; ++it) {
+    for (int it = 0; it < iters; ++it) {
         const V dq = ftanh(K * v[1]);
         const V A = v[0] + dq;
         const V F0 = v[0] - s[0] - g * (x - two * A + v[1]), F1 = v[1] - s[1] - g * (A - v[1]);

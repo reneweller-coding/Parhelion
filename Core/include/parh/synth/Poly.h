@@ -202,10 +202,14 @@ public:
      * limit decides which slots a note sets up, so changing it while notes sound would leave the
      * running notes with slots the render loop no longer sums.
      */
-    void setQuality(int unison, int voices)
+    void setQuality(int unison, int voices, int filterSteps = kNewton)
     {
         unisonLimit_ = unison < 1 ? 1 : (unison > kPolyUnison ? kPolyUnison : unison);
         voiceLimit_ = voices < 1 ? 1 : (voices > kPolyVoices ? kPolyVoices : voices);
+        // The Quest's filter models (Phase 7): fewer Newton steps a sample, where the models were two thirds of the
+        // voices' time on its NEON lanes (Filters.h, kNewtonLight); reset() keeps them.
+        filterSteps_ = filterSteps < 1 ? 1 : filterSteps;
+        ch_.newton = filterSteps_;
     }
     /** @brief Oscillators per voice this instance plays. */
     int unisonLimit() const { return unisonLimit_; }
@@ -439,6 +443,7 @@ private:
      */
     double driftFactorHeld_[kPolySlots] = {};
     double lastPitch_ = -1.0;                 ///< the instance's last sounding pitch, < 0 before the first note
+    int filterSteps_ = kNewton;               ///< the filter models' Newton steps a sample (setQuality; reset() keeps them)
     int    newest_ = 0;                       ///< the voice that started last: the one lastPitch_ follows
     float  glideAlpha_ = 0.0f;                ///< one-pole coefficient of the slew, per kPolyBlock step
     float  glideMs_ = 0.0f;                   ///< poly.glide: 0 switches the whole mechanism off

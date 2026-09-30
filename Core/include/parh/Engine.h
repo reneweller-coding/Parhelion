@@ -71,6 +71,8 @@ public:
     const Score& score() const { return decks_[0].score(); }
     /** @brief Current position in seconds. */
     double seconds() const { return static_cast<double>(sample_) / sampleRate_; }
+    /** @brief Current position in samples (Handover.h: two engines meet on it). */
+    int64_t samplePosition() const { return sample_; }
     /** @brief Current position in beats. */
     double beat() const { return tempo_.beatAt(seconds()); }
     /** @brief Length of the track or set in seconds. */

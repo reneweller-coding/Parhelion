@@ -82,10 +82,11 @@ void Deck::prepare(const ParamStore* params, double sampleRate, int index)
 void Deck::setQuest(bool on)
 {
     cellFresh_ = true;   // (the engines' limits are set; the next cell hands every module over again)
-    // The Quest's share (PLAN 10): three unison oscillators and four voices a voice, the pad five and six.
+    // The Quest's share (PLAN 10): three unison oscillators and four voices a voice, the pad five and six; their filter
+    // models with one Newton step (Phase 7, Filters.h kNewtonLight; the 303 keeps its three).
     for (int i = 0; i < kPolyInstances; ++i) {
         const bool pad = i == static_cast<int>(PolyInstance::Pad);
-        poly_[i].setQuality(on ? (pad ? 5 : 3) : kPolyUnison, on ? (pad ? 6 : 4) : kPolyVoices);
+        poly_[i].setQuality(on ? (pad ? 5 : 3) : kPolyUnison, on ? (pad ? 6 : 4) : kPolyVoices, on ? kNewtonLight : kNewton);
     }
     piano_.setVoiceLimit(on ? 10 : Piano::kVoices);
     // The orchestra's share: half the players and singers -- as limits on the knobs (the next cell hands them over).

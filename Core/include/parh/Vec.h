@@ -21,6 +21,8 @@
  * **Path selection**, first match wins:
  *  - @c PARH_FORCE_SCALAR: scalar (test variant)
  *  - @c PARH_NEON_SHIM or an ARM target: NEON (on x86 through Tests/neonshim/arm_neon.h)
+ *  - @c PARH_NEON_BENCH: NEON on SSE's lanes, to time the Quest's path on the desktop (Tests/neonbench/arm_neon.h; not
+ *    bit-exact, the fused forms are unfused there)
  *  - @c __AVX2__: AVX2 + FMA
  *  - otherwise scalar
  *
@@ -38,7 +40,7 @@
  *  @brief The vector path this translation unit is built for: 0 scalar, 1 AVX2, 2 NEON. */
 #if defined(PARH_FORCE_SCALAR)
   #define PARH_VEC_PATH 0
-#elif defined(PARH_NEON_SHIM) || defined(__aarch64__) || defined(_M_ARM64) || defined(__ARM_NEON) || defined(__ARM_NEON__)
+#elif defined(PARH_NEON_SHIM) || defined(PARH_NEON_BENCH) || defined(__aarch64__) || defined(_M_ARM64) || defined(__ARM_NEON) || defined(__ARM_NEON__)
   #define PARH_VEC_PATH 2
   #include <arm_neon.h>
 #elif defined(__AVX2__)
@@ -123,7 +125,9 @@ inline float sumOrdered(VecF a)
 // NEON (AArch64), four lanes.
 // ------------------------------------------------------------------------------------------------
 constexpr int kVecWidth = 4;
-#if defined(PARH_NEON_SHIM)
+#if defined(PARH_NEON_BENCH)
+constexpr const char* kVecPathName = "neon-bench";
+#elif defined(PARH_NEON_SHIM)
 constexpr const char* kVecPathName = "neon-shim";
 #else
 constexpr const char* kVecPathName = "neon";

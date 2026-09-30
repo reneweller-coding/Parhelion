@@ -258,8 +258,8 @@ fader.
 
 Breakdown now and Drop now rewrite the playing track from its next 8-bar line (or the one after it, where that is
 less than six seconds away): into a breakdown with its build and a drop after it, or into the drop at once, after a
-beat of silence. Everything before that line stays as it was, and the track plays on without a gap. A set is not
-rewritten -- its next blend would have to move with it.
+beat of silence. Everything before that line stays as it was, and the track plays on without a gap. A second one keeps
+the first: the track is rewritten from both lines. A set is not rewritten -- its next blend would have to move with it.
 
 Every control can be learned from a MIDI controller: click learn, move the controller (a right click forgets it). By
 default controller 74 moves the filter, controller 11 the throw and the mod wheel the wheel; channel pressure is the
@@ -297,6 +297,17 @@ composer chooses its presets from. The markers are the five profiles; the bar is
 morph. Under them the references' medians per style, as they were measured: tempo, length, integrated loudness and
 the loudest 20 seconds, the loudness range, the breakdown's share and its distance to the drop, the rise into the
 drop, the spectral centroid and the width above 200 Hz.
+
+== Meta Quest | | - ==
+
+The whole generator runs on the headset (build-quest\ParhelionQuest.apk, see Quest/README.md). The hands are the hands
+at the mixer: left pinch play and stop, right pinch kick out and in, the right pinch held Breakdown now or Drop now
+(handed over on a beat, without a gap: a second engine takes over from the first), both hands together the next track;
+the left hand's height the master filter, the right's the echo throw. Above and ahead of the player the parhelion hangs
+in the sky at the size of a room: the sun swells with the kick, the halo is the bar with the parts' notes on it, the sun
+dogs burn with the track's energy, and the line through them is the track with its sections. A file parh.cfg in the
+app's folder sets the seed, the style, a set's length and any knob. The headset's quality plays fewer unison
+oscillators, voices and players and solves the filter models more lightly.
 
 == The command line | | - ==
 

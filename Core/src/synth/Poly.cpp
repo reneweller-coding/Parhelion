@@ -122,6 +122,7 @@ void Poly::reset()
 {
     slots_ = PolySlots{};
     ch_ = PolyChannels{};
+    ch_.newton = filterSteps_;   // (the quality outlives a reset, setQuality)
     for (int s = 0; s < kPolySlots; ++s) { slots_.dt[s] = 0.001f; slots_.inv[s] = 1000.0f; slots_.idxDecay[s] = 1.0f; slots_.pw[s] = 0.5f; wtPh_[s] = 0.0; wtDt_[s] = 0.0; wtLevel_[s] = 0; slotSaw_[s] = false; slotHzMul_[s] = 1.0; slotSpread_[s] = 1.0; }
     for (int v = 0; v < kPolyVoices; ++v) {
         amp_[v].kill();

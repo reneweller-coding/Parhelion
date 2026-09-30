@@ -86,6 +86,7 @@ struct Playing {
     std::vector<TrackPlace> tracks;
     parh::SetInfo setInfo;   ///< a set's (empty for a track)
     bool resume = false;     ///< the performer's "now": loaded where the engine is, and it plays on (performNow)
+    std::vector<parh::Rewrite> rewrites;   ///< the "now"s this track was rewritten by, in order (a next one keeps them)
 };
 
 /** @brief The Parhelion processor. */

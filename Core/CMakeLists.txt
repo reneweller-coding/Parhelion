@@ -46,6 +46,7 @@ add_library(ParhelionCore STATIC
     src/Preferences.cpp
     src/Engine.cpp
     src/Cue.cpp
+    src/Handover.cpp
 )
 target_include_directories(ParhelionCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 option(PARH_PROFILE "Time the engine's stages (Profile.h); parh_render prints them" OFF)
@@ -61,6 +62,15 @@ if(MSVC)
     target_compile_definitions(ParhelionCore PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
     target_compile_options(ParhelionCore PRIVATE -Wall -Wextra)
+endif()
+
+# Phase 7: the NEON path on SSE's four lanes, only to time it on the desktop (what a set costs on the Quest; Vec.h,
+# Tests/neonbench). Not bit-exact; never for a release.
+option(PARH_NEON_BENCH "Build the core's NEON path on SSE lanes, for timing only" OFF)
+if(PARH_NEON_BENCH)
+    target_include_directories(ParhelionCore BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../Tests/neonbench)
+    target_compile_definitions(ParhelionCore PUBLIC PARH_NEON_BENCH=1)
+    set(PARH_AVX2 OFF CACHE BOOL "" FORCE)
 endif()
 
 # AVX2 with FMA for the lane-parallel paths (Vec.h). PUBLIC, so everything that links the core sees the same vector

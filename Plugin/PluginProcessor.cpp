@@ -169,6 +169,9 @@ Playing ParhelionProcessor::composeNow(ParamStore& snapshot)
             std::lock_guard<std::mutex> g(lock_);
             req.rewriteBar = bar;
             req.rewriteKind = nowKind_;
+            req.earlier = current_.rewrites;   // a second "now" keeps the first (Phase 7)
+            out.rewrites = current_.rewrites;
+            out.rewrites.push_back({ bar, nowKind_ });
             out.resume = true;
         }
         out.set.decks[0] = composeTrack(snapshot, seed, req, &cur, std::string(), &info);

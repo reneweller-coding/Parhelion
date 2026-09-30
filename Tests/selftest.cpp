@@ -10,6 +10,7 @@
  */
 #include "parh/Clock.h"
 #include "parh/Engine.h"
+#include "parh/Handover.h"
 #include "parh/Loudness.h"
 #include "parh/Midi.h"
 #include "parh/Params.h"
@@ -59,8 +60,6 @@ using namespace parhtest;
 namespace {
 
 constexpr double kPiD = 3.141592653589793;
-
-bool contains(const std::vector<int>& v, int x) { return std::find(v.begin(), v.end(), x) != v.end(); }
 
 /** The tempo map converts beats to seconds in closed form; checked against a numerical integral over a ramp. */
 void testTempoMap()
@@ -1509,7 +1508,7 @@ const BankId kBanks[kPresetBanks] = {
     { Module::Sfx, 0 }, { Module::Cloud, 0 } };
 
 /** @brief The loudest 3 s of a short phrase on @p b's voice, the preset @p sp applied (null: the default sound), LUFS. */
-double bankLoudness(const BankId& b, const SoundPreset* sp)
+double bankLoudness(const BankId& b, const SoundPreset* sp, bool quest = false)
 {
     auto p = std::make_unique<ParamStore>();
     if (sp != nullptr) applyPreset(*p, b.module, b.instance, *sp);
@@ -1546,6 +1545,7 @@ double bankLoudness(const BankId& b, const SoundPreset* sp)
     sc.sort();
     auto e = std::make_unique<Engine>();
     e->params().copyValuesFrom(*p);
+    if (quest) e->setQuality(Engine::Quality::Quest);
     e->prepare(48000.0, 512);
     e->load(sc);
     LoudnessMeter meter;
@@ -1701,6 +1701,57 @@ void testUserPreset()
 }
 
 /**
+ * The Quest's quality on the synths' presets (Phase 7): fewer unison oscillators and voices, and the filter models with
+ * fewer Newton steps (Deck::setQuest). Every 32nd preset of the six polyphonic voices, the mid-bass and the 303 played at
+ * both qualities: finite, and as loud at the Quest's as at the desktop's.
+ */
+void testQuestSounds()
+{
+    section("the synths' presets at the Quest's quality");
+    const DenormalGuard guard;
+    struct Job { int bank, preset; double desk, quest; };
+    std::vector<Job> jobs;
+    for (int bi = 0; bi < kPresetBanks; ++bi) {
+        const Module m = kBanks[bi].module;
+        if (m != Module::Poly && m != Module::Bass && m != Module::Acid) continue;
+        for (int i = bi % 32; i < kPresetsPerBank; i += 32) jobs.push_back({ bi, i, 0.0, 0.0 });
+    }
+    for (const BankId& b : kBanks) (void)factoryPresets(b.module, b.instance);
+    std::atomic<size_t> next{ 0 };
+    auto work = [&]() {
+        const DenormalGuard g;
+        for (size_t k = next++; k < jobs.size(); k = next++) {
+            Job& j = jobs[k];
+            const BankId& b = kBanks[j.bank];
+            const SoundPreset* sp = &factoryPresets(b.module, b.instance)[static_cast<size_t>(j.preset)];
+            j.desk = bankLoudness(b, sp, false);
+            j.quest = bankLoudness(b, sp, true);
+        }
+    };
+    std::vector<std::thread> pool;
+    const unsigned n = std::max(1u, std::min(16u, std::thread::hardware_concurrency()));
+    for (unsigned k = 0; k < n; ++k) pool.emplace_back(work);
+    for (std::thread& th : pool) th.join();
+    int finite = 0;
+    double worst = 0.0, sum = 0.0;
+    std::string worstName;
+    for (const Job& j : jobs) {
+        if (!std::isfinite(j.quest) || j.quest < -70.0) continue;
+        ++finite;
+        const double d = j.quest - j.desk;
+        sum += std::fabs(d);
+        if (std::fabs(d) > std::fabs(worst)) {
+            worst = d;
+            const SoundPreset& sp = factoryPresets(kBanks[j.bank].module, kBanks[j.bank].instance)[static_cast<size_t>(j.preset)];
+            worstName = fmt("%s/%s", sp.group.c_str(), sp.name.c_str());
+        }
+    }
+    check(finite == static_cast<int>(jobs.size()), "every one finite and audible at the Quest's quality", fmt("%d of %zu", finite, jobs.size()));
+    check(std::fabs(worst) <= 3.0, "as loud as at the desktop's", fmt("mean |difference| %.2f dB, largest %+.2f dB (%s)",
+                                                                         sum / std::max(1, finite), worst, worstName.c_str()));
+}
+
+/**
  * The performer's "Breakdown now" and "Drop now" (Phase 6, planTrackRewritten): from an 8-bar line the plan turns to a
  * breakdown (its build, a drop) or to a drop at once -- the vacuum in the bar before it --, the whole a multiple of 32
  * bars; and every note before the line is what it was (the drums, the bass, the pad, the pluck, the arp: the voices
@@ -1757,6 +1808,169 @@ void testRewrite()
     check(shaped == total, "from the line: the breakdown with its build and drop, or the drop at once after its vacuum",
           fmt("%d of %d%s", shaped, total, bad.c_str()));
     check(kept == total, "every note before the line as it was (before a drop at once: before its approach)", fmt("%d of %d", kept, total));
+    // A second "now" keeps the first (Phase 7, TrackRequest::earlier): a breakdown from bar 48, then from bar 96, in the
+    // drop it led to, another -- the first breakdown stays, and every note before the second line is the first
+    // rewrite's.
+    int chained = 0, chainKept = 0;
+    std::string chainBad;
+    for (uint64_t seed : { 3ull, 8ull }) {
+        TrackRequest one;
+        one.rewriteBar = 48;
+        one.rewriteKind = SectionKind::Breakdown;
+        const Score first = composeTrack(*p, seed, one);
+        TrackRequest two;
+        two.rewriteBar = 96;
+        two.rewriteKind = SectionKind::Breakdown;
+        two.earlier = { { 48, SectionKind::Breakdown } };
+        const Score second = composeTrack(*p, seed, two);
+        auto kindAt = [](const Score& s, int bar) {
+            for (const Section& x : s.sections) if (x.beat == 4.0 * bar) return static_cast<int>(x.kind);
+            return -1;
+        };
+        const int k48 = kindAt(second, 48), k96 = kindAt(second, 96);
+        const bool shape = k48 == static_cast<int>(SectionKind::Breakdown)
+                        && (k96 == static_cast<int>(SectionKind::Breakdown) || k96 == static_cast<int>(SectionKind::Break))
+                        && kindAt(first, 88) == static_cast<int>(SectionKind::Drop);
+        chained += shape;
+        auto upTo = [](const Score& s) {
+            std::vector<std::tuple<double, int, int, float>> out;
+            for (const NoteEvent& n : s.notes) {
+                if (n.beat >= 4.0 * 96 - 4.0) continue;
+                if (n.part == Part::Lead || n.part == Part::Counter || n.part == Part::Piano || n.part == Part::Strings
+                    || n.part == Part::Choir || n.part == Part::Brass || n.part == Part::Timpani || n.part == Part::Fx) continue;
+                out.push_back({ n.beat, static_cast<int>(n.part), n.pitch, n.velocity });
+            }
+            return out;
+        };
+        const bool same = upTo(first) == upTo(second);
+        chainKept += same;
+        if (!shape || !same) chainBad += fmt(" seed %llu:%s%s", static_cast<unsigned long long>(seed), shape ? "" : " form", same ? "" : " notes");
+    }
+    check(chained == 2 && chainKept == 2, "a second now keeps the first: its breakdown, and every note before the second line",
+          fmt("%d and %d of 2%s", chained, chainKept, chainBad.c_str()));
+}
+
+/**
+ * The handover (Phase 7, Handover.h): the performer's "now" on the Quest without a gap -- the rewritten track in a second
+ * engine, sought four bars back and rendered up to where the first one plays, then faded over. A worker thread does the
+ * pre-roll while this thread plays the audio thread's part at about five times real time. After the fade the output is
+ * the second engine's, bit for bit as if it had played from its seek alone (the handover does not touch its timeline);
+ * before it the first engine's, untouched; the fade begins on a beat and before the first note the two scores play
+ * differently, nothing clicks, the level does not dip (the two engines' free-running phases are not the same, Handover.h),
+ * and after it the music is as loud as the first engine's would have been.
+ */
+void testHandover()
+{
+    section("the handover to a rewritten track");
+    auto p = std::make_unique<ParamStore>();
+    p->parseText("compose.style=Uplifting");
+    const uint64_t seed = 3;
+    const int bar = 72;
+    const Score base = composeTrack(*p, seed);
+    TrackRequest req;
+    req.rewriteBar = bar;
+    req.rewriteKind = SectionKind::Breakdown;
+    const Score re = composeTrack(*p, seed, req);
+    const double fs = 48000.0;
+    const int block = 256;
+    auto make = [&](const Score& s) {
+        auto e = std::make_unique<Engine>();
+        e->params().copyValuesFrom(*p);
+        e->setLive(true);
+        e->prepare(fs, block);
+        e->load(s);
+        return e;
+    };
+    auto a = make(base), b = make(re), alone = make(base), ref = make(re);
+    Handover h;
+    h.prepare(block);
+    std::vector<float> L(block), R(block);
+    // The first engine plays to bar 60; the second is sought four bars back from there.
+    const int64_t bar60 = static_cast<int64_t>(std::llround(base.tempo.secondsAt(4.0 * 60) * fs));
+    while (a->samplePosition() < bar60) {
+        h.process(*a, *b, L.data(), R.data(), block);
+        alone->process(L.data(), R.data(), block);
+    }
+    const int64_t start = a->samplePosition();
+    const double seekBeat = 4.0 * 56;
+    b->seek(seekBeat);
+    ref->seek(seekBeat);
+    const double diff = firstDifference(base, re, seekBeat);
+    const int64_t deadline = static_cast<int64_t>(std::llround(base.tempo.secondsAt(std::min(diff, 4.0 * bar)) * fs)) - Handover::kFade;
+    std::atomic<bool> done{ false }, ok{ false };
+    const auto nextBeat = [&](int64_t s) {
+        const double beat = std::ceil(base.tempo.beatAt(static_cast<double>(s) / fs) - 1e-9);
+        return static_cast<int64_t>(std::llround(base.tempo.secondsAt(beat) * fs));
+    };
+    std::thread worker([&] { ok = h.handOver(*b, deadline, {}, nextBeat); done = true; });
+    // The audio thread's part, paced: its blocks and those of the first engine alone, which it should match until the fade.
+    std::vector<float> out, lone;
+    bool switched = false;
+    Engine* front = a.get();
+    Engine* back = b.get();
+    const int64_t end = start + static_cast<int64_t>(30.0 * fs);
+    while (front->samplePosition() < end) {
+        if (h.process(*front, *back, L.data(), R.data(), block)) {
+            std::swap(front, back);
+            switched = true;
+        }
+        out.insert(out.end(), L.begin(), L.end());
+        alone->process(L.data(), R.data(), block);
+        lone.insert(lone.end(), L.begin(), L.end());
+        if (!done) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    worker.join();
+    const int64_t switchedAt = switched ? h.lastTaken() : -1;
+    check(ok && switchedAt >= 0 && switchedAt <= deadline
+              && std::fabs(base.tempo.beatAt(switchedAt / fs) - std::round(base.tempo.beatAt(switchedAt / fs))) < 1e-4,
+          "the second engine took over on a beat, before the scores differ",
+          fmt("at %.3f s of the track (beat %.3f), the first difference at bar %.2f, deadline %.2f s", switchedAt / fs,
+              base.tempo.beatAt(switchedAt / fs), diff / 4.0, deadline / fs));
+    if (switchedAt < 0) return;
+    // After the fade: the second engine's own render from its seek, bit for bit.
+    std::vector<float> want;
+    while (ref->samplePosition() < start) ref->process(L.data(), R.data(), std::min<int>(block, static_cast<int>(start - ref->samplePosition())));
+    const size_t fadeEnd = static_cast<size_t>(switchedAt - start) + Handover::kFade;
+    int64_t pos = start;
+    while (pos < end) {
+        ref->process(L.data(), R.data(), block);
+        want.insert(want.end(), L.begin(), L.end());
+        pos += block;
+    }
+    size_t same = 0, compared = 0;
+    for (size_t i = fadeEnd; i < out.size() && i < want.size(); ++i, ++compared) same += out[i] == want[i];
+    check(compared > 0 && same == compared, "after the fade: the second engine as it plays alone, bit for bit",
+          fmt("%zu of %zu samples", same, compared));
+    // During the fade and before it: the first engine's music. The largest step from one sample to the next round the
+    // fade against the largest the first engine alone makes there, and the difference to it.
+    const size_t f0 = static_cast<size_t>(switchedAt - start);
+    const size_t w0 = f0 > 4800 ? f0 - 4800 : 0, w1 = std::min(out.size(), f0 + 4800 + Handover::kFade);
+    float stepOut = 0.0f, stepLone = 0.0f;
+    for (size_t i = w0 + 1; i < w1; ++i) {
+        stepOut = std::max(stepOut, std::fabs(out[i] - out[i - 1]));
+        stepLone = std::max(stepLone, std::fabs(lone[i] - lone[i - 1]));
+    }
+    check(stepOut <= 1.25f * stepLone + 1e-3f, "no click: the largest step round the fade as the first engine's own",
+          fmt("%.4f against %.4f", stepOut, stepLone));
+    // The level through the fade, 2.7 ms windows, against the quieter of the two engines alone there.
+    const auto rms = [](const std::vector<float>& x, size_t from, size_t n) {
+        double s = 0.0;
+        for (size_t i = from; i < from + n && i < x.size(); ++i) s += static_cast<double>(x[i]) * x[i];
+        return std::sqrt(s / static_cast<double>(n)) + 1e-12;
+    };
+    double dip = 0.0;
+    for (size_t i = f0; i + 128 <= f0 + Handover::kFade && i + 128 <= out.size(); i += 128)
+        dip = std::min(dip, 20.0 * std::log10(rms(out, i, 128) / std::min(rms(lone, i, 128), rms(want, i, 128))));
+    check(dip > -3.0, "no hole: through the fade the level stays with the two engines'", fmt("at most %.2f dB under the quieter", dip));
+    // After it, until the rewrite: the same music, as loud (what the second lacks: notes held from before its seek).
+    const size_t after = f0 + Handover::kFade;
+    const size_t span = std::min<size_t>(static_cast<size_t>(2.0 * fs), out.size() - after);
+    const double lvl = 20.0 * std::log10(rms(out, after, span) / rms(lone, after, span));
+    check(std::fabs(lvl) < 0.5, "after it as loud as the first engine would have been", fmt("%+.2f dB over 2 s", lvl));
+    // Before the handover began: the first engine, untouched.
+    size_t before = 0;
+    for (size_t i = 0; i < f0; ++i) before += out[i] == lone[i];
+    check(before == f0, "until it the first engine as it plays alone", fmt("%zu of %zu samples", before, f0));
 }
 
 /**
@@ -1921,8 +2135,10 @@ const TestSection kSections[] = {
     { "testOrchestraBlocks", testOrchestraBlocks },
     { "testModulation", testModulation },
     { "testPresetBank", testPresetBank },
+    { "testQuestSounds", testQuestSounds },
     { "testUserPreset", testUserPreset },
     { "testRewrite", testRewrite },
+    { "testHandover", testHandover },
     { "testSubGenres", testSubGenres },
     { "testSet", testSet },
 };

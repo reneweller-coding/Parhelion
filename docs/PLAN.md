@@ -24,7 +24,8 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 6 gebaut (29.09.2026); als nächstes 7, die Quest.**
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 7 gebaut (30.09.2026; die Quest ohne Headset: gebaut, auf
+dem Gerät noch nicht gelaufen); als nächstes 8, Qualität und Release.**
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
@@ -486,6 +487,58 @@ parh_pianoprobe. Die Aufnahmen bleiben außerhalb des Repositorys, eingecheckt s
 - **Offen**: in der Mittellage sind die Partialtöne 2 bis 5 gegen den Grundton 10 bis 15 dB stärker als beim Steinway (ein
   Kuhschwanz erster Ordnung trifft das nicht; ob es der Boden oder Pianoteqs Mikrofonierung ist, lässt die Messung offen),
   E4 bis C5 3 bis 7 dB zu laut, der Diskant klingt früh zu langsam ab. Hörvergleich in `out/hoeren_piano` (ignoriert).
+
+**Phase 7, die Quest (30.09.2026, auf Wunsch des Nutzers: "Dann bitte weiter mit den restlichen Phasen").** Nach 9, 10 und
+14 gebaut; die App aus Totality (Quest/, c773d65: OpenXR, Hände, Punkt-Renderer, Schrift, Oboe), neu der Player mit zwei
+Engines, das "Jetzt" der Performerin und der Himmel. Kein Headset angeschlossen: gebaut, gelinkt und signiert, der Lauf
+auf dem Gerät und seine Messung bleiben offen (Quest/README.md, "On the headset").
+- **Die App** (Quest/src/main.cpp): die Gesten Totalitys (links Pinch Play/Stop, rechts Kick raus/rein, beide zusammen der
+  nächste Track, Handhöhen Master-Filter und Echo-Throw), dazu **rechts gehalten (0,6 s) "Breakdown now"**, in Breakdown,
+  Break oder Build **"Drop now"**. Das Panel: Logo, Track oder Set, Stil und Form, Sektion und Takt, Tonart und Camelot,
+  die Presets von Lead und Pad, Zeit, Pegel, Filter, Throw, das anstehende "Jetzt" mit seinem Takt. Im Raum **die
+  Nebensonne** (das Logo in Raumgröße, 3 m voraus, 1,3 m über den Augen): die Sonne schwillt mit der Kick, der 22°-Halo
+  ist der Takt mit den Noten der Stimmen als Perlen und dem Zeiger, die zwei Nebensonnen brennen mit der Energiekurve
+  des Plans, der Horizontalkreis durch alle drei ist der Track mit seinen Sektionen, dem Abspielpunkt und dem Ziel eines
+  "Jetzt" (Kaleidoscope-Regeln: jede Helligkeit stetig in der Position, keine Kamerabewegung mit dem Ton). `parh.cfg`
+  wie Totalitys `tot.cfg`. APK 6,8 MB, 111 Dateien ohne eine Warnung (clang -Wall -Wextra).
+- **"Jetzt" ohne Lücke** (Core/Handover.h, neu): Das Plugin lädt den umgeschriebenen Track in die spielende Engine und
+  springt -- eine kurze Stille, gehaltene Noten brechen ab. Die App lädt ihn in die zweite Engine, die vier Takte zurück
+  beginnt, bis zur ersten vorgerollt wird und auf dem nächsten Schlag übernimmt (21 ms Überblendung), vor der ersten
+  Note, die beide Tracks verschieden spielen (`firstDifference`; gemessen an fünf Stilen, je drei Seeds und sechs
+  Linien: erst ab der Linie, bei "Drop now" bis 8 Takte davor im Anlauf). Befund dabei: die zwei Engines spielen
+  dieselben Noten, aber nicht dieselben Wellen -- freilaufende Oszillatoren (der Sub-Sinus, die Sägezähne) und das
+  Rauschen hängen an allem vorher Gespielten, je Stem ist die Differenz so groß wie das Signal. Eine Blende an
+  beliebiger Stelle kann sich daher für Millisekunden auslöschen; auf dem Schlag verdeckt es die Kick, und der Pump hat
+  den Bass geduckt. [M, testHandover] kein Klick (größter Sprung wie der der ersten Engine allein), der Pegel in der
+  Blende höchstens 0,06 dB unter der leiseren, danach +0,08 dB zur ersten, nach der Blende bitgleich zur zweiten allein.
+  Zwei Threads, kein Lock: der Komponist lädt nur die Engine, die nicht spielt; welche spielt, entscheidet allein der
+  Audio-Thread.
+- **Ein zweites "Jetzt" behält das erste** (TrackRequest::earlier, planTrackRewritten mit einer Liste): vorher schrieb
+  jedes "Jetzt" den ursprünglichen Track um, das erste ging verloren -- auch im Plugin, dort jetzt ebenso
+  (Playing::rewrites). [M, testRewrite] Breakdown ab Takt 48, dann ab Takt 96 im Drop danach: der erste bleibt, jede
+  Note vor der zweiten Linie ist die des ersten.
+- **Die CPU.** Gemessen mit dem NEON-Pfad des Kerns auf SSEs vier Lanes (neu: `PARH_NEON_BENCH`, Tests/neonbench; die
+  Lane-Breite der Quest und ihre skalaren Tabellenlesungen, nicht bitgleich, nur zum Messen), Quest-Qualität, % eines
+  Desktop-Kerns [M]: AVX2 10,2 für das 24-Minuten-Set, skalar 41, NEON 14,3 -- davon die Poly-Stimmen 5,5 und in ihnen
+  **die Schaltungsfilter zwei Drittel** (drei Newton-Schritte je Sample, zweifache Rate, je Stereokanal; auf AVX2 fiel
+  das nicht auf). Neu in der Quest-Stufe: **die Filtermodelle der Poly-Stimmen mit einem Newton-Schritt** (vom
+  letzten Sample aus). Geprüft an den Stems von fünf Tracks gegen drei Schritte: jede Stimme im Pegel innerhalb 0,3 dB,
+  im Oktavspektrum innerhalb 0,35 dB. Verworfen: die einfache Rate (+1 bis +9 dB in den obersten Oktaven, Aliasing der
+  nichtlinearen Stufen) und ein Schritt für die 303 (ihre Diodenleiter mit schneller Hüllkurve: +3 dB, dreimal so hell;
+  mit zwei Schritten noch 0,7 dB im Spektrum -- sie behält drei, Acids Stimme). Ergebnis NEON: das Set 14,3 → 11,7, ein
+  Uplifting-Track mit Orchester 17,1 → 12,0 (Poly 9,2 → 4,6). [M, testQuestSounds] jedes 32. Preset der sechs Stimmen,
+  des Mid-Bass und der 303 in Quest-Qualität endlich und hörbar (256 von 256), im Pegel im Mittel 0,15 dB, höchstens
+  1,3 dB neben dem Desktop. Der Desktop bitgleich (12 Renders, 6 Desktop gleich), seine Rechenzeit unverändert.
+- **Was das auf der Quest 2 ist**, bleibt zu messen: ein A77-Kern der XR2 gegen einen Kern des i9-12900K mit vier Lanes
+  etwa Faktor 2,5 bis 3,5 -- das Set läge bei 29 bis 41 % eines Kerns, am oder über dem Budget von 30 % (Abschnitt 10).
+  Dafür baut `Quest/build_tools.ps1` parh_render, parh_selftest und parh_vectest für arm64 (per adb auf dem Headset:
+  `parh_render --seed 5 --dj 24 --bench --quality quest`). Weitere Hebel, nicht gebaut: die Decks auf zwei Kernen
+  (die Blends sind die teuren Stellen), das Tease-Deck und das auslaufende Deck eines Blends in niedrigerer Stufe, die
+  303 mit zwei Schritten (0,4 %), der Master-Clipper zweifach statt vierfach (0,25 %), ein NEON-Pfad der Hall-FDN (1,3 %).
+- **NEON auf echtem arm64** ohne Headset: im Android-Emulator (x86_64-Image von Android 14, das arm64-Programme über
+  seine Übersetzung ausführt; das AVD des Nutzers schreibgeschützt gestartet) **parh_vectest 10 von 10** -- der vom NDK
+  übersetzte NEON-Pfad bitgleich zum skalaren (Kit, Poly-Lanes, neun Filtermodelle mit Modulation, Piano, Streicher).
+- selftest 135/135, ctest 36/36 (neu: testHandover, testQuestSounds), pluginval Strenge 10.
 
 ## 0. Kurzfassung
 
@@ -1315,7 +1368,9 @@ schreibt ab der nächsten 8-Takt-Linie um), Filter-Makro, Sidechain-Tiefe, Delay
 (`Tools/manual`).
 
 **Quest 2** (wie Totality): nativ, Qualitätsstufen (weniger Unison-Stimmen im Supersaw, weniger Piano-Partialtöne, FDN statt
-Faltung), Performer-Oberfläche.
+Faltung), Performer-Oberfläche. Gebaut in Phase 7 (Stand der Umsetzung): die Stufe mit drei Unison-Oszillatoren und vier
+Stimmen (das Pad fünf und sechs), zehn Piano-Stimmen, dem halben Orchester und Filtermodellen mit einem Newton-Schritt;
+Breakdown/Drop now als gehaltener Pinch, über eine zweite Engine ohne Lücke; die Nebensonne im Raum.
 
 ## 10. Vektorisierung und CPU
 

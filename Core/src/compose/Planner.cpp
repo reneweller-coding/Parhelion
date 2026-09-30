@@ -543,10 +543,17 @@ void rewriteSpecs(std::vector<Spec>& s, int bar, SectionKind kind)
 
 Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable)
 {
-    return planTrackRewritten(prof, bars, stream, mixable, -1, SectionKind::Drop);
+    return planTrackRewritten(prof, bars, stream, mixable, std::vector<Rewrite>{});
 }
 
 Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, int rewriteBar, SectionKind rewriteKind)
+{
+    std::vector<Rewrite> one;
+    if (rewriteBar >= 0) one.push_back({ rewriteBar, rewriteKind });
+    return planTrackRewritten(prof, bars, stream, mixable, one);
+}
+
+Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, const std::vector<Rewrite>& rewrites)
 {
     const uint64_t formSeed = stream("form");
     Rng r;
@@ -590,14 +597,20 @@ Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& st
                            + 4.0 * std::max(0.0, static_cast<double>(introBars) / std::max(1, p.bars) - 0.3);
         if (score < bestScore) { bestScore = score; best = std::move(p); bestC = c; }
     }
-    if (rewriteBar >= 0) {
-        // The chosen candidate's specs again (the same draws), cut and continued (planTrackRewritten).
+    if (!rewrites.empty()) {
+        // The chosen candidate's specs again (the same draws), cut and continued at each line in turn (fitTo32 evens
+        // the length out in the outro, after every line).
         Rng cr;
         cr.seed(mixSeed(formSeed, 0x43414E44ull + static_cast<uint64_t>(bestC)));
         std::vector<Spec> specs = drawSpecs(prof, form, cr, mixable);
         fitTo32(specs, mixable ? 32 : 16);
-        rewriteSpecs(specs, rewriteBar, rewriteKind);
-        fitTo32(specs, mixable ? 32 : 16);
+        int last = -1;
+        for (const Rewrite& w : rewrites) {
+            if (w.bar < 0 || w.bar <= last) continue;
+            rewriteSpecs(specs, w.bar, w.kind);
+            fitTo32(specs, mixable ? 32 : 16);
+            last = w.bar;
+        }
         best = buildPlan(prof, form, specs, cast, stream);
     }
     best.bassPattern = cast.acidBass ? static_cast<int>(BassPattern::Acid) : bassPattern;

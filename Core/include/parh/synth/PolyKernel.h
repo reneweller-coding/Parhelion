@@ -81,6 +81,7 @@ struct PolyChannels {
     alignas(32) float fv[4][kPolyLanes] = {}, fs[4][kPolyLanes] = {};  ///< node voltages and trapezoidal states
     alignas(32) float fg[kPolyLanes] = {}, fk[kPolyLanes] = {}, fmk[kPolyLanes] = {};   ///< g (at twice the rate), feedback, makeup
     alignas(32) float fxp[kPolyLanes] = {};                                               ///< the last input sample (the half-way point of 2x)
+    int newton = kNewton;   ///< the models' Newton steps a sample (the Quest's: kNewtonLight, Poly::setQuality)
     /** @} */
 };
 #if defined(_MSC_VER)
@@ -235,6 +236,7 @@ void polyModelKernel(PolyChannels& c, int lane, int n, const float* in, const fl
     // the Polivoks' slew-limited integrators and the Wasp's inverters screamed (a centroid of 9 kHz on the lead) and
     // the nonlinear stages folded their harmonics back. The input is interpolated half-way, the two outputs averaged.
     const V half = lanes<V>(0.5f);
+    const int it = c.newton;   // the Newton steps (the Quest's: kNewtonLight, Poly::setQuality)
     auto run = [&](auto&& filt) {
         for (int i = 0; i < n; ++i) {
             const int row = i * kPolyLanes + lane;
@@ -259,10 +261,10 @@ void polyModelKernel(PolyChannels& c, int lane, int n, const float* in, const fl
         }
     };
     switch (m) {
-    case FilterModel::Moog: run([&](V x) { return ladderMoog<V>(v, s, x, g, k); }); break;
+    case FilterModel::Moog: run([&](V x) { return ladderMoog<V>(v, s, x, g, k, it); }); break;
     case FilterModel::Prophet: case FilterModel::Juno: {
         const float d = FilterVoicing::otaDrive(m), r = FilterVoicing::otaRes(m);
-        run([&](V x) { return otaCascade<V>(v, s, x, g, k, d, r); });
+        run([&](V x) { return otaCascade<V>(v, s, x, g, k, d, r, 0, it); });
         break;
     }
     case FilterModel::Xpander: {
@@ -270,7 +272,7 @@ void polyModelKernel(PolyChannels& c, int lane, int n, const float* in, const fl
         const V w0 = at(c.xw[0]), w1 = at(c.xw[1]), w2 = at(c.xw[2]), w3 = at(c.xw[3]), w4 = at(c.xw[4]);
         const V rv = lanes<V>(r), invR = lanes<V>(1.0f / r);
         run([&](V x) {
-            otaCascade<V>(v, s, x, g, k, d, r);
+            otaCascade<V>(v, s, x, g, k, d, r, 0, it);
             const V a0 = x - k * ftanh<V>(rv * v[3]) * invR;
             return w0 * a0 + w1 * v[0] + w2 * v[1] + w3 * v[2] + w4 * v[3];
         });
@@ -278,20 +280,20 @@ void polyModelKernel(PolyChannels& c, int lane, int n, const float* in, const fl
     }
     case FilterModel::Sem: case FilterModel::Wasp: {
         const float L = FilterVoicing::svfRange(m), a = FilterVoicing::svfAsym(m);
-        run([&](V x) { return svfNonlinear<V>(v, s, x, g, k, L, a, morph); });
+        run([&](V x) { return svfNonlinear<V>(v, s, x, g, k, L, a, morph, false, it); });
         break;
     }
     case FilterModel::Polivoks: {
         const float L = FilterVoicing::svfRange(m);
-        run([&](V x) { return svfNonlinear<V>(v, s, x, g, k, L, 0.0f, morph, true); });
+        run([&](V x) { return svfNonlinear<V>(v, s, x, g, k, L, 0.0f, morph, true, it); });
         break;
     }
     case FilterModel::Diode: {
         const V gd = g * lanes<V>(0.70710678f);
-        run([&](V x) { return diodeLadder<V>(v, s, x, gd, k); });
+        run([&](V x) { return diodeLadder<V>(v, s, x, gd, k, it); });
         break;
     }
-    case FilterModel::Korg35: run([&](V x) { return korg35<V>(v, s, x, g, k); }); break;
+    case FilterModel::Korg35: run([&](V x) { return korg35<V>(v, s, x, g, k, it); }); break;
     default: run([&](V x) { return x; }); break;
     }
     for (int j = 0; j < 4; ++j) { vstore(c.fv[j] + lane, v[j]); vstore(c.fs[j] + lane, s[j]); }

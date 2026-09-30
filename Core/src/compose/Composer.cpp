@@ -61,8 +61,9 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
     if (autoKnobs) minutes = prof.minutesLow + (prof.minutesHigh - prof.minutesLow) * fr.uniform();
     const int askBars = req.bars > 0 ? req.bars : std::max(64, static_cast<int>(std::lround(minutes * bpm / 4.0)));
 
-    const Plan plan = req.rewriteBar >= 0 ? planTrackRewritten(prof, askBars, stream, req.mixable, req.rewriteBar, req.rewriteKind)
-                                          : planTrack(prof, askBars, stream, req.mixable);
+    std::vector<Rewrite> rewrites = req.earlier;
+    if (req.rewriteBar >= 0) rewrites.push_back({ req.rewriteBar, req.rewriteKind });
+    const Plan plan = planTrackRewritten(prof, askBars, stream, req.mixable, rewrites);
     const Harmony harm = composeHarmony(plan, prof, key, scale, stream("harmony"));
 
     Score sc;

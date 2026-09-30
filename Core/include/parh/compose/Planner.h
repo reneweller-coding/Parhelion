@@ -99,6 +99,12 @@ uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls = 0);
  */
 Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable = false);
 
+/** @brief A performer's "now": from bar @p bar (an 8-bar line) a breakdown with its build and drop, or a drop at once. */
+struct Rewrite {
+    int bar = -1;
+    SectionKind kind = SectionKind::Breakdown;
+};
+
 /**
  * @brief The performer's "Breakdown now" and "Drop now" (PLAN 9, Perform; Phase 6): the plan of planTrack as it was --
  *        the same form, cast and lengths up to bar @p bar (an 8-bar line) --, and from there a breakdown (its build and
@@ -107,6 +113,13 @@ Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, boo
  *        but a drop's approach: the harmony turns towards it over the eight bars before (VI-VII-i, PLAN 6.5).
  */
 Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, int bar, SectionKind kind);
+
+/**
+ * @brief The same for several "now"s one after the other (Phase 7, 30.09.2026: a second "now" keeps the first): each
+ *        rewrites the plan the ones before it left, from its own line on, so the plan up to the last line is the plan
+ *        that was played up to it. The lines rise; one that does not is left out.
+ */
+Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, const std::vector<Rewrite>& rewrites);
 
 /** @brief Plans a track from a track's seed without rerolls (as composeTrack does). */
 Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed, bool mixable = false);

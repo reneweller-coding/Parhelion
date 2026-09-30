@@ -7,7 +7,7 @@ its detuned neighbours, which is what the JP-8000's supersaw is.
 
 ![Parhelion](docs/screenshot.png)
 
-**State (30.09.2026): Phases 0 to 6.** The frame (copied modules with their origin in every header), the parameter
+**State (30.09.2026): Phases 0 to 7.** The frame (copied modules with their origin in every header), the parameter
 system, the score with sections, the layer matrix and the ghost kick, the deck with kick, sub, mid-bass, 303, a
 twelve-lane kit, six polyphonic voices (Phosphene's JP-8000 supersaw, VA, FM and wavetable, the circuit filters, the
 trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master.
@@ -40,7 +40,9 @@ pluginval at strictness 10 -- has a page per group of synths, each voice with it
 user's own presets, and the preset the composer chose for the track that plays), its modulation block, the arrangement
 with its layer matrix and energy curve, a performer's page (mutes, master filter, echo throw, mod wheel, "Breakdown
 now" and "Drop now", which rewrite the playing track from its next 8-bar line), the mixer, the export and the styles
-against their references. The Quest follows (docs/PLAN.md, section 14).
+against their references. On the Meta Quest (Quest/README.md) the whole generator runs natively and is played with the
+hands, "Breakdown now" and "Drop now" as a held pinch, handed over to a second engine on a beat without a gap, under the
+parhelion in the sky at the size of a room; built and signed, not yet run on a headset (none was attached).
 
 The manual, built from the program itself (every parameter, every page):
 [docs/manual/Parhelion-Manual.pdf](docs/manual/Parhelion-Manual.pdf). The plan, in German, with the reasons for

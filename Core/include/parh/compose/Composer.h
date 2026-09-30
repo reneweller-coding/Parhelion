@@ -62,6 +62,7 @@ struct TrackRequest {
     const Preferences* prefs = nullptr;      ///< the player's ratings (compose.use_ratings): the forms' and the sounds' weights
     int rewriteBar = -1;                     ///< the performer's "now" (planTrackRewritten): from this bar (an 8-bar line), -1 none
     SectionKind rewriteKind = SectionKind::Breakdown;   ///< a breakdown (with its build and drop) or a drop at once
+    std::vector<Rewrite> earlier;            ///< the "now"s before it on this track, in order (a second "now" keeps the first)
 };
 
 /** @brief What a track tells the set, the cues and the displays. */
