@@ -1,6 +1,6 @@
 /**
  * @file Poly.h
- * @brief The polyphonic engine of the six melodic voices -- lead, counter-lead, arp, stab, pad and drone
+ * @brief The polyphonic engine of the six melodic voices -- lead, counter-lead, pluck, arp, pad and stab
  *        (Params.h, PolyInstance) -- eight voices of up to seven unison oscillators each.
  *
  * **Supersaw** (the default of the lead). Seven sawtooth oscillators after Szabo's measurement of the
