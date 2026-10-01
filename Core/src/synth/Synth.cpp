@@ -11,8 +11,8 @@
 namespace parh {
 
 namespace {
-constexpr double kPiD = 3.141592653589793;
-constexpr double kLn1000 = 6.907755278982137;
+constexpr double kPiD = 3.141592653589793;   ///< pi
+constexpr double kLn1000 = 6.907755278982137;   ///< ln 1000: a decay of 60 dB
 }
 
 void MonoSynth::prepare(double sampleRate, uint64_t seed)

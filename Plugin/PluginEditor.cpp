@@ -14,8 +14,13 @@ using namespace parh;
 
 namespace {
 
-const juce::Colour kBack = parhui::colour::bg, kPanel = parhui::colour::panel, kInk = parhui::colour::ink, kDim = parhui::colour::dim,
-                   kAccent = parhui::colour::accent, kOnset = parhui::colour::onset, kSun = parhui::colour::sun;
+const juce::Colour kBack = parhui::colour::bg;           ///< the skin's background
+const juce::Colour kPanel = parhui::colour::panel;       ///< the skin's panel
+const juce::Colour kInk = parhui::colour::ink;           ///< the skin's ink
+const juce::Colour kDim = parhui::colour::dim;           ///< the skin's dim ink
+const juce::Colour kAccent = parhui::colour::accent;     ///< the skin's accent
+const juce::Colour kOnset = parhui::colour::onset;       ///< the onsets' red
+const juce::Colour kSun = parhui::colour::sun;   ///< the low sun: the energy, the drops
 
 /** @brief Colour of a block by its marker: the edges dark, the body brighter towards the peak, a reduction the motion's teal. */
 juce::Colour blockColour(const juce::String& name)

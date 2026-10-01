@@ -356,6 +356,14 @@ matrices' pressure; the keys from middle C up (C to F#) toggle the seven mutes. 
 project. Controllers 74 and 11 are the same in every generator of the family; while a headset sends its hands, a box
 beside the mutes shows what they do (The panel).
 
+The keyboard (the Keyboard group): Keyboard Plays sends the keys of a MIDI keyboard to a voice instead of the mutes --
+the kit (C1 the kick, C#1 to C2 the twelve lanes), the bass, the 303, the lead, counter, pluck, arp, pad or stab, the
+piano, the strings, the choir, the brass, or by channel (1 kit, 2 bass, 3 303, 4 to 9 lead to stab, 10 kit, 11 piano, 12
+strings, 13 choir, 14 brass) -- with the sound its page has, past the mutes. Replace leaves that voice's
+generated notes out, Layer plays over them; Composer off leaves every generated note out, and only what is played
+sounds, through the mix and the effects as composed. The keys play while the music runs, each on its sample; an export
+plays what was composed.
+
 The perform controls are live only: an export or parh_render plays the track as it was composed.
 
 == Export and cues | cue | 21 ==

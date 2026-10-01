@@ -53,6 +53,7 @@ constexpr int kBodyModes = 24;                                          ///< res
 #pragma warning(push)
 #pragma warning(disable : 4324)   // padded to its 32-byte lanes on purpose (the bodies)
 #endif
+/** @brief The string section: bowed modal strings, a player each, through the four families' bodies. */
 class StringSection {
 public:
     static constexpr int kMaxBlock = 32;   ///< samples per decision cell (vibrato, envelopes' targets)
@@ -91,62 +92,93 @@ public:
 private:
     /** @brief A lane's bow point moved to @p beta: its modes' response there and its admittance. */
     void placeBow(int lane, double beta);
+    /** @brief @p n samples of every lane's string and bow within one cell (see the file comment). */
     template <class V> void bowSegment(int n);
+    /** @brief Sets lane @p lane to play @p pitch at @p velocity as player @p player (@p staccato: a bitten stroke). */
     void startLane(int lane, int pitch, float velocity, bool staccato, int player);
+    /** @brief The decisions of a cell: the envelopes' targets, the vibrato, the modulation, the lanes that end. */
     void cellUpdate();
 
-    double sr_ = 48000.0;
-    uint64_t seed_ = 1;
-    int players_ = kStringPlayers;
+    double sr_ = 48000.0;   ///< the sample rate, Hz
+    uint64_t seed_ = 1;   ///< the players' streams' seed
+    int players_ = kStringPlayers;   ///< players on a note
     int playerLimit_ = kStringPlayers;   ///< setPlayerLimit()
-    int64_t pos_ = 0;
-    uint32_t counter_ = 0;
+    int64_t pos_ = 0;   ///< samples since the last reset (the cells)
+    uint32_t counter_ = 0;   ///< counts the lanes started (each player's stream)
     // Knobs.
-    float level_ = 1.0f, vibrato_ = 1.0f, pressure_ = 1.0f, position_ = 0.0f, speed_ = 1.0f, attackMs_ = 80.0f, releaseMs_ = 120.0f;
-    float width_ = 0.8f;
-    Svf lowCut_[2];
-    float lowCutHz_ = 60.0f;
+    float level_ = 1.0f;   ///< strings.level, linear
+    float vibrato_ = 1.0f;   ///< the vibrato's depth knob
+    float pressure_ = 1.0f;   ///< the bow force's factor
+    float position_ = 0.0f;   ///< the bow point knob
+    float speed_ = 1.0f;   ///< the bow speed's factor
+    float attackMs_ = 80.0f;   ///< the attack, ms
+    float releaseMs_ = 120.0f;   ///< the release, ms
+    float width_ = 0.8f;   ///< the width
+    Svf lowCut_[2];   ///< the low cut, per channel
+    float lowCutHz_ = 60.0f;   ///< the low cut, Hz
     // The modes, [mode][lane].
-    float zr_[kStringModes][kStringLanes] = {}, zi_[kStringModes][kStringLanes] = {};
-    float pr_[kStringModes][kStringLanes] = {}, pi_[kStringModes][kStringLanes] = {};
-    float p0r_[kStringModes][kStringLanes] = {}, p0i_[kStringModes][kStringLanes] = {};
-    float gr_[kStringModes][kStringLanes] = {}, gi_[kStringModes][kStringLanes] = {};
-    float hr_[kStringModes][kStringLanes] = {}, hi_[kStringModes][kStringLanes] = {};   ///< bow-point velocity
-    float br_[kStringModes][kStringLanes] = {}, bi_[kStringModes][kStringLanes] = {};   ///< bridge force
+    float zr_[kStringModes][kStringLanes] = {};   ///< the modes' states: real part
+    float zi_[kStringModes][kStringLanes] = {};   ///< ... imaginary part
+    float pr_[kStringModes][kStringLanes] = {};   ///< their poles this cell (with the vibrato): real part
+    float pi_[kStringModes][kStringLanes] = {};   ///< ... imaginary part
+    float p0r_[kStringModes][kStringLanes] = {};   ///< their poles at the stopped pitch: real part
+    float p0i_[kStringModes][kStringLanes] = {};   ///< ... imaginary part
+    float gr_[kStringModes][kStringLanes] = {};   ///< their input gains at the bow point: real part
+    float gi_[kStringModes][kStringLanes] = {};   ///< ... imaginary part
+    float hr_[kStringModes][kStringLanes] = {};   ///< the bow-point velocity's weights: real part
+    float hi_[kStringModes][kStringLanes] = {};   ///< ... imaginary part
+    float br_[kStringModes][kStringLanes] = {};   ///< the bridge force's weights: real part
+    float bi_[kStringModes][kStringLanes] = {};   ///< ... imaginary part
     float wT_[kStringModes][kStringLanes] = {};                                        ///< angle per sample
     float release_[kStringModes][kStringLanes] = {};                                   ///< decay factor after the stroke
-    float hur_[kStringModes][kStringLanes] = {}, hui_[kStringModes][kStringLanes] = {}; ///< bow-point velocity over sin^2 (the place moved)
+    float hur_[kStringModes][kStringLanes] = {};   ///< the bow-point velocity over sin^2 (the place moved): real part
+    float hui_[kStringModes][kStringLanes] = {};   ///< ... imaginary part
     // The lanes.
+    /** @brief One player on one note: his stroke, his vibrato, his place. */
     struct Lane {
-        bool on = false, held = false, staccato = false;
-        int pitch = 60, family = 0, note = -1;
-        float velocity = 0.7f;
+        bool on = false;   ///< it sounds
+        bool held = false;   ///< its key is held
+        bool staccato = false;   ///< a short bitten stroke
+        int pitch = 60;   ///< MIDI note
+        int family = 0;   ///< the family that plays it (0 violins .. 3 basses)
+        int note = -1;   ///< the note slot it belongs to, -1 none
+        float velocity = 0.7f;   ///< its velocity, 0..1
         double t = 0.0;            ///< seconds since the stroke's start (negative: the onset's delay)
         double lift = -1.0;        ///< seconds since the bow lifted, -1 while it plays
-        float vbow = 0.0f, fbow = 0.0f;      ///< targets
-        float vNow = 0.0f, fNow = 0.0f;      ///< the envelope's current values
-        float admittance = 1.0f;
+        float vbow = 0.0f;   ///< the bow speed to go to
+        float fbow = 0.0f;   ///< the bow force to go to
+        float vNow = 0.0f;   ///< the bow speed now
+        float fNow = 0.0f;   ///< the bow force now
+        float admittance = 1.0f;   ///< the string's admittance at the bow point
         float cents = 0.0f;        ///< the player's intonation
-        float vibHz = 5.5f, vibCents = 15.0f, vibPhase = 0.0f;
-        float panL = 0.7f, panR = 0.7f;
+        float vibHz = 5.5f;   ///< the vibrato's rate, Hz
+        float vibCents = 15.0f;   ///< the vibrato's depth, cents
+        float vibPhase = 0.0f;   ///< the vibrato's phase, radians
+        float panL = 0.7f;   ///< the pan's gain, left
+        float panR = 0.7f;   ///< the pan's gain, right
         // What the stroke began with (the modulation moves from these; Phase 5b).
-        float vbow0 = 0.0f, fbow0 = 0.0f, pan0 = 0.0f;
-        double beta0 = 0.1, beta = 0.1;
-        float peak = 0.0f;
-        int quiet = 0;
-        Rng noise;
+        float vbow0 = 0.0f;   ///< the bow speed the stroke began with
+        float fbow0 = 0.0f;   ///< the bow force the stroke began with
+        float pan0 = 0.0f;   ///< the place it began with
+        double beta0 = 0.1;   ///< the bow point the stroke began with (a share of the string)
+        double beta = 0.1;   ///< the bow point now
+        float peak = 0.0f;   ///< the bridge force's peak in this cell
+        int quiet = 0;   ///< cells it has been silent (it ends after a few)
+        Rng noise;   ///< its rosin noise stream
     };
-    Lane lane_[kStringLanes];
-    float vb_[kMaxBlock][kStringLanes] = {}, fb_[kMaxBlock][kStringLanes] = {}, y_[kStringLanes] = {};
-    float out_[kMaxBlock][kStringLanes] = {};
-    // The bodies: per family two inputs (left, right), a bank each.
+    Lane lane_[kStringLanes];   ///< the lanes
+    float vb_[kMaxBlock][kStringLanes] = {};   ///< per sample of the cell and lane: the bow speed
+    float fb_[kMaxBlock][kStringLanes] = {};   ///< per sample and lane: the bow force
+    float y_[kStringLanes] = {};   ///< per lane: the string's admittance at the bow point
+    float out_[kMaxBlock][kStringLanes] = {};   ///< per sample and lane: the bridge force
+    /// The bodies: per family two inputs (left, right), a bank each.
     struct Body {
         float direct = 0.3f;       ///< the broadband share
         float gain = 1.0f;         ///< the family levelled to the violins
-        bool active = false;
-        int quiet = 0;
+        bool active = false;   ///< it rings
+        int quiet = 0;   ///< cells it has been silent
     };
-    Body body_[kStringFamilies];
+    Body body_[kStringFamilies];   ///< the bodies, per family
     /**
      * @name The bodies' resonators on eight lanes (the optimisation pass, 29.09.2026)
      * Lane 2 f + c is family f's channel c (0 left, 1 right), mode by mode: the four families' two channels are the
@@ -159,7 +191,7 @@ private:
     alignas(32) float bw_[kBodyModes][kBodyLanes] = {};                                       ///< the output weights
     alignas(32) float bzr_[kBodyModes][kBodyLanes] = {}, bzi_[kBodyModes][kBodyLanes] = {};   ///< the states
     /** @} */
-    // The modulation (Phase 5b, Modulation.h): a Modulator per note slot.
+    /// The modulation (Phase 5b, Modulation.h): a Modulator per note slot.
     NoteModulation<kStringNotes> mod_;
 };
 #if defined(_MSC_VER)

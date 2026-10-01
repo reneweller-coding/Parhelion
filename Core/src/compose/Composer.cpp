@@ -14,6 +14,7 @@
 
 namespace parh {
 
+/** @brief the units' names, in the order of their streams (a reroll names one) */
 const char* const kUnitNames[kUnitCount] = { "form", "matrix", "energy", "harmony", "motif", "lead", "bass", "acid", "arp",
                                              "pluck", "piano", "orchestra", "drums", "fx", "sounds" };
 
@@ -28,10 +29,20 @@ std::string camelotLabel(int key, bool major)
 namespace {
 
 // The kit's lanes (Params.cpp, kDefaultKit).
-constexpr Part kCh = Part::Perc1, kOh = Part::Perc2, kClap = Part::Perc3, kSnare = Part::Perc4, kRide = Part::Perc5,
-               kCrash = Part::Perc6, kShaker = Part::Perc7, kTamb = Part::Perc8, kConga = Part::Perc9, kTom = Part::Perc10;
+constexpr Part kCh = Part::Perc1;       ///< the closed hat's lane
+constexpr Part kOh = Part::Perc2;       ///< the open hat's lane
+constexpr Part kClap = Part::Perc3;     ///< the clap's lane
+constexpr Part kSnare = Part::Perc4;    ///< the snare's lane
+constexpr Part kRide = Part::Perc5;     ///< the ride's lane
+constexpr Part kCrash = Part::Perc6;    ///< the crash's lane
+constexpr Part kShaker = Part::Perc7;   ///< the shaker's lane
+constexpr Part kTamb = Part::Perc8;     ///< the tambourine's lane
+constexpr Part kConga = Part::Perc9;    ///< the conga's lane
+constexpr Part kTom = Part::Perc10;     ///< the tom's lane
 
+/** @brief Whether bar @p bar of @p p lies in a drop. */
 bool isDrop(const Plan& p, int bar) { const int s = p.sectionAt(bar); return s >= 0 && p.sections[static_cast<size_t>(s)].kind == SectionKind::Drop; }
+/** @brief Whether @p v holds @p x. */
 bool contains(const std::vector<int>& v, int x) { return std::find(v.begin(), v.end(), x) != v.end(); }
 
 } // namespace

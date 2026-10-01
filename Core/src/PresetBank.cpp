@@ -23,28 +23,32 @@ namespace bank {
 /** @brief One knob of a group: its key inside the module, its range, its axis; or a list of values to draw from. */
 struct Knob {
     const char* key;     ///< e.g. "cutoff", "lfo@_rate", "mx#_amount"
-    float lo, hi;        ///< the range ('C': lo)
+    float lo;   ///< the low end of the range (the constant for an axis of C)
+    float hi;   ///< the high end of the range
     char axis;           ///< 'A' the row, 'B' the column, 'R' drawn, 'C' constant
     const char* list;    ///< "list:2,6,7": one of these (by the axis: the row's, the column's or drawn); else null
 };
 /** @brief A modulation recipe: its chance and its knobs. */
-struct Mod { float chance; std::vector<Knob> knobs; };
+struct Mod {
+    float chance;              ///< how often a preset of the group gets it, 0..1
+    std::vector<Knob> knobs;   ///< the knobs it sets
+};
 /** @brief A group: its name, its eight nouns, its weight in each style, the kit roles it is for, its knobs, its recipes. */
 struct Group {
-    const char* name;
-    const char* nouns[8];
+    const char* name;   ///< the group's name
+    const char* nouns[8];   ///< its eight nouns
     float style[5];      ///< Uplifting, Progressive, Dream House, Acid, Deep
     uint32_t roles;      ///< bit PercRole (the kit), 0: any
-    std::vector<Knob> knobs;
-    std::vector<Mod> mods;
+    std::vector<Knob> knobs;   ///< its knobs
+    std::vector<Mod> mods;   ///< its modulation recipes
 };
 /** @brief A bank: its label (the module's key prefix), module and instance, its eight adjectives, its sixteen groups. */
 struct Bank {
-    const char* label;
-    Module module;
-    int instance;
-    const char* adj[8];
-    std::vector<Group> groups;
+    const char* label;   ///< the bank's label: the module's key prefix
+    Module module;   ///< the module
+    int instance;   ///< the instance
+    const char* adj[8];   ///< its eight adjectives
+    std::vector<Group> groups;   ///< its sixteen groups
 };
 
 #include "PresetBankData.inl"
@@ -175,6 +179,7 @@ std::vector<SoundPreset> build(const Bank& b, int index)
     return out;
 }
 
+/** @brief The bank of instance @p instance of module @p m, null for one without presets. */
 const Bank* bankOf(Module m, int instance)
 {
     for (const Bank& b : banks())

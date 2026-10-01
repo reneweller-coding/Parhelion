@@ -75,24 +75,26 @@ public:
     int paramId() const { return id_; }               ///< the id in the store
 
 private:
-    parh::ParamStore& store_;
-    int id_;
-    juce::String name_;
-    juce::NormalisableRange<float> range_;
+    parh::ParamStore& store_;   ///< the store it reads and writes
+    int id_;   ///< the id in the store
+    juce::String name_;   ///< the display name
+    juce::NormalisableRange<float> range_;   ///< the store's mapping between the real and the normalised value
 };
 
 /** @brief A track where it lies in what plays (a track alone: at beat 0 on deck A). */
 struct TrackPlace {
-    double start = 0.0, swapIn = 0.0, end = 0.0;
-    int deck = 0;
-    parh::TrackInfo info;
+    double start = 0.0;   ///< set beat of the track's first bar
+    double swapIn = 0.0;   ///< set beat where it takes over the low end
+    double end = 0.0;   ///< set beat of its end
+    int deck = 0;   ///< the deck it plays on
+    parh::TrackInfo info;   ///< what the composer says of it
 };
 
 /** @brief What plays: a set, or a track as deck A of a one-track set, with where its tracks lie. */
 struct Playing {
-    parh::SetScore set;
-    bool isSet = false;
-    std::vector<TrackPlace> tracks;
+    parh::SetScore set;   ///< the set, or the one track as deck A
+    bool isSet = false;   ///< a set (a DJ mix), not a single track
+    std::vector<TrackPlace> tracks;   ///< its tracks where they lie
     parh::SetInfo setInfo;   ///< a set's (empty for a track)
     bool resume = false;     ///< the performer's "now": loaded where the engine is, and it plays on (performNow)
     std::vector<parh::Rewrite> rewrites;   ///< the "now"s this track was rewritten by, in order (a next one keeps them)
@@ -239,6 +241,7 @@ public:
     void forget(int id);
 
     parh::ParamStore& store() { return engine_.params(); }   ///< the engine's parameters
+    /** @brief The parameters (read only). */
     const parh::ParamStore& store() const { return engine_.params(); }
     /** @brief The host parameter of store id @p id, or null. */
     StoreParameter* parameter(int id) { return id >= 0 && id < static_cast<int>(params_.size()) ? params_[static_cast<size_t>(id)] : nullptr; }
@@ -265,15 +268,17 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;   ///< restores them and composes
 
 private:
+    /** @brief Nothing: a value alone is no step (the gestures are). */
     void parameterValueChanged(int, float) override {}
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;   ///< a knob on the panel: a step
     std::vector<float> values() const;               ///< every store value (undo)
     juce::String extraState() const;                 ///< seed, rerolls and the mix's length as text (undo)
     void applyExtra(const juce::String& text);       ///< the inverse; composes if seed or rerolls changed
+    /** @brief Puts undo step @p s back (@p after false) or makes it again (@p after true). */
     void applyStep(const frame::UndoStep& s, bool after);
     void pollHeadset();                              ///< the hands' events, 30 times a second (message thread)
-    void run() override;                             // the composer thread
-    void timerCallback() override;                   // loads a finished score on the message thread
+    void run() override;   ///< the composer thread
+    void timerCallback() override;   ///< loads a finished score on the message thread
     /** @brief Composes with the knobs as they are (copied into @p snapshot). */
     Playing composeNow(parh::ParamStore& snapshot);
     /** @brief Hands the loudness corrections, measured while it plays, to the engine (message thread). */
@@ -284,50 +289,70 @@ private:
     void loadEngine(const Playing& p);
     /** @brief The performer's MIDI: keys toggle the mutes, controllers move what they are bound to (audio thread). */
     void perform(const juce::MidiBuffer& midi);
+    int keyboardSeen_ = 0;   ///< the keyboard target of the last block (audio thread): a change releases every key
     /** @brief Sets store id @p id to the real value @p value through its host parameter. */
     void setFromMidi(int id, float value);
 
-    parh::Engine engine_;
-    std::vector<StoreParameter*> params_;
-    uint64_t seed_ = 1;
-    parh::Curation curation_;
-    mutable std::mutex lock_;
+    parh::Engine engine_;   ///< the engine
+    std::vector<StoreParameter*> params_;   ///< the host parameters, one per store id (owned by the processor)
+    uint64_t seed_ = 1;   ///< the seed of what plays
+    parh::Curation curation_;   ///< the rerolls and locks
+    mutable std::mutex lock_;   ///< guards what the composer thread hands over
     std::vector<parh::Rating> ratings_;   ///< Phase 17: the player's ratings (lock_)
     std::unique_ptr<Playing> pending_;               ///< composed, waiting to be loaded
     Playing current_;                                ///< what the engine plays
-    std::atomic<bool> composing_{ false }, playing_{ false }, exporting_{ false };
+    std::atomic<bool> composing_{ false };   ///< the composer thread works
+    std::atomic<bool> playing_{ false };   ///< play is on
+    std::atomic<bool> exporting_{ false };   ///< an export runs
     std::atomic<bool> again_{ false };               ///< compose was asked for while composing: once more when done
     std::atomic<int> nowBar_{ -1 };                  ///< performNow's bar, -1 none (read by composeNow)
     parh::SectionKind nowKind_ = parh::SectionKind::Breakdown;   ///< and its kind (lock_)
     // The loudness (Leveler.h): measured on the composer thread once the score is handed over, while it plays.
     std::atomic<bool> newer_{ false };               ///< a newer score is asked for: the measuring of the last one stops
-    uint64_t composed_ = 0, pendingId_ = 0, playingId_ = 0;   ///< counts the compositions; pending_'s, current_'s (lock_)
+    uint64_t composed_ = 0;   ///< counts the compositions
+    uint64_t pendingId_ = 0;   ///< pending_'s number (lock_)
+    uint64_t playingId_ = 0;   ///< current_'s number (lock_)
     std::vector<float> trims_[parh::kDecks];          ///< the corrections found for the composition trimsFor_ (lock_)
     std::vector<parh::BalanceDb> bal_[parh::kDecks];   ///< Phase 18: the parts' corrections found with them (lock_)
-    uint64_t trimsFor_ = 0;
+    uint64_t trimsFor_ = 0;   ///< the composition trims_ and bal_ belong to (lock_)
     bool levelled_ = false;                          ///< current_ carries its corrections (lock_)
-    std::atomic<double> position_{ 0.0 }, seekRequest_{ -1.0 };
-    double sampleRate_ = 48000.0;
-    int blockSize_ = 512;
-    juce::String lastExport_;
+    std::atomic<double> position_{ 0.0 };   ///< where the engine is, beats (audio thread writes)
+    std::atomic<double> seekRequest_{ -1.0 };   ///< a jump asked for, beats; -1 none
+    double sampleRate_ = 48000.0;   ///< the sample rate, Hz
+    int blockSize_ = 512;   ///< the largest block, samples
+    juce::String lastExport_;   ///< the last export's result, for the Export tab
     float mixMinutes_ = 60.0f;                       ///< the mix's length while a single track is chosen (chooseMix; the state)
-    std::unique_ptr<std::thread> exporter_;
+    std::unique_ptr<std::thread> exporter_;   ///< the export thread while it runs
     std::vector<float> record_;                      ///< interleaved, allocated in prepareToPlay in the test mode only
-    size_t recordTarget_ = 0;
-    std::atomic<size_t> recordPos_{ 0 };
-    bool autoPlay_ = false;
+    size_t recordTarget_ = 0;   ///< TOT_RECORD: how many values record_ takes, 0 off
+    std::atomic<size_t> recordPos_{ 0 };   ///< how many are written
+    bool autoPlay_ = false;   ///< TOT_PLAY: play once the first score is loaded
     // The meters: the decks through their taps, the output's peak and a K-weighted mean square.
     std::vector<float> tapBuf_;                      ///< kDecks x 2 x block (prepareToPlay)
-    std::array<float*, parh::kDecks> tapL_{}, tapR_{};
+    std::array<float*, parh::kDecks> tapL_{};   ///< per deck: its tap's left channel in tapBuf_
+    std::array<float*, parh::kDecks> tapR_{};   ///< per deck: its tap's right channel in tapBuf_
     std::array<std::atomic<float>, parh::kDecks> meterPeak_{};   ///< audio thread raises, the editor takes (exchange 0)
     std::array<std::atomic<double>, parh::kDecks> meterSum_{};   ///< sums of squares since the editor last took them
     std::atomic<int> meterCount_{ 0 };               ///< samples in those sums
-    std::atomic<float> outPeak_{ 0.0f }, lufs_{ -70.0f };
-    struct Biquad { double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
-                    double run(double x) { const double y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; } };
-    Biquad kShelf_[2], kHigh_[2];
-    double kMs_ = 0.0, kCoef_ = 0.0;
-    std::atomic<int> scoreVersion_{ 0 };
+    std::atomic<float> outPeak_{ 0.0f };   ///< the output's peak since the editor last took it
+    std::atomic<float> lufs_{ -70.0f };   ///< the output's momentary loudness, LUFS (400 ms)
+    /** @brief A biquad in transposed direct form II (the K weighting). */
+    struct Biquad {
+        double b0 = 1;   ///< feed-forward coefficient of x[n]
+        double b1 = 0;   ///< ... of x[n-1]
+        double b2 = 0;   ///< ... of x[n-2]
+        double a1 = 0;   ///< feedback coefficient of y[n-1]
+        double a2 = 0;   ///< ... of y[n-2]
+        double z1 = 0;   ///< the first state
+        double z2 = 0;   ///< the second state
+        /** @brief One sample @p x through the filter. */
+        double run(double x) { const double y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
+    };
+    Biquad kShelf_[2];   ///< the K weighting: its high shelf, per channel
+    Biquad kHigh_[2];   ///< ... and its high pass, per channel
+    double kMs_ = 0.0;   ///< the K-weighted mean square
+    double kCoef_ = 0.0;   ///< its one-pole coefficient
+    std::atomic<int> scoreVersion_{ 0 };   ///< counts the scores loaded (the editor redraws)
     parh::CueSender cues_;                            ///< the OSC cues' socket and thread (message thread starts and stops it)
     parh::CueTap cueTap_;                             ///< audio thread: beat range -> cues
     int cuePort_ = 0;                                ///< the port the sender was started for, 0 = off (message thread)
@@ -343,6 +368,6 @@ private:
     frame::UndoHistory history_;                     ///< undo and redo (message thread)
     bool restoring_ = false;                         ///< an undo or the headset moves knobs: no step of their own
     frame::Headset headset_;                         ///< the Quest's hands (message thread)
-    juce::TimedCallback headsetTick_{ [this] { pollHeadset(); } };
+    juce::TimedCallback headsetTick_{ [this] { pollHeadset(); } };   ///< polls the headset 30 times a second
     uint32_t toldSounds_ = 0;                        ///< the engine's soundsVersion() the host was last told of
 };

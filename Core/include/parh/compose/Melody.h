@@ -32,9 +32,9 @@ namespace parh {
 
 /** @brief What the melodic writers share: the plan, the harmony, the score to write into, a velocity scatter. */
 struct MelodyContext {
-    const Plan* plan = nullptr;
-    const Harmony* harmony = nullptr;
-    Score* score = nullptr;
+    const Plan* plan = nullptr;   ///< the track's plan
+    const Harmony* harmony = nullptr;   ///< its harmony
+    Score* score = nullptr;   ///< the score to write into
     float humanize = 0.08f;   ///< velocity scatter (compose.humanize)
     /** @brief The scatter's seed: a note's scatter is a hash of it and the note (its beat, part and pitch), so a voice
      *         drawn again changes no other voice's velocities (PLAN 6.9). */

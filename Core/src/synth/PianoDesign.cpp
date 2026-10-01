@@ -14,6 +14,7 @@
 
 namespace parh {
 
+/** @brief the instruments' names, in the order of PianoInstrument */
 const char* const kPianoInstrumentNames[kPianoInstruments] = { "Grand", "Baby Grand", "Upright", "Soft" };
 
 void PianoModes::resize(int n)
@@ -25,9 +26,9 @@ void PianoModes::resize(int n)
 
 namespace {
 
-constexpr double kPiD = 3.14159265358979323846;
-using cd = std::complex<double>;
-using Pt = std::array<double, 2>;
+constexpr double kPiD = 3.14159265358979323846;   ///< pi
+using cd = std::complex<double>;   ///< A complex number.
+using Pt = std::array<double, 2>;   ///< A point of the plate, m (x across the grain, y along it).
 
 // ------------------------------------------------------------------------------------------------ linear algebra
 
@@ -200,29 +201,37 @@ void symmetricEigen(std::vector<double>& v, int n, std::vector<double>& d)
 
 /** @brief A curved beam on the plate (a bridge): its polyline, bending stiffness EI and mass per length. */
 struct Beam {
-    std::vector<Pt> pts;
-    double ei = 0.0, mass = 0.0;
+    std::vector<Pt> pts;   ///< its polyline
+    double ei = 0.0;   ///< its bending stiffness EI, N m^2
+    double mass = 0.0;   ///< its mass per length, kg/m
 };
 
 /** @brief What the Rayleigh-Ritz solver needs. */
 struct PlateSpec {
-    double a = 1.0, b = 1.0;                 ///< the bounding rectangle, m (x across the grain, y along it)
-    double dx = 1.0, dy = 1.0, d12 = 0.0, d66 = 0.0;   ///< bending stiffnesses, N m
+    double a = 1.0;   ///< the bounding rectangle across the grain, m
+    double b = 1.0;   ///< ... along the grain, m
+    double dx = 1.0;   ///< the bending stiffness across the grain, N m
+    double dy = 1.0;   ///< ... along the grain
+    double d12 = 0.0;   ///< ... the coupling term
+    double d66 = 0.0;   ///< ... the torsion term
     double m = 1.0;                          ///< mass per area, kg/m^2
     std::vector<Pt> outline;                 ///< the polygon (m); empty: the whole rectangle
-    std::vector<Beam> beams;
+    std::vector<Beam> beams;   ///< the bridges and ribs on it
     double rim = 0.0;                        ///< support stiffness per length along the outline, N/m^2
-    int nx = 18, ny = 18;                    ///< basis functions per direction
+    int nx = 18;   ///< basis functions across the grain
+    int ny = 18;   ///< basis functions along the grain
     double grid = 0.015;                     ///< integration step, m
 };
 
 /** @brief The solved plate: frequencies (Hz, ascending) and the basis coefficients of each mass-normalised mode. */
 struct PlateModes {
-    int basis = 0;
-    std::vector<double> freq;
-    std::vector<std::vector<double>> coef;
-    double a = 1.0, b = 1.0;
-    int nx = 0, ny = 0;
+    int basis = 0;   ///< how many basis functions (nx ny)
+    std::vector<double> freq;   ///< the frequencies, Hz, ascending
+    std::vector<std::vector<double>> coef;   ///< each mode's basis coefficients
+    double a = 1.0;   ///< the rectangle across the grain, m
+    double b = 1.0;   ///< the rectangle along the grain, m
+    int nx = 0;   ///< basis functions across the grain
+    int ny = 0;   ///< basis functions along the grain
     /** @brief Mode @p m's displacement at (x, y). */
     double shape(int m, double x, double y) const
     {
@@ -235,6 +244,7 @@ struct PlateModes {
     }
 };
 
+/** @brief Whether the point (@p x, @p y) lies inside @p poly. */
 bool insidePolygon(const std::vector<Pt>& poly, double x, double y)
 {
     bool in = false;
@@ -263,6 +273,7 @@ std::vector<std::array<double, 4>> samplePolyline(const std::vector<Pt>& pts, do
     return out;
 }
 
+/** @brief The plate's first @p keep modes by Rayleigh-Ritz (sine basis, the beams' and the rim's energies added). */
 PlateModes solvePlate(const PlateSpec& ps, int keep)
 {
     const int nx = ps.nx, ny = ps.ny, N = nx * ny;
@@ -397,16 +408,28 @@ PlateModes solvePlate(const PlateSpec& ps, int keep)
 
 /** @brief One instrument: its case, its board, its strings' longest length, its felt. */
 struct Instrument {
-    double width, depth;               ///< the board's bounding rectangle, m
+    double width;   ///< the board's bounding rectangle: its width, m
+    double depth;   ///< ... its depth, m
     std::vector<Pt> outline;           ///< normalised to the rectangle
-    std::vector<Pt> mainBridge, bassBridge;   ///< normalised polylines, treble end first
-    Pt micL, micC, micR;
+    std::vector<Pt> mainBridge;   ///< the long bridge, a normalised polyline, treble end first
+    std::vector<Pt> bassBridge;   ///< the bass bridge, likewise
+    Pt micL;   ///< the bass-side listening point
+    Pt micC;   ///< the middle listening point
+    Pt micR;   ///< the treble-side listening point
     double lmax;                       ///< the longest string, m
-    double m, dx, dy, d12, d66;        ///< the board
-    double loss0, loss1;               ///< loss factor at 0 Hz and its rise per kHz
-    double hardness, strikeShift, stringLoss;
+    double m;   ///< the board's mass per area, kg/m^2
+    double dx;   ///< its bending stiffness across the grain, N m
+    double dy;   ///< ... along the grain
+    double d12;   ///< ... the coupling term
+    double d66;   ///< ... the torsion term
+    double loss0;   ///< the loss factor at 0 Hz
+    double loss1;   ///< its rise per kHz
+    double hardness;   ///< factor on the felt's stiffness
+    double strikeShift;   ///< shift of the strike point (deeper into the string: duller)
+    double stringLoss;   ///< factor on the strings' high-frequency losses
 };
 
+/** @brief Instrument @p which (PianoInstrument), clamped. */
 const Instrument& instrument(int which)
 {
     static const std::vector<Pt> kGrandOutline = { { 0, 0 }, { 1, 0 }, { 1, 0.12 }, { 0.93, 0.35 }, { 0.8, 0.55 }, { 0.62, 0.72 },
@@ -430,6 +453,7 @@ const Instrument& instrument(int which)
     return kInstr[std::clamp(which, 0, kPianoInstruments - 1)];
 }
 
+/** @brief Polyline @p p scaled from the unit square to @p w by @p d metres. */
 std::vector<Pt> scaled(const std::vector<Pt>& p, double w, double d)
 {
     std::vector<Pt> o;
@@ -454,6 +478,7 @@ Pt alongPolyline(const std::vector<Pt>& p, double t)
     return p.back();
 }
 
+/** @brief The length of polyline @p p. */
 double polylineLength(const std::vector<Pt>& p)
 {
     double total = 0.0;
@@ -507,7 +532,8 @@ double overKeys(double key, std::initializer_list<std::pair<double, double>> pts
     return p0.second + (key - p0.first) * (p1.second - p0.second) / (p1.first - p0.first);
 }
 
-constexpr double kSteelE = 2.0e11, kSteelRho = 7850.0;
+constexpr double kSteelE = 2.0e11;   ///< steel's Young's modulus, Pa
+constexpr double kSteelRho = 7850.0;   ///< steel's density, kg/m^3
 
 /** @brief The strings' data of every key (length, wire, tension, B) before the tuning. */
 void scaleStrings(PianoDesign& d, const Instrument& ins)
@@ -613,6 +639,10 @@ cd admittanceAt(const PianoBoard& b, const float* shape, double hz)
     return y;
 }
 
+/**
+ * @brief The board of @p d: its modes from @p pm, their shapes at the regions, the listening points and the keys' bridge
+ *        points, the high bank (@p seed: its spread).
+ */
 void designBoard(PianoDesign& d, const Instrument& ins, const PlateModes& pm, uint64_t seed)
 {
     PianoBoard& b = d.board;
@@ -742,6 +772,7 @@ void courseEigen(const cd* s, int n, cd kappa, cd* roots)
     }
 }
 
+/** @brief sin(x) / x, 1 at 0. */
 double sinc(double x) { return std::fabs(x) < 1e-9 ? 1.0 : std::sin(x) / x; }
 
 /**
@@ -759,6 +790,10 @@ cd boundedCoupling(cd kappa, int strings, double hz, const Instrument& ins, doub
     return cd(std::min(kappa.real(), cap), std::clamp(kappa.imag(), -0.5 * cap, 0.5 * cap));
 }
 
+/**
+ * @brief Key @p k of @p d: its strings' coupled modes, its hammer, its dampers, its longitudinal and sympathetic modes (@p r:
+ *        the condition's mistuning).
+ */
 void designKey(PianoDesign& d, const Instrument& ins, int k, Rng& r)
 {
     PianoKey& key = d.keys[static_cast<size_t>(k)];
@@ -894,6 +929,7 @@ void designKey(PianoDesign& d, const Instrument& ins, int k, Rng& r)
     key.pan = static_cast<float>((key.midi - 64.5) / 43.5);
 }
 
+/** @brief The whole design for @p spec at @p sampleRate (designPiano caches it). */
 std::shared_ptr<PianoDesign> build(const PianoSpec& spec, double sampleRate)
 {
     auto d = std::make_shared<PianoDesign>();

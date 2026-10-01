@@ -12,20 +12,23 @@ namespace parh {
 
 namespace {
 
-constexpr double kPiD = 3.14159265358979323846;
-constexpr float kMuS = 0.8f, kMuD = 0.3f, kV0 = 0.2f;   ///< the rosin's friction (Smith and Woodhouse 2000)
+constexpr double kPiD = 3.14159265358979323846;   ///< pi
+constexpr float kMuS = 0.8f;   ///< the rosin's static friction
+constexpr float kMuD = 0.3f;   ///< the rosin's dynamic friction
+constexpr float kV0 = 0.2f;   ///< the friction curve's velocity scale, m/s (Smith and Woodhouse 2000)
 
 /** @brief A family: its open strings (MIDI), their tensions (N), the string length (m), inharmonicity, pan. */
 struct Family {
-    int open[4];
-    float tension[4];
-    double length;
-    double B;
-    float pan;
+    int open[4];   ///< its open strings, MIDI
+    float tension[4];   ///< their tensions, N
+    double length;   ///< the string length, m
+    double B;   ///< the inharmonicity
+    float pan;   ///< where it sits, -1 .. 1
     double bodyScale;     ///< the body's modes relative to a violin's
     double hillHz;        ///< the bridge hill
 };
 
+/** @brief violins, violas, cellos, basses */
 const Family kFamilies[kStringFamilies] = {
     { { 55, 62, 69, 76 }, { 45.0f, 45.0f, 50.0f, 75.0f }, 0.325, 2e-5, -0.5f, 1.0, 2500.0 },    // violins
     { { 48, 55, 62, 69 }, { 55.0f, 55.0f, 60.0f, 70.0f }, 0.37, 3e-5, -0.15f, 0.82, 2100.0 },    // violas
@@ -33,7 +36,7 @@ const Family kFamilies[kStringFamilies] = {
     { { 28, 33, 38, 43 }, { 270.0f, 280.0f, 300.0f, 310.0f }, 1.05, 1e-4, 0.45f, 0.24, 1000.0 },  // basses
 };
 
-using cd = std::complex<double>;
+using cd = std::complex<double>;   ///< A complex number.
 
 } // namespace
 

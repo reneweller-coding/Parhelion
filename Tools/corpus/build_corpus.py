@@ -202,26 +202,33 @@ def write_tables(stats, out):
     for role in ROLES:
         st = stats[role]
         R = role.capitalize()
-        lines.append(f"// {role}: {st['files']} files, {st['notes']} notes")
+        lines.append(f"/// {role}: {st['files']} files, {st['notes']} notes; order 0: how often each step occurs")
         lines.append(f"const uint16_t k{R}T0[kCorpusAlpha] = {{ " + ", ".join(str(min(65535, st['t0'][i])) for i in range(ALPHA)) + " };")
         rows = []
         for a in range(ALPHA):
             rows.append("    { " + ", ".join(str(min(65535, st['t1'][(a, b)])) for b in range(ALPHA)) + " },")
+        lines.append(f"/// {role}, order 1: how often step b follows step a, [a][b]")
         lines.append(f"const uint16_t k{R}T1[kCorpusAlpha][kCorpusAlpha] = {{")
         lines += rows
         lines.append("};")
         # Order 2 as a sparse list: (a, b, c, count).
         t2 = sorted(st["t2"].items())
+        lines.append(f"/// {role}, order 2: the successions a, b, c and their counts, sparse, sorted by (a, b, c)")
         lines.append(f"const CorpusTriple k{R}T2[] = {{")
         for (a, b, c), n in t2:
             lines.append(f"    {{ {a}, {b}, {c}, {min(65535, n)} }},")
         lines.append("};")
-        lines.append(f"const int k{R}T2Count = {len(t2)};")
+        lines.append(f"const int k{R}T2Count = {len(t2)};   ///< how many order-2 successions there are")
+        lines.append(f"/// {role}: onsets on two bars' sixteenths: [step + 32 if the step before had one][no, yes]")
         lines.append(f"const uint16_t k{R}Onset[64][2] = {{ " + ", ".join("{ %d, %d }" % (min(65535, a), min(65535, b)) for a, b in st["on"]) + " };")
+        lines.append(f"/// {role}: note lengths in sixteenths (16: longer)")
         lines.append(f"const uint16_t k{R}Length[17] = {{ " + ", ".join(str(min(65535, st['len'][i])) for i in range(17)) + " };")
+        lines.append(f"/// {role}: the 303's accents per sixteenth: (no, yes)")
         lines.append(f"const uint16_t k{R}Accent[16][2] = {{ " + ", ".join("{ %d, %d }" % tuple(x) for x in st["acc"]) + " };")
+        lines.append(f"/// {role}: the 303's slides per sixteenth: (no, yes)")
         lines.append(f"const uint16_t k{R}Slide[16][2] = {{ " + ", ".join("{ %d, %d }" % tuple(x) for x in st["sld"]) + " };")
         lines.append("")
+    lines.append("/// The tables of every role, in the order of the roles.")
     lines.append("const CorpusRole kCorpusRoles[kCorpusRoleCount] = {")
     for role in ROLES:
         R = role.capitalize()

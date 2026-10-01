@@ -11,7 +11,7 @@
 namespace parh {
 
 namespace {
-constexpr double kTwoPiD = 6.283185307179586;
+constexpr double kTwoPiD = 6.283185307179586;   ///< 2 pi
 }
 
 void SubBass::prepare(double sampleRate)

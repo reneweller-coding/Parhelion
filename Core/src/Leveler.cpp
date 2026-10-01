@@ -17,19 +17,20 @@
 namespace parh {
 
 namespace {
-constexpr double kRate = 48000.0;
-constexpr int kBlock = 512;
+constexpr double kRate = 48000.0;   ///< the rate the parts are rendered at to be measured, Hz
+constexpr int kBlock = 512;   ///< the block they are rendered in
 constexpr double kWarm = 4.0;          ///< seconds before a measured part: the rooms fill, the notes sounding on are found
 constexpr float kMostDb = 6.0f;        ///< the largest loudness correction either way (Deep's soft drops need more than 4)
 constexpr double kBalSeconds = 12.0;   ///< how much the balance reads in each of its places
 constexpr double kBalWarm = 2.0;       ///< and before it
-constexpr float kBalDown = -8.0f, kBalUp = 10.0f;   ///< the largest corrections of a part
+constexpr float kBalDown = -8.0f;   ///< the largest correction of a part down, dB
+constexpr float kBalUp = 10.0f;   ///< the largest correction of a part up, dB
 constexpr float kBreakMost = 8.0f;     ///< the breakdown's correction, either way
 
 /** @brief The loudest samples of the kick and of every part. */
 struct PartPeaks {
-    float kick = 0.0f;
-    float part[kBalParts] = {};
+    float kick = 0.0f;   ///< the kick's loudest sample
+    float part[kBalParts] = {};   ///< every part's loudest sample
 };
 
 /** @brief Plays @p seconds from @p beat (after kBalWarm before it) and keeps the loudest samples. False if stopped. */

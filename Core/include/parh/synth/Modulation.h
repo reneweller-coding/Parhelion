@@ -111,7 +111,10 @@ struct ModSlot {
 };
 /** @brief A voice's modulation settings: the modulation envelope, the LFOs, the matrix. */
 struct ModSettings {
-    float attackMs = 10.0f, decayMs = 500.0f, sustain = 0.0f, releaseMs = 300.0f;   ///< the modulation envelope
+    float attackMs = 10.0f;   ///< the modulation envelope's attack, ms
+    float decayMs = 500.0f;   ///< its decay, ms
+    float sustain = 0.0f;   ///< its sustain, 0..1
+    float releaseMs = 300.0f;   ///< its release, ms
     LfoSettings lfo[kLfos];   ///< the four LFOs
     ModSlot slot[kModSlots];  ///< the matrix
 };
@@ -121,7 +124,10 @@ struct ModSettings {
  *        attack, sustain and release, the modulation envelope's four times, four LFOs of five knobs (rate, shape,
  *        sync, retrig, fade) and eight slots of three (source, target, amount) -- 51 knobs from the block's first.
  */
-constexpr int kModBlockMenv = 3, kModBlockLfo = 7, kModBlockSlots = 27, kModBlockSize = 51;
+constexpr int kModBlockMenv = 3;    ///< the modulation envelope's first knob in the block
+constexpr int kModBlockLfo = 7;     ///< the first LFO's first knob
+constexpr int kModBlockSlots = 27;  ///< the first slot's first knob
+constexpr int kModBlockSize = 51;   ///< knobs in the block
 /** @brief The block without the filter envelope (every engine but Poly): from the modulation envelope's attack, 48 knobs. */
 constexpr int kModCoreSize = kModBlockSize - kModBlockMenv;
 
@@ -284,11 +290,16 @@ private:
         double inc = 0.0;       ///< cycles per sample, free
         double cpb = 0.0;       ///< cycles per beat, synced (0: free)
         int64_t cycle = std::numeric_limits<int64_t>::min();   ///< the whole cycle last read (the random shapes draw on a new one)
-        float from = 0.0f, to = 0.0f;   ///< the random shapes' last two values
+        float from = 0.0f;   ///< the random shapes' last value
+        float to = 0.0f;   ///< ... and the next
         Rng rng;                ///< the random shapes' stream
     };
     /** @brief A slot that reaches something, with its amount already scaled by the span. */
-    struct Live { int src = 0, dst = 0; float amount = 0.0f; };
+    struct Live {
+        int src = 0;           ///< its source (ModSource)
+        int dst = 0;           ///< its destination (ModDest)
+        float amount = 0.0f;   ///< its amount, scaled by the destination's span
+    };
 
     /** @brief The free LFOs run on to sample @p at (read or not). */
     void advance(int64_t at)
@@ -335,7 +346,8 @@ private:
     LfoState lfo_[kLfos];          ///< the LFOs
     Live liveSlots_[kModSlots];    ///< the slots that reach something
     int live_ = 0;                 ///< how many
-    unsigned lfoUsed_ = 0u, dstMask_ = 0u;   ///< which LFOs a slot reads, which destinations a slot reaches
+    unsigned lfoUsed_ = 0u;   ///< which LFOs a slot reads (bit l)
+    unsigned dstMask_ = 0u;   ///< which destinations a slot reaches (bit d)
     bool envUsed_ = false;         ///< a slot reads the envelope
     int64_t lastAt_ = 0;           ///< the sample the free LFOs ran to
     int64_t noteAt_ = 0;           ///< the last note's sample (the fades)
@@ -352,6 +364,7 @@ private:
 template <int N>
 class NoteModulation {
 public:
+    /** @brief Sets the sample rate and the seed of every note's LFOs and of the random source; clears the sums. */
     void prepare(double sampleRate, uint64_t seed)
     {
         sr_ = sampleRate;
@@ -416,17 +429,20 @@ public:
     double beatAt(int64_t at) const { return clockBeat_ + static_cast<double>(at - clockAt_) * bps_; }
 
 private:
-    double sr_ = 48000.0;
-    uint64_t seed_ = 1;
-    Modulator mod_[N];
-    float sum_[N][kModDests] = {};
-    float vel_[N] = {}, key_[N] = {}, rnd_[N] = {};
-    int64_t lastAt_[N] = {};
-    ModGlobals glob_;
-    Rng rng_;
-    bool on_ = false;
-    int64_t clockAt_ = 0;
-    double clockBeat_ = 0.0, bps_ = 0.0;
+    double sr_ = 48000.0;   ///< the sample rate, Hz
+    uint64_t seed_ = 1;   ///< the seed
+    Modulator mod_[N];   ///< a Modulator per note
+    float sum_[N][kModDests] = {};   ///< per note: the sums per destination
+    float vel_[N] = {};   ///< per note: its velocity (a source)
+    float key_[N] = {};   ///< per note: its key around C4, -1 .. 1 (a source)
+    float rnd_[N] = {};   ///< per note: its random value, -1 .. 1 (a source)
+    int64_t lastAt_[N] = {};   ///< per note: the sample its envelope ran to
+    ModGlobals glob_;   ///< the deck's shared sources
+    Rng rng_;   ///< the random source's stream
+    bool on_ = false;   ///< a slot is live
+    int64_t clockAt_ = 0;   ///< the engine sample of the last setClock()
+    double clockBeat_ = 0.0;   ///< the beat there
+    double bps_ = 0.0;   ///< beats per sample
 };
 
 /** @brief Fills the shared sources into a voice's own (Poly::applyModulation). */

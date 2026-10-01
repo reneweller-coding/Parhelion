@@ -28,7 +28,7 @@ const char* const kModSourceNames[] = { "Off", "LFO 1", "LFO 2", "LFO 3", "LFO 4
                                         "Wheel", "Pressure", "Energy" };
 const char* const kModDestNames[] = { "Off", "Pitch", "Osc 2 Pitch", "Pulse Width", "Table Position", "FM Index", "Cutoff",
                                       "Resonance", "Filter Mode", "Level", "Pan", "Detune" };
-// The other engines' targets (Modulation.h maps each list onto ModDest).
+/// The other engines' targets (Modulation.h maps each list onto ModDest).
 const char* const kSynthModDestNames[] = { "Off", "Pitch", "Pulse Width", "Cutoff", "Resonance", "Env Amount", "Drive", "Level", "Pan" };
 const char* const kPianoModDestNames[] = { "Off", "Pitch", "Hardness", "Level", "Pan" };
 const char* const kStringsModDestNames[] = { "Off", "Pitch", "Bow Pressure", "Bow Speed", "Bow Position", "Vibrato", "Vibrato Rate",
@@ -37,18 +37,20 @@ const char* const kChoirModDestNames[] = { "Off", "Pitch", "Vowel", "Tension", "
 const char* const kBrassModDestNames[] = { "Off", "Pitch", "Breath", "Brassiness", "Vibrato", "Level", "Pan" };
 const char* const kTimpaniModDestNames[] = { "Off", "Pitch", "Hardness", "Strike", "Decay", "Level", "Pan" };
 
-// The modulation block's core as rows (Phase 5b): the modulation envelope, four LFOs, eight slots with the engine's
-// targets -- the same keys as the polyphonic voice's, so a preset's modulation reads the same everywhere.
+/// The modulation block's core as rows (Phase 5b): the modulation envelope, four LFOs, eight slots with the engine's
+/// targets -- the same keys as the polyphonic voice's, so a preset's modulation reads the same everywhere.
 #define PARH_MOD_LFO(n) \
     { "lfo" #n "_rate",   "LFO " #n " Rate",   "Hz", 0.01f, 40.0f, 1.0f, Curve::Log }, \
     { "lfo" #n "_shape",  "LFO " #n " Shape",  "",   0.0f,  6.0f,  0.0f, Curve::Choice, kLfoShapeNames }, \
     { "lfo" #n "_sync",   "LFO " #n " Sync",   "",   0.0f,  9.0f,  0.0f, Curve::Choice, kLfoSyncNames }, \
     { "lfo" #n "_retrig", "LFO " #n " Retrig", "",   0.0f,  1.0f,  0.0f, Curve::Toggle }, \
     { "lfo" #n "_fade",   "LFO " #n " Fade",   "s",  0.0f,  8.0f,  0.0f, Curve::Linear }
+/** @brief The three knobs of modulation slot @p n: its source, its target from @p DST (up to @p DMAX), its amount. */
 #define PARH_MOD_SLOT(n, DST, DMAX) \
     { "mx" #n "_src",    "Mod " #n " Source", "", 0.0f, 12.0f, 0.0f, Curve::Choice, kModSourceNames }, \
     { "mx" #n "_dst",    "Mod " #n " Target", "", 0.0f, DMAX,  0.0f, Curve::Choice, DST }, \
     { "mx" #n "_amount", "Mod " #n " Amount", "", -1.0f, 1.0f, 0.0f, Curve::Linear }
+/** @brief The modulation block's core with the targets @p DST (up to @p DMAX): the envelope, four LFOs, eight slots. */
 #define PARH_MOD_CORE(DST, DMAX) \
     { "menv_attack",  "Mod Attack",  "ms", 0.1f, 8000.0f,  10.0f, Curve::Log }, \
     { "menv_decay",   "Mod Decay",   "ms", 5.0f, 12000.0f, 800.0f, Curve::Log }, \
@@ -60,35 +62,44 @@ const char* const kTimpaniModDestNames[] = { "Off", "Pitch", "Hardness", "Strike
 
 namespace {
 
+/** @brief compose.morph_to: the style a track morphs into */
 const char* const kMorphToNames[] = { "Off", "Uplifting", "Progressive", "Dream House", "Acid", "Deep" };
-const char* const kKickEngineNames[] = { "Sweep", "Resonator", "909" };
-const char* const kKickTuneNames[] = { "Free", "Key", "Fifth", "Flat Seventh" };
-const char* const kKickClipNames[] = { "Soft", "Hard" };
-const char* const kLockNames[] = { "Off", "Kick" };
-const char* const kPercEngineNames[] = { "Noise", "Metal", "Modal", "Tone", "FM" };
-const char* const kModeSetNames[] = { "Membrane", "Bar", "Harmonic" };
-const char* const kPercFilterNames[] = { "Low Pass", "Band Pass", "High Pass" };
-const char* const kNoiseTypeNames[] = { "White", "909 Metal" };
+/** @brief perform.keyboard_part (perform::keys) */
+const char* const kKeyboardPartNames[] = { "Off", "Kit", "Bass", "303", "Lead", "Counter", "Pluck", "Arp", "Pad", "Stab", "Piano",
+                                           "Strings", "Choir", "Brass", "By channel" };   // perform::keys
+const char* const kKeyboardModeNames[] = { "Replace", "Layer" };   ///< perform.keyboard_mode
+const char* const kKickEngineNames[] = { "Sweep", "Resonator", "909" };   ///< kick.engine
+const char* const kKickTuneNames[] = { "Free", "Key", "Fifth", "Flat Seventh" };   ///< kick.tune (KickTune)
+const char* const kKickClipNames[] = { "Soft", "Hard" };   ///< kick.clip
+const char* const kLockNames[] = { "Off", "Kick" };   ///< sub.lock: the sub's phase locked to the kick or not
+const char* const kPercEngineNames[] = { "Noise", "Metal", "Modal", "Tone", "FM" };   ///< perc.engine (PercEngine)
+const char* const kModeSetNames[] = { "Membrane", "Bar", "Harmonic" };   ///< perc.modes: the modal engine's mode sets
+const char* const kPercFilterNames[] = { "Low Pass", "Band Pass", "High Pass" };   ///< perc.filter: the lane filter's output
+const char* const kNoiseTypeNames[] = { "White", "909 Metal" };   ///< perc.noise_type
+/** @brief synth.model (FilterModel). */
 const char* const kFilterModelNames[] = { "Moog Ladder", "Prophet (SSM2040)", "Juno (IR3109)", "Oberheim SEM", "Xpander",
                                           "Diode Ladder (303)", "Korg35 (MS-20)", "Polivoks", "Wasp", "Comb" };
-const char* const kEchoTimeNames[] = { "1/16", "1/8", "3/16", "1/4", "3/8", "1/2" };
-const char* const kDelayTimeNames[] = { "1/16", "1/8", "3/16", "1/4", "3/8", "1/2" };
-const char* const kPolyOscNames[] = { "Supersaw", "VA", "FM", "Wavetable" };
-const char* const kPolyOsc2Names[] = { "Off", "Supersaw", "VA", "FM", "Wavetable" };
+const char* const kEchoTimeNames[] = { "1/16", "1/8", "3/16", "1/4", "3/8", "1/2" };   ///< the echo times, in notes
+const char* const kDelayTimeNames[] = { "1/16", "1/8", "3/16", "1/4", "3/8", "1/2" };   ///< the tempo delay's times, in notes
+const char* const kPolyOscNames[] = { "Supersaw", "VA", "FM", "Wavetable" };   ///< poly.osc: the first oscillator's engine
+const char* const kPolyOsc2Names[] = { "Off", "Supersaw", "VA", "FM", "Wavetable" };   ///< poly.osc2: the second oscillator's engine, or none
+/** @brief poly.osc2_interval: the second oscillator's interval */
 const char* const kPolyOsc2IntervalNames[] = { "-2 Oct", "-1 Oct", "-5th", "Unison", "+5th", "+1 Oct" };
-const char* const kPolyFilterNames[] = { "Low Pass", "Band Pass", "High Pass", "Notch" };
+const char* const kPolyFilterNames[] = { "Low Pass", "Band Pass", "High Pass", "Notch" };   ///< poly.filter_type: the filter's response
+/** @brief poly.filter_model: the filter models */
 const char* const kPolyFilterModelNames[kVoiceFilterModels] = { "State Variable", "Moog Ladder", "Prophet (SSM2040)", "Juno (IR3109)",
                                                                 "Oberheim SEM", "Xpander", "Diode Ladder", "Korg35 (MS-20)",
                                                                 "Polivoks", "Wasp" };
-// The `table` choice: the six tables written as spectra in code, then the library's (Phosphene's list; WaveTableFile.h).
+/// The `table` choice: the six tables written as spectra in code, then the library's (Phosphene's list; WaveTableFile.h).
 #define PARH_WT(index, name, id, lane, fallback) name,
+/** @brief poly.table: the wavetables. */
 const char* const kWaveTableNames[] = { "Classic", "Vocal", "Glass", "PWM", "Sync", "Formant Saw",
 #include "parh/synth/WaveTableList.inl"
 };
 #undef PARH_WT
 static_assert(sizeof(kWaveTableNames) / sizeof(kWaveTableNames[0]) == kNumWaveTables,
               "the table choice list and kNumWaveTables have come apart");
-// Phosphene's six patterns, then the trance gate's classic sixteenth masks (PLAN 5.7, Dok. 5: "x.xx.x.xx.x.x.x.").
+/// Phosphene's six patterns, then the trance gate's classic sixteenth masks (PLAN 5.7, Dok. 5: "x.xx.x.xx.x.x.x.").
 const char* const kGatePatternNames[] = { "Sixteenths", "Eighths", "Rolling", "Gallop", "3-3-2", "Triplets",
                                           "Trance 1", "Trance 2", "Trance 3" };
 
@@ -424,7 +435,7 @@ const ParamDesc kSfxParams[sfx::Count] = {
     { "plate_send",           "Plate Send",    "", 0.0f, 1.0f, 0.1f, Curve::Linear },
 };
 
-const char* const kPianoInstrumentChoices[] = { "Grand", "Baby Grand", "Upright", "Soft" };
+const char* const kPianoInstrumentChoices[] = { "Grand", "Baby Grand", "Upright", "Soft" };   ///< piano.instrument
 
 /**
  * The physical piano (PLAN 5.8): the instrument first (read at load), then what acts while it plays. Level -6 dB and a
@@ -595,9 +606,9 @@ const ParamDesc kDjFxParams[djfx::Count] = {
     { "hall_return", "Hall Return", "dB", -60.0f, 12.0f, 6.0f, Curve::Linear },
 };
 
-const char* const kDramaturgyChoiceNames[] = { "Warm-up", "Peak", "Closing", "Sunrise", "Journey" };
-const char* const kJourneyNames[] = { "Stay", "Wander" };
-const char* const kBlendNames[] = { "32 bars", "64 bars" };
+const char* const kDramaturgyChoiceNames[] = { "Warm-up", "Peak", "Closing", "Sunrise", "Journey" };   ///< set.dramaturgy: the set's arc
+const char* const kJourneyNames[] = { "Stay", "Wander" };   ///< set.journey: the key stays or wanders
+const char* const kBlendNames[] = { "32 bars", "64 bars" };   ///< set.blend: how long two tracks overlap
 /** The set (PLAN 6.8): trance tracks are extended mixes, blended over their DJ intros and outros. */
 const ParamDesc kSetParams[set::Count] = {
     { "dramaturgy",    "Dramaturgy", "",    0.0f,   4.0f, 1.0f, Curve::Choice, kDramaturgyChoiceNames },
@@ -620,6 +631,10 @@ const ParamDesc kPerformParams[perform::Count] = {
     { "mute_pads",   "Mute Pads",     "",   0.0f, 1.0f, 0.0f, Curve::Toggle },
     { "wheel",       "Mod Wheel",     "",   0.0f, 1.0f, 0.0f, Curve::Linear },
     { "pressure",    "Pressure",      "",   0.0f, 1.0f, 0.0f, Curve::Linear },
+    // 01.10.2026: a MIDI keyboard plays a voice (Engine::queueLive); the composer can be switched off.
+    { "keyboard_part", "Keyboard Plays", "", 0.0f, 14.0f, 0.0f, Curve::Choice, kKeyboardPartNames },
+    { "keyboard_mode", "Keyboard Mode",  "", 0.0f, 1.0f, 0.0f, Curve::Choice, kKeyboardModeNames },
+    { "composer",      "Composer",       "", 0.0f, 1.0f, 1.0f, Curve::Toggle },
 };
 
 /** The OSC cues (Cue.h). */
@@ -706,14 +721,16 @@ const char* const kDefaultKit =
     "perc12.role=Noise; perc12.engine=Noise; perc12.noise_decay=2500; perc12.filter=Band Pass; perc12.cutoff=2000;"
     "perc12.resonance=0.4; perc12.low_cut=300; perc12.level=-9.0\n";
 
+/** @brief A module of the store: its key prefix, its parameters, how many instances. */
 struct ModuleSpec {
-    const char* prefix;
-    const ParamDesc* descs;
-    int count;
-    int instances;
+    const char* prefix;   ///< the key prefix ("kick", "perc" ...)
+    const ParamDesc* descs;   ///< its parameters
+    int count;   ///< how many
+    int instances;   ///< how many instances
     const char* const* names = nullptr;   ///< the instances' own prefixes (else prefix + number)
 };
 
+/** @brief The modules, in the order of Module. */
 const ModuleSpec kModules[static_cast<int>(Module::Count)] = {
     { "compose", kComposeParams, compose::Count, 1 },
     { "kick",    kKickParams,    kick::Count,    1 },
@@ -740,8 +757,10 @@ const ModuleSpec kModules[static_cast<int>(Module::Count)] = {
     { "cue",     kCueParams,     cue::Count,     1 },
 };
 
+/** @brief Whether a curve takes whole steps (Int, Choice, Toggle). */
 bool isDiscrete(Curve c) { return c == Curve::Int || c == Curve::Choice || c == Curve::Toggle; }
 
+/** @brief @p s without spaces, tabs and carriage returns at either end. */
 std::string_view trim(std::string_view s)
 {
     while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\r')) s.remove_prefix(1);

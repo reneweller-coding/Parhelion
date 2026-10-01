@@ -13,20 +13,22 @@ namespace parh {
 
 namespace {
 
-constexpr int kBars = 104;
-constexpr int kBlocks = kBars / 8;
+constexpr int kBars = 104;   ///< the study's length, bars
+constexpr int kBlocks = kBars / 8;   ///< its blocks of eight bars
+/** @brief The beat bar @p bar begins on. */
 constexpr double beatOf(int bar) { return 4.0 * bar; }
 
-using L = Layer;
-using S = LayerState;
+using L = Layer;   ///< The layers, shortly.
+using S = LayerState;   ///< The layers' states, shortly.
 
 /** @brief The layer matrix of the study, block by block (Study.h). */
 struct BlockPlan {
-    int bar;
-    std::array<S, kNumLayers> st;
-    float energy;
+    int bar;   ///< the bar the block begins on
+    std::array<S, kNumLayers> st;   ///< every layer's state
+    float energy;   ///< the block's energy
 };
 
+/** @brief Every layer off but those @p on names. */
 std::array<S, kNumLayers> states(std::initializer_list<std::pair<L, S>> on)
 {
     std::array<S, kNumLayers> a{};
@@ -34,6 +36,7 @@ std::array<S, kNumLayers> states(std::initializer_list<std::pair<L, S>> on)
     return a;
 }
 
+/** @brief The study's blocks: the layers in and out, the energy, as Study.h tells it. */
 std::vector<BlockPlan> studyPlan()
 {
     const S on = S::On, fi = S::Filtered;
@@ -60,8 +63,12 @@ std::vector<BlockPlan> studyPlan()
 }
 
 /** @brief A chord: its root in semitones above the key and its three tones (root, third, fifth) in semitones. */
-struct Chord { int root; int tones[3]; };
+struct Chord {
+    int root;       ///< semitones above the key
+    int tones[3];   ///< root, third, fifth, in semitones
+};
 
+/** @brief The triad on scale degree @p degree of @p sc. */
 Chord chordOn(const ScaleDef& sc, int degree)
 {
     Chord c{};
@@ -102,6 +109,7 @@ std::array<int, 4> voicePad(const Chord& c, int key, const std::array<int, 4>& p
     return best;
 }
 
+/** @brief @p v moved by up to @p amount of itself either way, kept in 0.05 .. 1. */
 float humanised(Rng& r, float v, float amount)
 {
     return clampv(v * (1.0f + amount * r.bipolar()), 0.05f, 1.0f);

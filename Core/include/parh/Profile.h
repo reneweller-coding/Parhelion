@@ -39,7 +39,10 @@ struct Scope {
 #define PARH_PROF_BEGIN(slot) const auto parhProfT_##slot = std::chrono::steady_clock::now()
 #define PARH_PROF_END(slot)     (::parh::prof::ns[::parh::prof::slot] += std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - parhProfT_##slot).count())
 #else
+/** @brief Times the enclosing scope into @p slot (nothing without TOT_PROFILE). */
 #define PARH_PROF(slot) ((void)0)
+/** @brief Starts timing into @p slot (nothing without TOT_PROFILE). */
 #define PARH_PROF_BEGIN(slot) ((void)0)
+/** @brief Ends timing into @p slot (nothing without TOT_PROFILE). */
 #define PARH_PROF_END(slot) ((void)0)
 #endif

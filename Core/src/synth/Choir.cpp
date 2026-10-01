@@ -11,12 +11,17 @@ namespace parh {
 
 namespace {
 
-constexpr double kPiD = 3.14159265358979323846;
-constexpr double kRdLo = 0.3, kRdHi = 2.7;
+constexpr double kPiD = 3.14159265358979323846;   ///< pi
+constexpr double kRdLo = 0.3;   ///< Rd's low end: pressed
+constexpr double kRdHi = 2.7;   ///< Rd's high end: lax and breathy
 
 /** @brief Formants: frequency (Hz), level (dB), bandwidth (Hz) of five, for a voice on a vowel. */
-struct Formants { double f[5], db[5], bw[5]; };
-// [voice: bass, tenor, alto, soprano][vowel: a, o, u]
+struct Formants {
+    double f[5];    ///< the frequencies, Hz
+    double db[5];   ///< the levels, dB
+    double bw[5];   ///< the bandwidths, Hz
+};
+/// [voice: bass, tenor, alto, soprano][vowel: a, o, u]
 const Formants kFormants[4][3] = {
     { { { 600, 1040, 2250, 2450, 2750 }, { 0, -7, -9, -9, -20 }, { 60, 70, 110, 120, 130 } },
       { { 400, 750, 2400, 2600, 2900 }, { 0, -11, -21, -20, -40 }, { 40, 80, 100, 120, 120 } },

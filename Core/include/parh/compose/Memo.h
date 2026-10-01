@@ -17,8 +17,8 @@
 
 namespace parh {
 
-constexpr int kMemoMinNotes = 5;
-constexpr int kMemoMinPitches = 3;
+constexpr int kMemoMinNotes = 5;   ///< a window counts with at least this many notes
+constexpr int kMemoMinPitches = 3;   ///< ... and this many distinct pitches
 
 extern const int kMemoBloomBits;
 extern const int kMemoBloomK;

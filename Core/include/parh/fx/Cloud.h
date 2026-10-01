@@ -42,26 +42,34 @@ public:
     void process(const float* inL, const float* inR, float* L, float* R, int n);
 
 private:
+    /** @brief One grain: where it reads, how fast, how long, where it sits. */
     struct Grain {
         double pos = 0.0;     ///< read position in the history, frames
         double rate = 1.0;    ///< frames per sample
         int length = 0;       ///< samples
         int age = 0;          ///< samples played
-        float gl = 0.0f, gr = 0.0f;   ///< pan gains
-        bool live = false;
+        float gl = 0.0f;   ///< the pan's gain, left
+        float gr = 0.0f;   ///< the pan's gain, right
+        bool live = false;   ///< it sounds
     };
+    /** @brief Starts a grain at a random place in the history (Spray), pitch and side. */
     void spawn();
 
-    double sr_ = 48000.0;
-    uint64_t seed_ = 1;
-    Rng rng_;
-    std::vector<float> histL_, histR_;
-    int mask_ = 0, write_ = 0;
-    Grain g_[kMaxGrains];
-    int live_ = 0;
+    double sr_ = 48000.0;   ///< the sample rate, Hz
+    uint64_t seed_ = 1;   ///< the stream's seed
+    Rng rng_;   ///< the random stream
+    std::vector<float> histL_;   ///< the history the grains read, left
+    std::vector<float> histR_;   ///< ... right
+    int mask_ = 0;   ///< its size - 1
+    int write_ = 0;   ///< where the next sample goes
+    Grain g_[kMaxGrains];   ///< the grains
+    int live_ = 0;   ///< how many grains sound
     float rate_ = 0.0f;        ///< onsets per sample
-    float sizeS_ = 0.2f, pitch_ = 0.3f, spray_ = 1.5f, level_ = 0.0f;
-    bool on_ = false;
+    float sizeS_ = 0.2f;   ///< a grain's length, s
+    float pitch_ = 0.3f;   ///< the grains' pitch spread, semitones
+    float spray_ = 1.5f;   ///< how far back in the history they read, s
+    float level_ = 0.0f;   ///< the level, linear
+    bool on_ = false;   ///< the cloud plays (level above zero)
 };
 
 } // namespace parh

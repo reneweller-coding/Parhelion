@@ -14,8 +14,13 @@ namespace {
 enum class Role : int { AmbientIntro, Intro, Groove, ShortBreak, Drop1, Breakdown, Build, MainDrop, Break2, FinalDrop, KickPause,
                         Plateau, Outro, AmbientOutro };
 
-struct Spec { Role role; int bars; };
+/** @brief A section of a template: its role and its length. */
+struct Spec {
+    Role role;   ///< what it does
+    int bars;    ///< how long, bars
+};
 
+/** @brief The kind of section role @p r is (SectionKind). */
 SectionKind kindOf(Role r)
 {
     switch (r) {
@@ -51,6 +56,7 @@ void energyOf(Role r, float& from, float& to)
     }
 }
 
+/** @brief One of @p options, drawn from @p r. */
 int pick(Rng& r, std::initializer_list<int> options)
 {
     const int n = static_cast<int>(options.size());
@@ -140,6 +146,7 @@ std::vector<Spec> drawSpecs(const StyleProfile& prof, FormTemplate form, Rng& r,
     return s;
 }
 
+/** @brief The bars of every section of @p s together. */
 int totalBars(const std::vector<Spec>& s)
 {
     int n = 0;
@@ -173,13 +180,21 @@ void fitTo32(std::vector<Spec>& s, int minOutro)
 struct Cast {
     bool acidBass = false;    ///< the 303 carries the bass (and the melody)
     bool lead = true;         ///< a lead voice plays the melody (the supersaw, or the piano's stand-in)
-    bool pluck = true, arp = false, stab = false, counter = false, ride = true, perc = false;
-    bool beatless = false;
+    bool pluck = true;   ///< a pluck plays
+    bool arp = false;   ///< an arp plays
+    bool stab = false;   ///< a stab plays
+    bool counter = false;   ///< a counter melody plays
+    bool ride = true;   ///< a ride in the drops
+    bool perc = false;   ///< a percussion loop
+    bool beatless = false;   ///< no kick at all (Deep)
     bool bassInBreaks = false;   ///< Dream House: the bass never leaves (measured, PLAN 13.4)
 };
 
+/** @brief Every layer off. */
 std::array<LayerState, kNumLayers> none() { return std::array<LayerState, kNumLayers>{}; }
+/** @brief Sets layer @p l of @p a to @p s. */
 void set(std::array<LayerState, kNumLayers>& a, Layer l, LayerState s) { a[static_cast<size_t>(l)] = s; }
+/** @brief Layer @p l of @p a. */
 LayerState get(const std::array<LayerState, kNumLayers>& a, Layer l) { return a[static_cast<size_t>(l)]; }
 
 /** @brief The rhythm section: kick, the low end, the hats, the clap, the percussion. */
@@ -217,6 +232,7 @@ struct Scatter {
     int vacuum = 0;           ///< a drop's vacuum before it: the last beat, two beats, the bar, the kick alone on 4
 };
 
+/** @brief A section's variations, every field drawn from @p r. */
 Scatter drawScatter(Rng& r)
 {
     Scatter s;

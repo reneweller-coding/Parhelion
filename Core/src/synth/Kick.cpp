@@ -12,12 +12,12 @@
 namespace parh {
 
 namespace {
-constexpr double kPiD = 3.141592653589793;
-constexpr double kLn1000 = 6.907755278982137;
+constexpr double kPiD = 3.141592653589793;   ///< pi
+constexpr double kLn1000 = 6.907755278982137;   ///< ln 1000: a decay of 60 dB
 constexpr double kDcHz = 3.0;                 ///< DC blocker corner
 constexpr float kClickGain = 4.0f;            ///< gain of the click layer at Click = 1 (Phosphene, 18.09.2026)
 constexpr float kDipQ = 0.8f;                 ///< the EQ dip's quality: broad, "-3 dB at 500 Hz, wide" (Dok. 3)
-constexpr float kSqrt2 = 1.41421356f;
+constexpr float kSqrt2 = 1.41421356f;   ///< sqrt 2
 
 /** @brief Drive knob to saturator gain. */
 float driveGain(float drive) { return 0.2f + 7.8f * drive; }

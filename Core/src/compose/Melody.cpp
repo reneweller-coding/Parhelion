@@ -48,6 +48,7 @@ struct StepFrame {
     bool pent = false;   ///< the minor pentatonic: the second and the sixth degree left out
 };
 
+/** @brief The scale the melody's steps run in for harmony @p h: its own minor or Aeolian, the tonic, the pentatonic. */
 StepFrame frameOf(const Harmony& h)
 {
     StepFrame f;
@@ -60,6 +61,7 @@ StepFrame frameOf(const Harmony& h)
     return f;
 }
 
+/** @brief @p bar kept inside the harmony. */
 int clampBar(const Harmony& h, int bar) { return std::clamp(bar, 0, static_cast<int>(h.bars.size()) - 1); }
 
 /** @brief The frame's degrees at @p bar: a chord tone the mode lacks (harmonic minor's major V) replaces the degree a
@@ -97,7 +99,9 @@ bool chordHas(const Harmony& h, int bar, int pitch)
 
 /** @brief One motif: onsets in sixteenths over two bars, lengths in sixteenths, step indices. */
 struct Motif {
-    std::vector<int> on, len, steps;
+    std::vector<int> on;   ///< onsets in sixteenths over two bars
+    std::vector<int> len;   ///< lengths in sixteenths
+    std::vector<int> steps;   ///< step indices
 };
 
 /** @brief How good a motif is by the rules of Dok. 4 (higher is better). */

@@ -62,15 +62,16 @@ struct SetTrack {
 
 /** @brief A tease on the third deck: the hook of track @p from, before its blend. */
 struct SetTease {
-    int from = 0;
-    double start = 0.0, end = 0.0;
+    int from = 0;   ///< the track it comes from
+    double start = 0.0;   ///< set beat where it begins
+    double end = 0.0;   ///< set beat where it ends
 };
 
 /** @brief What a set tells. */
 struct SetInfo {
-    Dramaturgy dramaturgy = Dramaturgy::Peak;
-    std::vector<SetTrack> tracks;
-    std::vector<SetTease> teases;
+    Dramaturgy dramaturgy = Dramaturgy::Peak;   ///< the set's arc
+    std::vector<SetTrack> tracks;   ///< its tracks, in order
+    std::vector<SetTease> teases;   ///< the teases on the third deck
 };
 
 /**

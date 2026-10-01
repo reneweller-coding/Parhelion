@@ -96,6 +96,21 @@ public:
      *        default): the score plays as it was composed, and the stems sum to the mix.
      */
     void setLive(bool on);
+    /**
+     * @name A MIDI keyboard (01.10.2026, perform.keyboard_part)
+     * The keys play a voice of the lead deck (the track whose sounds the knobs show) with its sound, past the mutes;
+     * perform.keyboard_mode Replace leaves that voice's generated notes out (by channel: from a voice's first played key
+     * on), Layer plays over them; perform.composer off leaves every generated note out. Live play only (setLive).
+     * @{ */
+    /**
+     * @brief Queues a key for the next process() call, @p offset samples into it: it is played on that sample. The
+     *        rendering thread, before process().
+     * @param pitch MIDI note; @param velocity 1..127; @param channel 0..15 (by channel); @param on false: its release
+     */
+    void queueLive(int offset, int pitch, int velocity, int channel, bool on);
+    /** @brief Releases every played key and forgets the queued ones (a stop, another keyboard target). */
+    void liveAllOff();
+    /** @} */
     /** @brief How much the engine does: all of it (the desktop, the default), or the Quest's share (PLAN 10: fewer unison
      *         oscillators and voices, Deck::setQuest). */
     enum class Quality { Desktop, Quest };
@@ -137,91 +152,134 @@ public:
 private:
     /** @brief A three-band Linkwitz-Riley split at 200 Hz and 2.5 kHz (the low band through the upper crossover's allpass). */
     struct ThreeBand {
-        Svf split1, low2, high2, split2, mid2, top2, ap;
+        Svf split1;   ///< the 200 Hz split
+        Svf low2;   ///< its low pass again (fourth order)
+        Svf high2;   ///< its high pass again
+        Svf split2;   ///< the 2.5 kHz split of the high band
+        Svf mid2;   ///< its low pass again
+        Svf top2;   ///< its high pass again
+        Svf ap;   ///< the 2.5 kHz allpass the low band goes through
+        /** @brief Tunes the crossovers for sample rate @p fs. */
         void set(float fs);
+        /** @brief Silence: every filter state cleared. */
         void reset();
+        /** @brief Splits sample @p x into @p low (in phase with the others), @p mid and @p top. */
         void process(float x, float& low, float& mid, float& top);
     };
     /** @brief A mixer channel. */
     struct Channel {
         float target[3] = { 1.0f, 1.0f, 1.0f };   ///< the isolator's gains to go to
         float g[3] = { 1.0f, 1.0f, 1.0f };        ///< where they are (smoothed over a millisecond)
-        float fader = 1.0f, gFader = 1.0f;
-        float send = 0.0f;
-        float filter = 0.0f;
-        ThreeBand bands[2];
-        Svf filt[2];
+        float fader = 1.0f;   ///< the channel fader's gain to go to
+        float gFader = 1.0f;   ///< where it is (smoothed like the isolator)
+        float send = 0.0f;   ///< the channel's send into the mixer's effects (deck.fx_send)
+        float filter = 0.0f;   ///< the channel's filter, -1 (low pass) .. 1 (high pass), 0 open
+        ThreeBand bands[2];   ///< the isolator's split, per channel
+        Svf filt[2];   ///< the channel's filter, per channel
     };
     /** @brief The set's own automation on one knob (the mixer's effects), with a cursor. */
     struct Track {
-        int param;
-        std::vector<Gesture> gestures;
-        size_t cursor = 0;
-        float offset = 0.0f;
+        int param;   ///< the knob
+        std::vector<Gesture> gestures;   ///< its curves, in time order
+        size_t cursor = 0;   ///< index of the latest curve that has started, or gestures.size()
+        float offset = 0.0f;   ///< the offset at the current cell
     };
 
+    /** @brief Reads the knobs and the automation for the next raster cell: the mixer, its effects, the master. */
     void updateCell();
+    /** @brief Mixes the decks' blocks through their channels and the mixer's effects into @p L and @p R (@p n samples). */
     void mix(float* L, float* R, int n);
+    /** @brief The value of parameter @p id as the set plays it: the knob plus the set's own automation. */
     float setPlayed(int id) const;
 
-    ParamStore params_;
-    double sampleRate_ = 48000.0;
-    int maxBlock_ = 512;
-    int64_t sample_ = 0, endSample_ = 0;
-    TempoMap tempo_;
-    double lengthBeats_ = 0.0;
-    bool cellDirty_ = true;
+    ParamStore params_;   ///< the knobs
+    double sampleRate_ = 48000.0;   ///< the sample rate, Hz
+    int maxBlock_ = 512;   ///< the largest block process() is given
+    int64_t sample_ = 0;   ///< the position, samples
+    int64_t endSample_ = 0;   ///< the end of what is loaded, samples
+    TempoMap tempo_;   ///< the beats' times
+    double lengthBeats_ = 0.0;   ///< the length of what is loaded, beats
+    bool cellDirty_ = true;   ///< the knobs are to be read again before the next sample
     bool isSet_ = false;           ///< a set: the isolators and filters are in the path
     bool fxOn_ = false;            ///< the set sends into the mixer's effects
-    Deck decks_[kDecks];
-    bool playing_[kDecks] = {};
+    Deck decks_[kDecks];   ///< the three decks: A plays a track, all three a set
+    bool playing_[kDecks] = {};   ///< per deck: it plays at the current sample
     std::vector<int64_t> steps_;   ///< where the decks' mixer channels step, merged
-    size_t stepCursor_ = 0;
-    std::vector<Track> tracks_;
-    std::vector<int> trackOf_;
+    size_t stepCursor_ = 0;   ///< index of the next step in steps_
+    std::vector<Track> tracks_;   ///< the set's own automation, one track per knob
+    std::vector<int> trackOf_;   ///< parameter id -> index into tracks_, or -1
 
-    // The mixer.
+    /// The mixer.
     Channel ch_[kDecks];
     float smooth_ = 0.02f;         ///< the channel gains' one-pole coefficient (a millisecond)
-    TapeEcho djEcho_;
-    Reverb djHall_;
-    float echoReturn_ = 0.0f, hallReturn_ = 0.0f;
+    TapeEcho djEcho_;   ///< the mixer's echo
+    Reverb djHall_;   ///< the mixer's hall
+    float echoReturn_ = 0.0f;   ///< the echo's return level
+    float hallReturn_ = 0.0f;   ///< the hall's return level
     // The master.
-    Svf sideHp1_, sideHp2_;
-    float masterGain_ = 1.0f, clipDrive_ = 1.0f;
-    bool cut_ = false;
-    BandLimit cutLp_[2];
-    Svf cutHp1_[2], cutHp2_[2];
-    float cutEnv_ = 0.0f, cutAtt_ = 0.1f, cutRel_ = 0.001f;
-    Oversampler4 clipOs_[2];
-    TruePeakLimiter limiter_;
+    Svf sideHp1_;   ///< mono below (master.mono_below): the side's high pass, first stage
+    Svf sideHp2_;   ///< ... and the second (fourth-order Butterworth together)
+    float masterGain_ = 1.0f;   ///< master.level, linear
+    float clipDrive_ = 1.0f;   ///< the clipper's drive (master.clip), linear
+    bool cut_ = false;   ///< the vinyl cut is in (master.cut)
+    BandLimit cutLp_[2];   ///< the cut's 16 kHz band limit, per channel
+    Svf cutHp1_[2];   ///< the cut's 6 kHz high pass, first stage, per channel
+    Svf cutHp2_[2];   ///< ... and the second
+    float cutEnv_ = 0.0f;   ///< the cut's envelope of the band over 6 kHz
+    float cutAtt_ = 0.1f;   ///< the envelope's attack coefficient (a millisecond)
+    float cutRel_ = 0.001f;   ///< the envelope's release coefficient (50 ms)
+    Oversampler4 clipOs_[2];   ///< the clipper's fourfold oversampling, per channel
+    TruePeakLimiter limiter_;   ///< the true-peak limiter (master.ceiling)
 
-    std::vector<float> deckL_[kDecks], deckR_[kDecks], sendL_, sendR_, fxL_, fxR_;
-    float* const* stemL_ = nullptr;
-    float* const* stemR_ = nullptr;
-    float* const* tapL_ = nullptr;
-    float* const* tapR_ = nullptr;
-    float* preL_ = nullptr;
-    float* preR_ = nullptr;
-    // The knob settings (soundsVersion): what the engine wrote on each knob (NaN: never), the deck they came from.
+    std::vector<float> deckL_[kDecks];   ///< per deck: its block, left
+    std::vector<float> deckR_[kDecks];   ///< per deck: its block, right
+    std::vector<float> sendL_;   ///< the send into the mixer's effects, left
+    std::vector<float> sendR_;   ///< the send into the mixer's effects, right
+    std::vector<float> fxL_;   ///< the mixer's effects' output, left
+    std::vector<float> fxR_;   ///< the mixer's effects' output, right
+    float* const* stemL_ = nullptr;   ///< the stems' left channels (setStems), or null
+    float* const* stemR_ = nullptr;   ///< the stems' right channels, or null
+    float* const* tapL_ = nullptr;   ///< the deck taps' left channels (setDeckTaps), or null
+    float* const* tapR_ = nullptr;   ///< the deck taps' right channels, or null
+    float* preL_ = nullptr;   ///< the premaster tap, left (setPremasterTap), or null
+    float* preR_ = nullptr;   ///< the premaster tap, right, or null
+    /// The knob settings (soundsVersion): what the engine wrote on each knob (NaN: never), the deck they came from.
     std::vector<float> shown_;
-    std::atomic<int> lead_{ -1 };
-    double leadGroup_ = -1.0;
-    std::atomic<uint32_t> soundsVersion_{ 0 };
+    std::atomic<int> lead_{ -1 };   ///< the deck whose knob settings the knobs show, -1 before any
+    double leadGroup_ = -1.0;   ///< the beat of the lead deck's knob settings last shown, -1 before any
+    std::atomic<uint32_t> soundsVersion_{ 0 };   ///< how often knob settings were written onto the knobs
     /** @brief Puts deck @p d's knob settings on the knobs. */
     void showKnobs(int d);
-    // Live play (setLive).
+    /// Live play (setLive).
     bool live_ = false;
-    float perfFilter_ = 0.0f, perfThrow_ = 0.0f;
-    Svf perfFilt_[2];
-    std::vector<CueMark> cueMarks_;
-    int tapOffset_ = 0;
+    /** @brief A key queued for the current process() call (queueLive). */
+    struct LiveKey {
+        int64_t at;       ///< the engine sample it plays on
+        int pitch;        ///< MIDI note
+        float velocity;   ///< 0..1
+        int target;       ///< perform::keys (the release's is the one its key went to)
+        bool on;          ///< false: a release
+    };
+    static constexpr int kLiveQueue = 256;   ///< keys per process() call at most
+    LiveKey liveQueue_[kLiveQueue] = {};   ///< the keys queued for this process() call, in time order
+    int liveCount_ = 0;   ///< how many keys are queued
+    int liveCursor_ = 0;   ///< index of the next queued key not yet played
+    uint8_t liveTarget_[128] = {};   ///< per key: the target it plays + 1 (0: not held)
+    uint8_t liveDeck_[128] = {};     ///< per key: the deck it plays on
+    int keyboardTarget(int channel) const;   ///< perform.keyboard_part for a key on @p channel (perform::keys; Off: none)
+    void playLive(const LiveKey& k);          ///< a queued key, now
+    void releaseLive(int pitch);              ///< the key @p pitch, wherever it plays
+    float perfFilter_ = 0.0f;   ///< perform.filter as read at the cell: -1 low pass .. 1 high pass
+    float perfThrow_ = 0.0f;   ///< perform.throw as read at the cell: the echo throw 0..1
+    Svf perfFilt_[2];   ///< the master filter of the perform module, per channel
+    std::vector<CueMark> cueMarks_;   ///< the cue marks of what is loaded
+    int tapOffset_ = 0;   ///< where in the taps and stems the current piece of the block goes
     // The stems: each deck's (Deck::render writes them), and their copies of the mixer channel's filters.
     std::vector<float> deckStems_;                   ///< kDecks x Deck::kStems x 2 channels x kRaster
-    float* deckStemL_[kDecks][Deck::kStems] = {};
-    float* deckStemR_[kDecks][Deck::kStems] = {};
-    ThreeBand stemBands_[kDecks][Deck::kStems][2];
-    Svf stemFilt_[kDecks][Deck::kStems][2];
+    float* deckStemL_[kDecks][Deck::kStems] = {};   ///< per deck and stem: its left channel in deckStems_
+    float* deckStemR_[kDecks][Deck::kStems] = {};   ///< per deck and stem: its right channel in deckStems_
+    ThreeBand stemBands_[kDecks][Deck::kStems][2];   ///< per deck, stem and channel: its copy of the isolator's split
+    Svf stemFilt_[kDecks][Deck::kStems][2];   ///< per deck, stem and channel: its copy of the channel's filter
     float chGains_[4][kRaster] = {};                 ///< a channel's isolator gains and fader, sample by sample
 };
 

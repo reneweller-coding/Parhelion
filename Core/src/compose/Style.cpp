@@ -17,15 +17,16 @@ const int kProgressionDegrees[kProgressions][4] = {
 };
 const char* const kFormTemplateNames[kFormTemplates] = { "Anthem", "Dream", "Acid", "Plateau", "Drift" };
 const char* const kProgressionNames[kProgressions] = { "i-VI-III-VII", "i-VII-VI-VII", "VI-VII-i", "i-iv-VI-VII", "i-VI-VII-v" };
+/** @brief the bass figures, in the order of BassPattern */
 const char* const kBassPatternNames[kBassPatterns] = { "Off-beat", "Rolling", "Gallop", "Walking", "303", "Drone" };
 
 namespace {
 
-using Sc = std::array<float, static_cast<int>(Scale::Count)>;   // Aeolian, Dorian, HarmonicMinor, MinorPentatonic, Phrygian, Ionian
-using Pr = std::array<float, kProgressions>;                    // Anthem, Circling, Lift, Melancholy, Tension
-using Ba = std::array<float, kBassPatterns>;                    // Offbeat, Rolling, Gallop, Walking, Acid, Drone
-using Fo = std::array<float, kFormTemplates>;
-using Mx = std::array<float, 5>;                               // Uplifting, Progressive, Dream House, Acid, Deep                   // Anthem, Dream, Acid, Plateau, Drift
+using Sc = std::array<float, static_cast<int>(Scale::Count)>;   ///< Aeolian, Dorian, HarmonicMinor, MinorPentatonic, Phrygian, Ionian
+using Pr = std::array<float, kProgressions>;   ///< Anthem, Circling, Lift, Melancholy, Tension
+using Ba = std::array<float, kBassPatterns>;   ///< Offbeat, Rolling, Gallop, Walking, Acid, Drone
+using Fo = std::array<float, kFormTemplates>;   ///< Weights of the form templates: Anthem, Dream, Acid, Plateau, Drift.
+using Mx = std::array<float, 5>;   ///< Uplifting, Progressive, Dream House, Acid, Deep                   // Anthem, Dream, Acid, Plateau, Drift
 
 /**
  * The profiles. Tempo and length after the references (Tools/ref_stats.json, 29.09.2026); the rest after Dok. 2 to 10
@@ -76,9 +77,11 @@ const StyleProfile kProfiles[static_cast<int>(Style::Count)] = {
       .hallBreakS = 9.0f, .hallDropS = 3.0f, .bassDuckDb = 3.0f, .padDuckDb = 2.0f, .targetLufs = -9.0f, .mix = Mx{ 0, 0, 0, 0, 1 } },
 };
 
+/** @brief @p a to @p b at @p t. */
 float lerp(float a, float b, float t) { return a + (b - a) * t; }
 
 template <size_t N>
+/** @brief @p a to @p b at @p t, element by element. */
 std::array<float, N> mixArrays(const std::array<float, N>& a, const std::array<float, N>& b, float t)
 {
     std::array<float, N> o{};

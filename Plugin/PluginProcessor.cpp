@@ -637,6 +637,11 @@ void ParhelionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     }
     const double seek = seekRequest_.exchange(-1.0);
     if (seek >= 0.0) engine_.seek(seek);
+    {   // Stopped, or another keyboard target: every played key is released (01.10.2026).
+        const int target = store().getInt(store().id(Module::Perform, 0, perform::KeyboardPart));
+        if (!play || target != keyboardSeen_) engine_.liveAllOff();
+        keyboardSeen_ = target;
+    }
     if (!play || buffer.getNumChannels() < 2 || n > blockSize_) {
         buffer.clear();
         return;
@@ -915,9 +920,16 @@ void ParhelionProcessor::setFromMidi(int id, float value)
 void ParhelionProcessor::perform(const juce::MidiBuffer& midi)
 {
     const ParamStore& s = store();
+    // A keyboard that plays (perform.keyboard_part, 01.10.2026): its keys go to the engine, on their samples; else the
+    // keys from middle C toggle the mutes.
+    const bool keys = s.getInt(s.id(Module::Perform, 0, perform::KeyboardPart)) != perform::keys::Off;
     for (const auto meta : midi) {
         const juce::MidiMessage m = meta.getMessage();
-        if (m.isNoteOn()) {
+        if (m.isAllNotesOff() || m.isAllSoundOff()) {
+            engine_.liveAllOff();
+        } else if (keys && (m.isNoteOn() || m.isNoteOff())) {
+            engine_.queueLive(meta.samplePosition, m.getNoteNumber(), m.getVelocity(), m.getChannel() - 1, m.isNoteOn());
+        } else if (m.isNoteOn()) {
             // The keys from middle C: C kick, C# bass, D hats, D# perc, E lead, F synths, F# pads -- each press toggles.
             const int k = m.getNoteNumber() - 60;
             if (k >= 0 && k < perform::kMutes) {

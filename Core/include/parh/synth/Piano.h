@@ -54,6 +54,7 @@
 
 namespace parh {
 
+/** @brief The physical piano: hammers, strings, dampers, the soundboard and the sympathetic strings (see the file comment). */
 class Piano {
 public:
     static constexpr int kVoices = 24;       ///< voices at most (the Quest: fewer)
@@ -89,80 +90,119 @@ public:
     void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
 
 private:
+    /** @brief One sounding key: its hammer, its modes, its damper, its mechanics, its modulation. */
     struct Voice {
         int key = -1;              ///< 0 .. 87, -1 free
         bool contact = false;      ///< the hammer touches or flies near
-        double yh = 0.0, vh = 0.0, hyst = 0.0;   ///< hammer displacement, velocity, hysteresis state
-        int contactSteps = 0, apart = 0;
+        double yh = 0.0;   ///< the hammer's displacement
+        double vh = 0.0;   ///< the hammer's velocity
+        double hyst = 0.0;   ///< the felt's hysteresis state
+        int contactSteps = 0;   ///< sub-steps since the contact began
+        int apart = 0;   ///< sub-steps the felt has been apart from the strings in a row
         float damper = 0.0f;       ///< the felt's contact, 0 .. 1
         float delta = 0.0f;        ///< the tension's relative frequency rise
         float peak = 0.0f;         ///< the bridge force's peak in this grid cell so far
         float lastPeak = 0.0f;     ///< and in the last whole one
         int quiet = 0;             ///< blocks under the threshold
-        uint64_t age = 0;
-        std::vector<float> zr, zi, pr, pi;
-        float lzr[kPianoLongModes] = {}, lzi[kPianoLongModes] = {};
+        uint64_t age = 0;   ///< when it started, in voices (the oldest is taken)
+        std::vector<float> zr;   ///< the strings' modes: state, real part
+        std::vector<float> zi;   ///< ... imaginary part
+        std::vector<float> pr;   ///< their poles this block (turned by the tension and the bend): real part
+        std::vector<float> pi;   ///< ... imaginary part
+        float lzr[kPianoLongModes] = {};   ///< the longitudinal modes: state, real part
+        float lzi[kPianoLongModes] = {};   ///< ... imaginary part
         int thump = -1;            ///< samples into the key's thump, -1 none
-        float thumpGain = 0.0f;
+        float thumpGain = 0.0f;   ///< the thump's level
         int damperNoise = -1;      ///< samples into the damper's noise, -1 none
-        float damperNoiseGain = 0.0f;
+        float damperNoiseGain = 0.0f;   ///< the damper noise's level
         Rng noise;                 ///< its own stream (a shared one would interleave by how the calls are cut)
         // The modulation's values (Phase 5b): the key's own where no slot reaches them.
         double bend = 0.0;         ///< semitones
-        float hardMul = 1.0f, modGain = 1.0f;
+        float hardMul = 1.0f;   ///< the hammer's hardness factor (the modulation)
+        float modGain = 1.0f;   ///< the force on the bridge (the modulation's level)
         float velHard = 1.0f;      ///< the felt's stiffness at this note's velocity (PianoSpec::hardVelocity)
         int region = 0;            ///< the bridge region its force goes to (and the next)
-        float w0 = 1.0f, w1 = 0.0f;
+        float w0 = 1.0f;   ///< its share in the region
+        float w1 = 0.0f;   ///< its share in the next region
     };
     /** @brief Voice @p i's modulation now; @p strike: its hammer is about to fly (the hardness). */
     void modVoice(int i, bool strike);
     /** @brief The board's states: its modes and the high bank. */
     struct BoardState {
-        std::vector<float> zr, zi, hzr, hzi;
+        std::vector<float> zr;   ///< the board's modes: state, real part
+        std::vector<float> zi;   ///< ... imaginary part
+        std::vector<float> hzr;   ///< the high bank: state, real part
+        std::vector<float> hzi;   ///< ... imaginary part
     };
 
+    /** @brief The voice for @p key: the one already on it, else a free one, else the oldest. */
     int voiceFor(int key);
+    /** @brief Throws the hammer of voice @p v at @p key with @p velocity, @p late samples ago. */
     void startVoice(Voice& v, int key, float velocity, double late);
+    /** @brief Voice @p v's poles for the next @p n samples: the tension's rise, the bend, the damper. */
     void blockCoefficients(Voice& v, int n);
+    /** @brief @p n samples of voice @p v while the hammer touches: its modes on sub-steps, the bridge force into @p force. */
     void contactBlock(Voice& v, float* force, int n);
+    /** @brief @p n samples of voice @p v's free strings, the bridge force into @p force. */
     template <class V> void stringBlock(Voice& v, float* force, int n);
+    /** @brief @p n samples within one grid cell (@p cellStart, @p cellEnd: it begins or ends one) into @p L and @p R. */
     template <class V> void renderSegment(float* L, float* R, int n, bool cellStart, bool cellEnd);
+    /**
+     * @brief @p n samples of board @p s driven by the @p region forces into @p L and @p R; @p wantAccel: its acceleration
+     *        too.
+     */
     template <class V> void boardBlock(BoardState& s, const float (*region)[kMaxBlock], float* L, float* R, bool wantAccel, int n);
+    /** @brief @p n samples of the sympathetic strings (@p sounding: anything drives them) within a grid cell. */
     template <class V> void symBlock(int n, bool sounding, bool cellStart, bool cellEnd);
 
-    std::shared_ptr<const PianoDesign> design_;
-    double sampleRate_ = 48000.0;
-    PianoSpec spec_{};
-    bool specSet_ = false;
-    Voice voices_[kVoices];
-    int voiceLimit_ = kVoices;
-    uint64_t clock_ = 0;
+    std::shared_ptr<const PianoDesign> design_;   ///< the design: the modes of every key and of the board
+    double sampleRate_ = 48000.0;   ///< the sample rate, Hz
+    PianoSpec spec_{};   ///< the spec the design was built for
+    bool specSet_ = false;   ///< setSpec() was called
+    Voice voices_[kVoices];   ///< the voices
+    int voiceLimit_ = kVoices;   ///< voices at most (the Quest: fewer)
+    uint64_t clock_ = 0;   ///< counts the voices started
     int64_t pos_ = 0;                    ///< samples since the last reset (the grid)
     int held_[kPianoKeys] = {};          ///< notes down per key
     // The playing knobs.
-    float level_ = 1.0f, pedal_ = 0.0f, sympathetic_ = 1.0f, phantom_ = 1.0f, damperNoise_ = 0.3f, mechanics_ = 0.3f;
-    float width_ = 0.7f;
-    Svf lowCut_[2];
-    /** @brief The radiation shelf (PianoSpec::radiation): first order, per channel. */
-    float radB0_ = 1.0f, radB1_ = 0.0f, radA1_ = 0.0f, radX_[2] = {}, radY_[2] = {};
-    float lowCutHz_ = 80.0f;
-    std::vector<float> micL_, micR_;     ///< the board's listening weights for the width
+    float level_ = 1.0f;   ///< piano.level, linear
+    float pedal_ = 0.0f;   ///< the sustain pedal, 0 up .. 1 down
+    float sympathetic_ = 1.0f;   ///< the sympathetic strings' amount
+    float phantom_ = 1.0f;   ///< the phantom partials' amount
+    float damperNoise_ = 0.3f;   ///< the damper noise's amount
+    float mechanics_ = 0.3f;   ///< the thump's amount
+    float width_ = 0.7f;   ///< the width: the listening points blended
+    Svf lowCut_[2];   ///< the low cut, per channel
+    /** @brief The radiation shelf (PianoSpec::radiation), first order, per channel: its b0. */
+    float radB0_ = 1.0f;
+    float radB1_ = 0.0f;   ///< the shelf's b1
+    float radA1_ = 0.0f;   ///< the shelf's a1
+    float radX_[2] = {};   ///< the shelf's last input, per channel
+    float radY_[2] = {};   ///< the shelf's last output, per channel
+    float lowCutHz_ = 80.0f;   ///< the low cut, Hz
+    std::vector<float> micL_;   ///< the board's listening weights for the left
+    std::vector<float> micR_;   ///< ... for the right
     // The board and its copy for the sympathetic strings.
-    BoardState board_, symBoard_;
+    BoardState board_;   ///< the board the voices drive
+    BoardState symBoard_;   ///< its copy the sympathetic strings drive
     // The sympathetic strings of every key.
-    std::vector<float> symZr_, symZi_, symPr_, symPi_;   ///< [kPianoKeys][sym padded 16]
-    float symDamper_[kPianoKeys] = {};
-    float symPeak_[kPianoKeys] = {};
-    bool symOn_[kPianoKeys] = {};
+    std::vector<float> symZr_;   ///< the sympathetic strings' modes: state, real part
+    std::vector<float> symZi_;   ///< ... imaginary part
+    std::vector<float> symPr_;   ///< their poles: real part
+    std::vector<float> symPi_;   ///< ... imaginary part
+    float symDamper_[kPianoKeys] = {};   ///< per key: its damper's contact
+    float symPeak_[kPianoKeys] = {};   ///< per key: its sympathetic strings' peak in this grid cell
+    bool symOn_[kPianoKeys] = {};   ///< per key: its sympathetic strings ring
     bool symBoardOn_ = false;           ///< the second board carries something
     // Per block.
-    float regionF_[kPianoRegions][kMaxBlock] = {};
-    float symRegionF_[kPianoRegions][kMaxBlock] = {};
-    float accel_[kPianoRegions][kMaxBlock] = {};
-    float force_[kMaxBlock] = {};
-    float acc_[kMaxBlock * 8] = {};
-    float accL_[kMaxBlock * 8] = {}, accR_[kMaxBlock * 8] = {};
-    float accA_[kPianoRegions][kMaxBlock * 8] = {};
+    float regionF_[kPianoRegions][kMaxBlock] = {};   ///< per region: the voices' bridge force this block
+    float symRegionF_[kPianoRegions][kMaxBlock] = {};   ///< per region: the sympathetic strings' force
+    float accel_[kPianoRegions][kMaxBlock] = {};   ///< per region: the board's acceleration (what drives the sympathetic strings)
+    float force_[kMaxBlock] = {};   ///< one voice's bridge force this block
+    float acc_[kMaxBlock * 8] = {};   ///< eight accumulators per sample (the lanes summed in order)
+    float accL_[kMaxBlock * 8] = {};   ///< the board's left output: eight accumulators per sample
+    float accR_[kMaxBlock * 8] = {};   ///< ... right
+    float accA_[kPianoRegions][kMaxBlock * 8] = {};   ///< per region: the acceleration's eight accumulators per sample
     NoteModulation<kVoices> mod_;        ///< the modulation, a Modulator per voice (Phase 5b)
 };
 

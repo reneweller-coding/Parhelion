@@ -13,9 +13,9 @@ namespace parh {
 
 namespace {
 
-constexpr double kPiD = 3.14159265358979323846;
+constexpr double kPiD = 3.14159265358979323846;   ///< pi
 constexpr float kQuietForce = 2e-5f;   ///< N: a voice whose bridge force stays under this is freed
-constexpr int kQuietBlocks = 24;
+constexpr int kQuietBlocks = 24;   ///< blocks under kQuietForce before a voice is freed
 constexpr float kSymQuiet = 2e-7f;     ///< N: a sympathetic string under this stops when its damper is down
 constexpr float kLongCoupling = 0.08f; ///< the longitudinal force's share in the bridge's vertical (the downbearing)
 /**

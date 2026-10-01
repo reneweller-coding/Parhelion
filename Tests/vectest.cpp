@@ -28,8 +28,9 @@ using namespace parhtest;
 
 namespace {
 
-constexpr int W = kVecWidth;
+constexpr int W = kVecWidth;   ///< the lanes of the vector type compiled here
 
+/** @brief A float made from @p i that covers signs, magnitudes and the denormals. */
 float testValue(uint32_t i)
 {
     uint32_t h = i * 2654435761u ^ 0x9E3779B9u;
@@ -44,8 +45,10 @@ float testValue(uint32_t i)
     }
 }
 
+/** @brief Whether @p a and @p b are the same float, bit for bit. */
 bool sameBits(float a, float b) { return std::memcmp(&a, &b, sizeof(float)) == 0; }
 
+/** @brief The vector type's operations against the scalar ones, lane by lane, bit for bit. */
 void testOps()
 {
     section("vector operations, lane by lane");
@@ -73,6 +76,7 @@ void testOps()
     check(bad == 0, "12 operations identical to scalar", fmt("%d of %d lanes differ", bad, total));
 }
 
+/** @brief The half-band decimator on vectors against the scalar one, bit for bit. */
 void testHalfband()
 {
     section("half-band lanes against scalar");
@@ -329,6 +333,7 @@ void testStrings()
 }
 } // namespace
 
+/** @brief Runs the tests; the exit code is the number of failures. */
 int main()
 {
     std::printf("parh_vectest: path %s, %d lanes\n", kVecPathName, W);

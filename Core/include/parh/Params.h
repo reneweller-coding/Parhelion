@@ -222,7 +222,7 @@ enum : int { Level, Noise, Resonance, Brightness, ImpactDecay, Vowel, SwellDecay
              Count };
 /** @brief The first of the per-family preset choices, and how many there are. */
 constexpr int kFirstPreset = PresetRiser;
-constexpr int kNumPresetChoices = PresetAtmosphere - PresetRiser + 1;
+constexpr int kNumPresetChoices = PresetAtmosphere - PresetRiser + 1;   ///< how many per-family preset choices there are
 }
 /**
  * @brief Parameters of the physical piano (PLAN 5.8, Piano.h, PianoDesign.h). The first eight build the instrument and
@@ -339,7 +339,19 @@ namespace perform {
 enum : int { Filter, Throw, MuteKick, MuteBass, MuteHats, MutePerc, MuteLead, MuteSynths, MutePads,
              Wheel,      ///< the modulation wheel, 0..1 (MIDI CC 1): a source of every voice's matrix (Phase 5b)
              Pressure,   ///< the channel pressure, 0..1: another
+             KeyboardPart,   ///< what a MIDI keyboard plays (perform::keys, 01.10.2026); off: the keys toggle the mutes
+             KeyboardMode,   ///< 0 Replace: the played voice's generated notes are left out; 1 Layer: it plays over them
+             Composer,       ///< on: the composer's notes play; off: only what the keyboard plays
              Count };
+/**
+ * @brief The keyboard's targets (perform.keyboard_part, 01.10.2026, Engine::queueLive): the kit -- C1 (36) the kick,
+ *        C#1 .. C2 the twelve lanes --, the bass, the 303, the six polyphonic voices, the piano, the strings, the choir,
+ *        the brass, or by channel (1 kit, 2 bass, 3 303, 4 lead, 5 counter, 6 pluck, 7 arp, 8 pad, 9 stab, 10 kit as
+ *        General MIDI's drum channel, 11 piano, 12 strings, 13 choir, 14 brass).
+ */
+namespace keys {
+enum : int { Off, Kit, Bass, Acid, Lead, Counter, Pluck, Arp, Pad, Stab, Piano, Strings, Choir, Brass, ByChannel, Count };
+}
 constexpr int kMutes = MutePads - MuteKick + 1;   ///< kick; sub, bass, 303; hats; perc; lead, counter; pluck, arp; pad, stab
 }
 /** @brief The OSC cues (Cue.h): on or off, and the UDP port. */
@@ -470,19 +482,20 @@ public:
     std::string format(int id) const;
 
 private:
+    /** @brief One parameter of the store: its description, its key, its module and instance. */
     struct Entry {
-        const ParamDesc* desc;
-        std::string key;
-        Module module;
-        int instance;
+        const ParamDesc* desc;   ///< its description
+        std::string key;   ///< its key ("kick.decay", "perc3.level")
+        Module module;   ///< its module
+        int instance;   ///< its instance
     };
-    std::vector<Entry> entries_;
-    std::unique_ptr<std::atomic<float>[]> values_;
+    std::vector<Entry> entries_;   ///< the parameters, by id
+    std::unique_ptr<std::atomic<float>[]> values_;   ///< their values, real units (atomic: any thread)
     std::atomic<uint32_t> version_{ 0 };   ///< version()
-    std::vector<float> defaults_;
-    std::unordered_map<std::string, int> index_;
-    static constexpr int kMaxInstances = 16;
-    int bases_[static_cast<int>(Module::Count)][kMaxInstances] = {};
+    std::vector<float> defaults_;   ///< their defaults
+    std::unordered_map<std::string, int> index_;   ///< key -> id
+    static constexpr int kMaxInstances = 16;   ///< the most instances a module can have
+    int bases_[static_cast<int>(Module::Count)][kMaxInstances] = {};   ///< per module and instance: the id of its first parameter, -1 none
 };
 
 } // namespace parh

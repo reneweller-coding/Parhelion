@@ -34,11 +34,11 @@ enum class FormTemplate : int {
     Drift,        ///< a slow groove, a long breakdown, a groove again (Deep/Ambient)
     Count
 };
-constexpr int kFormTemplates = static_cast<int>(FormTemplate::Count);
+constexpr int kFormTemplates = static_cast<int>(FormTemplate::Count);   ///< how many form templates there are
 
 /** @brief The core progressions of Dok. 4, as scale degrees (0-based, in a seven-note minor scale). */
 enum class Progression : int { Anthem = 0, Circling, Lift, Melancholy, Tension, Count };
-constexpr int kProgressions = static_cast<int>(Progression::Count);
+constexpr int kProgressions = static_cast<int>(Progression::Count);   ///< how many progressions there are
 /** @brief The degrees of each progression (four chords; Lift repeats its last). */
 extern const int kProgressionDegrees[kProgressions][4];
 extern const char* const kFormTemplateNames[kFormTemplates];   ///< "Anthem", "Dream", "Acid", "Plateau", "Drift"
@@ -46,7 +46,7 @@ extern const char* const kProgressionNames[kProgressions];   ///< "i-VI-III-VII"
 
 /** @brief The bass figures of Dok. 3. */
 enum class BassPattern : int { Offbeat = 0, Rolling, Gallop, Walking, Acid, Drone, Count };
-constexpr int kBassPatterns = static_cast<int>(BassPattern::Count);
+constexpr int kBassPatterns = static_cast<int>(BassPattern::Count);   ///< how many bass figures there are
 extern const char* const kBassPatternNames[kBassPatterns];
 
 /** @brief What carries the melody (Dok. 10, "Lead-Archetyp"). */
@@ -54,12 +54,16 @@ enum class LeadKind : int { Supersaw = 0, Piano, Acid, PluckArp, Pad, Count };
 
 /** @brief One style profile. */
 struct StyleProfile {
-    const char* name = "";
-    float bpmLow = 136.0f, bpmHigh = 140.0f;            ///< the tempo range
-    float minutesLow = 7.0f, minutesHigh = 9.0f;        ///< a track alone
-    float breakdownLow = 0.15f, breakdownHigh = 0.3f;   ///< share of the track in breakdowns (Dok. 6, 10)
+    const char* name = "";   ///< the style's name
+    float bpmLow = 136.0f;   ///< the tempo range's low end
+    float bpmHigh = 140.0f;   ///< ... and its high end
+    float minutesLow = 7.0f;   ///< a track alone: the length's low end, minutes
+    float minutesHigh = 9.0f;   ///< ... and its high end
+    float breakdownLow = 0.15f;   ///< the share of the track in breakdowns: low end (Dok. 6, 10)
+    float breakdownHigh = 0.3f;   ///< ... and high end
     std::array<float, kFormTemplates> forms{};          ///< weights of the body templates
-    int introBars = 32, outroBars = 32;                 ///< the DJ's intro and outro (Dok. 6)
+    int introBars = 32;   ///< the DJ's intro, bars (Dok. 6)
+    int outroBars = 32;   ///< the DJ's outro, bars
     float introLong = 0.5f;                             ///< chance the intro is twice as long
     float ambientIntro = 0.0f;                          ///< chance of bars without a kick before the intro (the piano's, the pad's)
     int ambientIntroBars = 16;                          ///< how many (16 .. 64; measured: Dream House 40 .. 70)
@@ -76,17 +80,24 @@ struct StyleProfile {
     // Groove (Dok. 3).
     std::array<float, kBassPatterns> bass{};            ///< weights of the bass figures
     float hats16 = 0.6f;                                ///< chance the closed hat plays sixteenths (else eighths)
-    float ride = 0.6f, perc = 0.5f, shaker = 0.4f;      ///< chances of the ride in the drop, a percussion loop, a shaker
+    float ride = 0.6f;   ///< the chance of the ride in the drop
+    float perc = 0.5f;   ///< the chance of a percussion loop
+    float shaker = 0.4f;   ///< the chance of a shaker
     float kickSoft = 0.0f;                              ///< 0 hard and layered .. 1 soft (Deep)
     float beatless = 0.0f;                              ///< chance of a track without a kick (Deep)
     // Voices (Dok. 5, 10).
-    LeadKind lead = LeadKind::Supersaw;
-    float pluck = 0.8f, arp = 0.5f, stab = 0.3f, counter = 0.4f, gate = 0.5f;   ///< chances
+    LeadKind lead = LeadKind::Supersaw;   ///< the lead voice
+    float pluck = 0.8f;   ///< the chance of a pluck
+    float arp = 0.5f;   ///< the chance of an arp
+    float stab = 0.3f;   ///< the chance of a stab
+    float counter = 0.4f;   ///< the chance of a counter melody
+    float gate = 0.5f;   ///< the chance of a trance gate on the pad
     float orchestra = 0.0f;                             ///< chance of the orchestra (Cinematic, PLAN 5.9)
     float hatsDb = 0.0f;                                ///< the hats' level over the knob's (the air: Tools/calibrate.py)
     float tiltDb = 0.0f;                                ///< the master's tilt over the knob's (the air: Tools/calibrate.py)
     // Space and pump (Dok. 7, 10).
-    float hallBreakS = 4.0f, hallDropS = 1.5f;          ///< the hall's decay in the breakdown and in the drop
+    float hallBreakS = 4.0f;   ///< the hall's decay in the breakdown, s
+    float hallDropS = 1.5f;   ///< ... and in the drop
     float bassDuckDb = 8.0f;                            ///< the mid-bass's duck (the sub's is 3 dB more)
     float padDuckDb = 4.0f;                             ///< the pads'
     float targetLufs = -8.0f;                           ///< the loudest part's loudness (the Leveler)

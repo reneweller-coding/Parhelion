@@ -63,7 +63,7 @@ struct Vacuum {
 
 /** @brief What the planner decided. */
 struct Plan {
-    FormTemplate form = FormTemplate::Anthem;
+    FormTemplate form = FormTemplate::Anthem;   ///< the track's form
     int bars = 0;                          ///< the track's length
     std::vector<Section> sections;         ///< in order (beats)
     std::vector<LayerBlock> blocks;        ///< one per 8 bars (beats)
@@ -102,8 +102,8 @@ Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, boo
 
 /** @brief A performer's "now": from bar @p bar (an 8-bar line) a breakdown with its build and drop, or a drop at once. */
 struct Rewrite {
-    int bar = -1;
-    SectionKind kind = SectionKind::Breakdown;
+    int bar = -1;   ///< the 8-bar line it begins on, -1 none
+    SectionKind kind = SectionKind::Breakdown;   ///< a breakdown (with its build and drop) or a drop at once
 };
 
 /**

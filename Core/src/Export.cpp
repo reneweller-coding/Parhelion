@@ -16,6 +16,7 @@ namespace parh {
 
 namespace {
 
+/** @brief @p s escaped for a JSON string. */
 std::string jsonEscape(const std::string& s)
 {
     std::string o;
@@ -27,6 +28,7 @@ std::string jsonEscape(const std::string& s)
     return o;
 }
 
+/** @brief @p s escaped for XML. */
 std::string xmlEscape(const std::string& s)
 {
     std::string o;

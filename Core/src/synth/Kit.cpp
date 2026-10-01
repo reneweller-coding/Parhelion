@@ -12,8 +12,8 @@ namespace parh {
 
 namespace {
 
-constexpr double kPiD = 3.141592653589793;
-constexpr double kLn1000 = 6.907755278982137;
+constexpr double kPiD = 3.141592653589793;   ///< pi
+constexpr double kLn1000 = 6.907755278982137;   ///< ln 1000: a decay of 60 dB
 
 /** @brief Mode frequency ratios: membrane (Bessel zeros), free-free bar, loaded membrane (tabla). */
 constexpr double kModeRatios[3][kPercModes] = {
@@ -33,8 +33,9 @@ constexpr double kMetalHz[kPercMetalOsc] = { 205.3, 304.4, 369.6, 522.7, 540.0, 
 constexpr float kMetalNoiseTrade = 0.8f;
 /** @brief The auto-pan's swing amplitude and the largest angle the kernel's series may be asked for (Phosphene). */
 constexpr double kPanRms = 1.4142135623730951;
-constexpr double kPanMaxAngle = 1.6;
+constexpr double kPanMaxAngle = 1.6;   ///< the auto-pan's widest swing, radians
 
+/** @brief The per-sample factor of a decay of 60 dB in @p seconds at rate @p sr. */
 double decayFactor(double seconds, double sr) { return std::exp(-kLn1000 / (std::max(seconds, 1.0e-4) * sr)); }
 
 /** @brief Trapezoidal SVF coefficients (Phosphene's Util.h). */

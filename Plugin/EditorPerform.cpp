@@ -11,9 +11,11 @@ using namespace parh;
 
 namespace {
 
+/** @brief the mutes' names, in the order of perform::MuteKick .. */
 const char* const kMuteNames[perform::kMutes] = { "Kick", "Bass", "Hats", "Perc", "Lead", "Synths", "Pads" };
-const char* const kKeyOf[perform::kMutes] = { "C3", "C#3", "D3", "D#3", "E3", "F3", "F#3" };
+const char* const kKeyOf[perform::kMutes] = { "C3", "C#3", "D3", "D#3", "E3", "F3", "F#3" };   ///< the key that toggles each mute
 
+/** @brief Gain @p g in dB, -120 for silence. */
 float toDb(float g) { return g > 1e-6f ? 20.0f * std::log10(g) : -120.0f; }
 
 } // namespace
@@ -69,6 +71,31 @@ PerformPage::PerformPage(ParhelionProcessor& p) : proc_(p)
     filter_.setTooltip("The master filter: left a low pass, right a high pass, the middle open (controller 74; double click: open)");
     bigSlider(throw_, s.id(Module::Perform, 0, perform::Throw), parhui::familyColour(parhui::Family::Motion));
     throw_.setTooltip("The echo throw: the whole mix into the mixer's tape echo (the expression pedal)");
+    {   // The keyboard (01.10.2026): its choosers from the parameters' own names.
+        auto choice = [&](std::unique_ptr<frame::Choice>& box, std::unique_ptr<juce::ComboBoxParameterAttachment>& attach, int id,
+                          const char* tip) {
+            const ParamDesc& d = s.desc(id);
+            box = std::make_unique<frame::Choice>(nullptr, id);
+            for (int c = 0; c <= static_cast<int>(d.maxValue); ++c) box->addItem(d.choices[c], c + 1);
+            box->setTooltip(tip);
+            attach = std::make_unique<juce::ComboBoxParameterAttachment>(*proc_.parameter(id), *box);
+            addAndMakeVisible(*box);
+        };
+        choice(keyPart_, keyPartAttach_, s.id(Module::Perform, 0, perform::KeyboardPart),
+               "What the keys of a MIDI keyboard play: the kit (C1 the kick, C#1 to C2 the lanes), the bass, the 303, a "
+               "polyphonic voice, the piano, the strings, the choir, the brass, or by channel (1 kit, 2 bass, 3 303, 4 to 9 "
+               "lead, counter, pluck, arp, pad, stab, 10 kit, 11 piano, 12 strings, 13 choir, 14 brass). Off: the keys from "
+               "middle C toggle the mutes.");
+        choice(keyMode_, keyModeAttach_, s.id(Module::Perform, 0, perform::KeyboardMode),
+               "Replace: the voice the keyboard plays leaves the composer's notes out; Layer: it plays over them.");
+        const int cid = s.id(Module::Perform, 0, perform::Composer);
+        composer_ = std::make_unique<frame::Switch>(nullptr, cid);
+        composer_->setButtonText("Composer");
+        composer_->setTooltip("On: the composer's notes play. Off: only what the keyboard plays -- the mix, the filters and the "
+                              "effects go on as composed.");
+        composerAttach_ = std::make_unique<juce::ButtonParameterAttachment>(*proc_.parameter(cid), *composer_);
+        addAndMakeVisible(*composer_);
+    }
     bigSlider(wheel_, s.id(Module::Perform, 0, perform::Wheel), parhui::familyColour(parhui::Family::Source));
     wheel_.setTooltip("The mod wheel: a source of every voice's modulation matrix -- what it moves is the preset's (MIDI controller 1)");
     // Breakdown now, drop now: the planner rewrites the track from its next 8-bar line (PLAN 9).
@@ -170,7 +197,23 @@ void PerformPage::resized()
         learn_[li++]->setBounds(strip.removeFromBottom(26).reduced(10, 3));
         strips_[d].fader.setBounds(strip.reduced(10, 0));
     }
-    headsetArea_ = headset_ ? r.withTrimmedLeft(20) : juce::Rectangle<int>();
+    // Right of the decks: the keyboard, the headset under it.
+    auto right = r.withTrimmedLeft(20);
+    keyArea_ = right.removeFromTop(150);
+    {
+        auto k = keyArea_.reduced(12, 8);
+        k.removeFromTop(24);   // the title (paint)
+        auto keyLine = [&](juce::Component& c) {
+            auto row = k.removeFromTop(36);
+            row.removeFromLeft(110);   // the name (paint)
+            c.setBounds(row.removeFromLeft(std::min(220, row.getWidth())).reduced(0, 4));
+        };
+        keyLine(*keyPart_);
+        keyLine(*keyMode_);
+        keyLine(*composer_);
+    }
+    right.removeFromTop(12);
+    headsetArea_ = headset_ ? right : juce::Rectangle<int>();
 }
 
 void PerformPage::paint(juce::Graphics& g)
@@ -178,7 +221,8 @@ void PerformPage::paint(juce::Graphics& g)
     g.setColour(parhui::colour::dim);
     g.setFont(juce::FontOptions(13.0f));
     auto r = getLocalBounds().reduced(16);
-    g.drawText("MUTE -- the keys C3 to F#3 toggle them; a muted group's notes stop, its tails ring out", r.getX(), r.getY() + 112, r.getWidth(), 20,
+    g.drawText("MUTE -- the keys C3 to F#3 toggle them (while the keyboard plays nothing); a muted group's notes stop, its tails ring out",
+               r.getX(), r.getY() + 112, r.getWidth(), 20,
                juce::Justification::left);
     g.drawText("Master Filter", r.getX(), filter_.getY(), 120, filter_.getHeight(), juce::Justification::centredLeft);
     g.drawText("Echo Throw", r.getX(), throw_.getY(), 120, throw_.getHeight(), juce::Justification::centredLeft);
@@ -189,6 +233,22 @@ void PerformPage::paint(juce::Graphics& g)
         g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
         g.drawText(juce::String("DECK ") + juce::String::charToString(static_cast<juce::juce_wchar>('A' + d)) + (d == 2 ? " (loops)" : ""),
                    b.getX(), b.getY() - 22, 200, 18, juce::Justification::left);
+    }
+    if (!keyArea_.isEmpty()) {   // the keyboard's box, as the frame draws a group
+        const frame::Skin& sk = parhui::skin();
+        const auto box = keyArea_.toFloat();
+        g.setColour(sk.group);
+        g.fillRoundedRectangle(box, sk.radius);
+        g.setColour(sk.edge);
+        g.drawRoundedRectangle(box.reduced(0.5f), sk.radius, 1.0f);
+        g.setColour(sk.family(frame::Family::Source));
+        g.setFont(juce::FontOptions(11.5f, juce::Font::bold));
+        g.drawText("KEYBOARD", keyArea_.getX() + 12, keyArea_.getY() + 8, 200, 16, juce::Justification::centredLeft);
+        g.setColour(parhui::colour::dim);
+        g.setFont(juce::FontOptions(13.0f));
+        for (auto [c, name] : { std::pair<juce::Component*, const char*>{ keyPart_.get(), "Plays" }, { keyMode_.get(), "Mode" },
+                                { composer_.get(), "Composer" } })
+            g.drawText(name, keyArea_.getX() + 12, c->getY(), 96, c->getHeight(), juce::Justification::centredLeft);
     }
     if (headset_ && !headsetArea_.isEmpty())   // the headset (the frame): what the hands do, and how they stand now
         frame::drawHeadsetBox(g, headsetArea_, parhui::skin(), proc_.headset(), "kick out / in", "breakdown / drop now");
@@ -269,11 +329,11 @@ void DecksPage::paint(juce::Graphics& g)
 namespace {
 /** @brief A strip of the console: its name, its meter (a stem), its synth, its fader, pan and sends, its mute. */
 struct StripSpec {
-    std::string name;
-    int meter;
-    Module synth;
-    int instance;
-    std::string fader;
+    std::string name;   ///< the strip's name
+    int meter;   ///< the strip it reads (MeterSink::Strip)
+    Module synth;   ///< the synth whose preset it names (Module::Count: none)
+    int instance;   ///< the synth's instance
+    std::string fader;   ///< its fader's key
     std::vector<std::pair<std::string, std::string>> knobs;   ///< key, label; "Pan" is not a send
     int mute;                                                   ///< perform::Mute* offset from MuteKick, -1 none
 };

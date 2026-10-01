@@ -14,6 +14,7 @@ namespace parh {
 
 namespace {
 
+/** @brief A weight limited to 0.25 .. 3. */
 float clampFactor(float f) { return std::clamp(f, 0.25f, 3.0f); }
 
 } // namespace

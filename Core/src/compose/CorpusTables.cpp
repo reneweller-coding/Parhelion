@@ -8,8 +8,9 @@
 
 namespace parh {
 
-// lead: 500 files, 64742 notes
+/// lead: 500 files, 64742 notes; order 0: how often each step occurs
 const uint16_t kLeadT0[kCorpusAlpha] = { 8825, 225, 3962, 2117, 1940, 3402, 3012, 5058, 906, 4379, 2121, 3728, 1859, 3818, 3993, 2638, 4728, 2065, 2201, 878, 1206, 1681 };
+/// lead, order 1: how often step b follows step a, [a][b]
 const uint16_t kLeadT1[kCorpusAlpha][kCorpusAlpha] = {
     { 544, 5, 106, 92, 165, 496, 477, 1085, 195, 593, 390, 615, 252, 624, 681, 475, 891, 353, 232, 84, 185, 239 },
     { 10, 39, 0, 2, 3, 0, 0, 8, 46, 5, 10, 7, 7, 13, 22, 1, 1, 20, 11, 8, 7, 3 },
@@ -34,6 +35,7 @@ const uint16_t kLeadT1[kCorpusAlpha][kCorpusAlpha] = {
     { 175, 7, 164, 46, 142, 89, 89, 100, 14, 84, 16, 35, 6, 10, 12, 7, 48, 29, 10, 16, 71, 19 },
     { 347, 9, 146, 169, 67, 182, 146, 165, 23, 91, 33, 33, 20, 7, 51, 14, 41, 17, 13, 2, 14, 64 },
 };
+/// lead, order 2: the successions a, b, c and their counts, sparse, sorted by (a, b, c)
 const CorpusTriple kLeadT2[] = {
     { 0, 0, 0, 2 },
     { 0, 0, 4, 4 },
@@ -5218,14 +5220,19 @@ const CorpusTriple kLeadT2[] = {
     { 21, 21, 18, 4 },
     { 21, 21, 20, 1 },
 };
-const int kLeadT2Count = 5182;
+const int kLeadT2Count = 5182;   ///< how many order-2 successions there are
+/// lead: onsets on two bars' sixteenths: [step + 32 if the step before had one][no, yes]
 const uint16_t kLeadOnset[64][2] = { { 24, 730 }, { 11, 17 }, { 63, 300 }, { 44, 125 }, { 34, 175 }, { 71, 174 }, { 27, 273 }, { 31, 64 }, { 68, 214 }, { 52, 106 }, { 50, 226 }, { 62, 120 }, { 47, 191 }, { 57, 166 }, { 55, 251 }, { 67, 36 }, { 28, 293 }, { 28, 28 }, { 47, 307 }, { 31, 118 }, { 32, 182 }, { 52, 182 }, { 23, 241 }, { 35, 70 }, { 34, 247 }, { 30, 87 }, { 38, 242 }, { 38, 126 }, { 30, 178 }, { 50, 154 }, { 23, 281 }, { 38, 35 }, { 4, 1485 }, { 352, 1863 }, { 106, 1774 }, { 165, 1909 }, { 211, 1823 }, { 229, 1769 }, { 68, 1875 }, { 251, 1897 }, { 90, 1871 }, { 224, 1861 }, { 132, 1835 }, { 176, 1885 }, { 176, 1829 }, { 249, 1771 }, { 48, 1889 }, { 265, 1875 }, { 28, 1883 }, { 326, 1850 }, { 102, 1776 }, { 183, 1900 }, { 202, 1816 }, { 212, 1786 }, { 82, 1886 }, { 246, 1881 }, { 83, 1868 }, { 250, 1865 }, { 126, 1826 }, { 170, 1898 }, { 174, 1850 }, { 254, 1774 }, { 50, 1878 }, { 304, 1855 } };
+/// lead: note lengths in sixteenths (16: longer)
 const uint16_t kLeadLength[17] = { 0, 60241, 4430, 53, 18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+/// lead: the 303's accents per sixteenth: (no, yes)
 const uint16_t kLeadAccent[16][2] = { { 4381, 10 }, { 3742, 16 }, { 4157, 0 }, { 4036, 16 }, { 3988, 8 }, { 3903, 8 }, { 4267, 8 }, { 3896, 16 }, { 4200, 0 }, { 3904, 15 }, { 4113, 16 }, { 4029, 0 }, { 4041, 7 }, { 3857, 8 }, { 4299, 0 }, { 3785, 16 } };
+/// lead: the 303's slides per sixteenth: (no, yes)
 const uint16_t kLeadSlide[16][2] = { { 4262, 129 }, { 3600, 158 }, { 4050, 107 }, { 3927, 125 }, { 3865, 131 }, { 3804, 107 }, { 4126, 149 }, { 3859, 53 }, { 4086, 114 }, { 3715, 204 }, { 4021, 108 }, { 3881, 148 }, { 3937, 111 }, { 3776, 89 }, { 4156, 143 }, { 3751, 50 } };
 
-// piano: 100 files, 5566 notes
+/// piano: 100 files, 5566 notes; order 0: how often each step occurs
 const uint16_t kPianoT0[kCorpusAlpha] = { 314, 15, 244, 148, 327, 187, 364, 467, 394, 680, 388, 560, 202, 350, 335, 165, 200, 62, 80, 27, 24, 33 };
+/// piano, order 1: how often step b follows step a, [a][b]
 const uint16_t kPianoT1[kCorpusAlpha][kCorpusAlpha] = {
     { 28, 0, 29, 7, 41, 4, 4, 12, 20, 22, 12, 40, 3, 26, 14, 18, 25, 3, 3, 0, 0, 0 },
     { 0, 1, 0, 0, 5, 0, 5, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0 },
@@ -5250,6 +5257,7 @@ const uint16_t kPianoT1[kCorpusAlpha][kCorpusAlpha] = {
     { 2, 0, 2, 0, 0, 1, 2, 2, 5, 1, 0, 1, 0, 0, 0, 1, 2, 0, 3, 0, 0, 2 },
     { 0, 0, 3, 0, 4, 0, 0, 2, 0, 2, 4, 2, 1, 0, 1, 0, 0, 0, 4, 1, 0, 8 },
 };
+/// piano, order 2: the successions a, b, c and their counts, sparse, sorted by (a, b, c)
 const CorpusTriple kPianoT2[] = {
     { 0, 0, 0, 9 },
     { 0, 0, 2, 4 },
@@ -6977,14 +6985,19 @@ const CorpusTriple kPianoT2[] = {
     { 21, 21, 18, 3 },
     { 21, 21, 21, 2 },
 };
-const int kPianoT2Count = 1725;
+const int kPianoT2Count = 1725;   ///< how many order-2 successions there are
+/// piano: onsets on two bars' sixteenths: [step + 32 if the step before had one][no, yes]
 const uint16_t kPianoOnset[64][2] = { { 5, 436 }, { 5, 0 }, { 188, 262 }, { 168, 20 }, { 128, 291 }, { 148, 4 }, { 114, 330 }, { 114, 0 }, { 127, 315 }, { 123, 4 }, { 218, 228 }, { 210, 12 }, { 111, 324 }, { 110, 9 }, { 139, 300 }, { 140, 0 }, { 37, 397 }, { 37, 0 }, { 193, 251 }, { 179, 14 }, { 152, 271 }, { 168, 2 }, { 126, 321 }, { 126, 0 }, { 124, 321 }, { 121, 4 }, { 225, 224 }, { 227, 4 }, { 129, 319 }, { 125, 10 }, { 187, 256 }, { 186, 1 }, { 0, 25 }, { 445, 16 }, { 0, 16 }, { 251, 27 }, { 24, 23 }, { 296, 18 }, { 0, 22 }, { 328, 24 }, { 0, 24 }, { 323, 16 }, { 4, 16 }, { 225, 19 }, { 8, 23 }, { 329, 18 }, { 1, 26 }, { 296, 30 }, { 0, 30 }, { 407, 20 }, { 0, 20 }, { 244, 27 }, { 18, 23 }, { 279, 15 }, { 0, 17 }, { 319, 19 }, { 1, 18 }, { 328, 11 }, { 6, 9 }, { 221, 12 }, { 6, 10 }, { 318, 11 }, { 0, 21 }, { 247, 30 } };
+/// piano: note lengths in sixteenths (16: longer)
 const uint16_t kPianoLength[17] = { 0, 787, 2332, 485, 609, 196, 395, 80, 294, 43, 41, 27, 69, 27, 57, 10, 114 };
+/// piano: the 303's accents per sixteenth: (no, yes)
 const uint16_t kPianoAccent[16][2] = { { 724, 164 }, { 30, 6 }, { 489, 60 }, { 77, 11 }, { 504, 104 }, { 37, 2 }, { 591, 99 }, { 36, 7 }, { 587, 91 }, { 30, 5 }, { 418, 59 }, { 39, 8 }, { 583, 93 }, { 41, 7 }, { 539, 64 }, { 51, 10 } };
+/// piano: the 303's slides per sixteenth: (no, yes)
 const uint16_t kPianoSlide[16][2] = { { 446, 442 }, { 11, 25 }, { 309, 240 }, { 52, 36 }, { 390, 218 }, { 5, 34 }, { 395, 295 }, { 29, 14 }, { 374, 304 }, { 18, 17 }, { 294, 183 }, { 19, 28 }, { 458, 218 }, { 12, 36 }, { 462, 141 }, { 49, 12 } };
 
-// acid: 108 files, 9604 notes
+/// acid: 108 files, 9604 notes; order 0: how often each step occurs
 const uint16_t kAcidT0[kCorpusAlpha] = { 42, 0, 112, 0, 40, 74, 316, 2584, 16, 3956, 266, 264, 88, 266, 665, 41, 801, 32, 16, 24, 0, 1 };
+/// acid, order 1: how often step b follows step a, [a][b]
 const uint16_t kAcidT1[kCorpusAlpha][kCorpusAlpha] = {
     { 3, 0, 0, 0, 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -7009,6 +7022,7 @@ const uint16_t kAcidT1[kCorpusAlpha][kCorpusAlpha] = {
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 },
 };
+/// acid, order 2: the successions a, b, c and their counts, sparse, sorted by (a, b, c)
 const CorpusTriple kAcidT2[] = {
     { 0, 0, 0, 2 },
     { 0, 7, 13, 8 },
@@ -7258,14 +7272,19 @@ const CorpusTriple kAcidT2[] = {
     { 19, 17, 2, 7 },
     { 21, 15, 7, 1 },
 };
-const int kAcidT2Count = 247;
+const int kAcidT2Count = 247;   ///< how many order-2 successions there are
+/// acid: onsets on two bars' sixteenths: [step + 32 if the step before had one][no, yes]
 const uint16_t kAcidOnset[64][2] = { { 91, 137 }, { 50, 129 }, { 39, 75 }, { 16, 78 }, { 72, 57 }, { 72, 185 }, { 28, 82 }, { 32, 53 }, { 88, 45 }, { 80, 162 }, { 44, 69 }, { 24, 81 }, { 72, 62 }, { 76, 185 }, { 32, 77 }, { 50, 40 }, { 68, 81 }, { 53, 129 }, { 37, 74 }, { 13, 77 }, { 73, 57 }, { 69, 186 }, { 25, 81 }, { 25, 53 }, { 85, 46 }, { 81, 157 }, { 41, 73 }, { 17, 82 }, { 69, 61 }, { 73, 173 }, { 21, 88 }, { 40, 34 }, { 88, 128 }, { 64, 201 }, { 55, 275 }, { 113, 237 }, { 185, 130 }, { 38, 149 }, { 57, 277 }, { 101, 258 }, { 154, 157 }, { 33, 169 }, { 61, 270 }, { 110, 229 }, { 189, 121 }, { 33, 150 }, { 58, 277 }, { 101, 253 }, { 114, 178 }, { 58, 201 }, { 53, 277 }, { 117, 234 }, { 182, 129 }, { 37, 149 }, { 53, 282 }, { 106, 257 }, { 153, 157 }, { 33, 170 }, { 58, 269 }, { 113, 229 }, { 177, 134 }, { 36, 159 }, { 53, 279 }, { 117, 250 } };
+/// acid: note lengths in sixteenths (16: longer)
 const uint16_t kAcidLength[17] = { 0, 8804, 642, 92, 62, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+/// acid: the 303's accents per sixteenth: (no, yes)
 const uint16_t kAcidAccent[16][2] = { { 516, 8 }, { 656, 4 }, { 693, 8 }, { 618, 8 }, { 373, 0 }, { 669, 0 }, { 702, 20 }, { 621, 0 }, { 397, 8 }, { 658, 0 }, { 673, 8 }, { 605, 16 }, { 378, 0 }, { 667, 0 }, { 701, 20 }, { 569, 8 } };
+/// acid: the 303's slides per sixteenth: (no, yes)
 const uint16_t kAcidSlide[16][2] = { { 488, 36 }, { 624, 36 }, { 653, 48 }, { 606, 20 }, { 353, 20 }, { 645, 24 }, { 694, 28 }, { 593, 28 }, { 393, 12 }, { 638, 20 }, { 635, 46 }, { 601, 20 }, { 360, 18 }, { 643, 24 }, { 693, 28 }, { 567, 10 } };
 
-// bass: 200 files, 18277 notes
+/// bass: 200 files, 18277 notes; order 0: how often each step occurs
 const uint16_t kBassT0[kCorpusAlpha] = { 88, 8, 228, 225, 585, 335, 805, 4247, 426, 6209, 1116, 984, 240, 577, 791, 28, 1208, 104, 64, 5, 4, 0 };
+/// bass, order 1: how often step b follows step a, [a][b]
 const uint16_t kBassT1[kCorpusAlpha][kCorpusAlpha] = {
     { 0, 0, 0, 0, 0, 8, 18, 28, 0, 17, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0 },
     { 0, 2, 0, 0, 0, 0, 0, 0, 4, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -7290,6 +7309,7 @@ const uint16_t kBassT1[kCorpusAlpha][kCorpusAlpha] = {
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
+/// bass, order 2: the successions a, b, c and their counts, sparse, sorted by (a, b, c)
 const CorpusTriple kBassT2[] = {
     { 0, 5, 9, 8 },
     { 0, 6, 0, 4 },
@@ -7795,12 +7815,17 @@ const CorpusTriple kBassT2[] = {
     { 19, 19, 12, 1 },
     { 20, 13, 13, 4 },
 };
-const int kBassT2Count = 503;
+const int kBassT2Count = 503;   ///< how many order-2 successions there are
+/// bass: onsets on two bars' sixteenths: [step + 32 if the step before had one][no, yes]
 const uint16_t kBassOnset[64][2] = { { 292, 312 }, { 196, 324 }, { 130, 282 }, { 70, 200 }, { 152, 162 }, { 290, 322 }, { 90, 392 }, { 98, 70 }, { 290, 184 }, { 236, 392 }, { 90, 298 }, { 72, 182 }, { 162, 196 }, { 290, 318 }, { 66, 398 }, { 96, 56 }, { 248, 236 }, { 232, 328 }, { 110, 322 }, { 62, 174 }, { 172, 160 }, { 262, 344 }, { 90, 362 }, { 124, 70 }, { 282, 202 }, { 246, 373 }, { 109, 293 }, { 65, 178 }, { 169, 172 }, { 298, 327 }, { 46, 416 }, { 104, 27 }, { 228, 152 }, { 216, 248 }, { 140, 432 }, { 244, 470 }, { 460, 210 }, { 192, 180 }, { 78, 424 }, { 376, 440 }, { 338, 172 }, { 152, 204 }, { 164, 432 }, { 286, 444 }, { 446, 180 }, { 174, 202 }, { 86, 434 }, { 388, 444 }, { 312, 188 }, { 200, 224 }, { 126, 426 }, { 270, 478 }, { 434, 218 }, { 190, 188 }, { 104, 428 }, { 360, 430 }, { 337, 163 }, { 156, 209 }, { 134, 448 }, { 276, 465 }, { 456, 187 }, { 164, 195 }, { 85, 437 }, { 400, 453 } };
+/// bass: note lengths in sixteenths (16: longer)
 const uint16_t kBassLength[17] = { 0, 15058, 3072, 75, 64, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+/// bass: the 303's accents per sixteenth: (no, yes)
 const uint16_t kBassAccent[16][2] = { { 868, 20 }, { 1120, 4 }, { 1402, 60 }, { 1302, 20 }, { 726, 24 }, { 1034, 0 }, { 1558, 48 }, { 1010, 0 }, { 695, 26 }, { 1176, 2 }, { 1427, 44 }, { 1253, 16 }, { 719, 16 }, { 1034, 8 }, { 1605, 80 }, { 980, 0 } };
+/// bass: the 303's slides per sixteenth: (no, yes)
 const uint16_t kBassSlide[16][2] = { { 880, 8 }, { 1120, 4 }, { 1428, 34 }, { 1322, 0 }, { 750, 0 }, { 1030, 4 }, { 1606, 0 }, { 1010, 0 }, { 713, 8 }, { 1172, 6 }, { 1459, 12 }, { 1269, 0 }, { 719, 16 }, { 1042, 0 }, { 1681, 4 }, { 980, 0 } };
 
+/// The tables of every role, in the order of the roles.
 const CorpusRole kCorpusRoles[kCorpusRoleCount] = {
     { kLeadT0, kLeadT1, kLeadT2, kLeadT2Count, kLeadOnset, kLeadLength, kLeadAccent, kLeadSlide },
     { kPianoT0, kPianoT1, kPianoT2, kPianoT2Count, kPianoOnset, kPianoLength, kPianoAccent, kPianoSlide },

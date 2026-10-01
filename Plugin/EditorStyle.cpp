@@ -13,12 +13,14 @@ namespace {
 
 /** @brief One of the six axes: its name, its range on the panel, its value in a profile, how it reads. */
 struct Axis {
-    const char* name;
-    float lo, hi;
-    std::function<float(const StyleProfile&)> value;
-    std::function<juce::String(float)> text;
+    const char* name;   ///< the axis' name
+    float lo;   ///< the low end of its range on the panel
+    float hi;   ///< ... and the high end
+    std::function<float(const StyleProfile&)> value;   ///< the axis' value in a profile
+    std::function<juce::String(float)> text;   ///< how a value reads
 };
 
+/** @brief the lead archetypes, in the order of LeadKind */
 const char* const kLeadNames[static_cast<int>(LeadKind::Count)] = { "Supersaw", "Piano", "303", "Pluck and Arp", "Pad" };
 /** @brief Where each lead archetype sits on its axis (from the dry riff to the wide pad). */
 float leadPlace(LeadKind k)
@@ -32,6 +34,7 @@ float leadPlace(LeadKind k)
     }
 }
 
+/** @brief The six axes, built on first use. */
 const std::vector<Axis>& axes()
 {
     static const std::vector<Axis> a = {
@@ -56,7 +59,11 @@ const std::vector<Axis>& axes()
 }
 
 /** The references' medians per style (Tools/ref_stats.json, 30 recordings, 29.09.2026). */
-struct RefRow { const char* what; const char* values[5]; };
+struct RefRow {
+    const char* what;        ///< the measure
+    const char* values[5];   ///< its median per style
+};
+/** @brief the references' medians, a row per measure */
 const RefRow kRefs[] = {
     { "Tempo, BPM",                  { "138", "135", "137", "134", "131" } },
     { "Length, min",                 { "8.6", "8.2", "6.9", "7.5", "8.7" } },
@@ -69,8 +76,9 @@ const RefRow kRefs[] = {
     { "Centroid, Hz",                { "724", "604", "580", "262", "579" } },
     { "Side over mid (> 200 Hz), dB", { "-4.9", "-6.5", "-7.5", "-11.8", "-7.5" } },
 };
-const char* const kStyleShort[5] = { "Uplifting", "Progr.", "Dream H.", "Acid", "Deep" };   // (the full names crowded)
+const char* const kStyleShort[5] = { "Uplifting", "Progr.", "Dream H.", "Acid", "Deep" };   ///< (the full names crowded)
 
+/** @brief the styles' colours: Uplifting, Progressive, Dream House, Acid, Deep */
 const juce::Colour kStyleColour[5] = { juce::Colour(0xffe6c178), juce::Colour(0xff6fb8ae), juce::Colour(0xffc47fb0),
                                        juce::Colour(0xffd9825b), juce::Colour(0xff6f8fb8) };
 

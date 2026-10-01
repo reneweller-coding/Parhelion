@@ -71,10 +71,11 @@ struct TrackRequest {
 /** @brief What a track tells the set, the cues and the displays. */
 struct TrackInfo {
     std::string style;           ///< the profile's name
-    FormTemplate form = FormTemplate::Anthem;
-    float bpm = 138.0f;
-    int key = 9, scale = 0;
-    int bars = 0;
+    FormTemplate form = FormTemplate::Anthem;   ///< the track's form
+    float bpm = 138.0f;   ///< the tempo
+    int key = 9;   ///< the key's root, 0 = C
+    int scale = 0;   ///< the scale (compose.scale)
+    int bars = 0;   ///< length
     int mainDropBar = -1;        ///< the main drop's first bar
     int breakdownBar = -1;       ///< the main breakdown's first bar
     int firstLeadBar = -1;       ///< where the lead is first heard
@@ -88,7 +89,7 @@ struct TrackInfo {
     std::string progression;     ///< "i-VI-III-VII"
     std::string bass;            ///< the bass figure
     std::string camelot;         ///< "8A"
-    bool beatless = false;
+    bool beatless = false;   ///< no kick at all (Deep)
 };
 
 /** @brief The names of a track's units (and `section<n>`, n from 1, for each of its sections). */

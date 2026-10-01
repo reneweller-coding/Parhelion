@@ -49,6 +49,7 @@ using namespace parh;
 
 namespace {
 
+/** @brief Prints the command line. */
 void usage()
 {
     std::printf("parh_render [--seed N] [--style Uplifting|Progressive|Dream House|Acid|Deep] [--bpm B] [--minutes M]\n"
@@ -127,6 +128,7 @@ std::string trackJson(const Score& sc, const TrackInfo& info, double at, const T
     return s + "}}";
 }
 
+/** @brief Writes @p text to @p path; false if it cannot. */
 bool writeText(const std::string& path, const std::string& text)
 {
     FILE* f = std::fopen(path.c_str(), "wb");
@@ -137,6 +139,7 @@ bool writeText(const std::string& path, const std::string& text)
 
 } // namespace
 
+/** @brief Renders what the command line asks for; the exit code is 0 on success. */
 int main(int argc, char** argv)
 {
     uint64_t seed = 1;

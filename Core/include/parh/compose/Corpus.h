@@ -35,14 +35,19 @@ constexpr int kCorpusRoleCount = 4;        ///< lead, piano, acid, bass
 enum class CorpusRoleId : int { Lead = 0, Piano, Acid, Bass };
 
 /** @brief One order-2 count. */
-struct CorpusTriple { uint8_t a, b, c; uint16_t n; };
+struct CorpusTriple {
+    uint8_t a;    ///< the first step
+    uint8_t b;    ///< the second
+    uint8_t c;    ///< the step that follows them
+    uint16_t n;   ///< how often
+};
 
 /** @brief The counts of one role. */
 struct CorpusRole {
     const uint16_t* t0;                                  ///< [kCorpusAlpha]
     const uint16_t (*t1)[kCorpusAlpha];                  ///< [kCorpusAlpha][kCorpusAlpha]
     const CorpusTriple* t2;                              ///< sparse order-2 counts, sorted by (a, b, c)
-    int t2Count;
+    int t2Count;   ///< how many order-2 counts there are
     const uint16_t (*onset)[2];                          ///< [64][2]: step (0..31) + 32 if the step before had an onset: (no, yes)
     const uint16_t* length;                              ///< [17]: note lengths in sixteenths (16: longer)
     const uint16_t (*accent)[2];                         ///< [16][2]
@@ -53,6 +58,7 @@ extern const CorpusRole kCorpusRoles[kCorpusRoleCount];
 /** @brief The variable-order model of one role: P(next step | two steps before). */
 class StepModel {
 public:
+    /** @brief The model of role @p role, built from its counts. */
     explicit StepModel(CorpusRoleId role);
     /** @brief The probability of step @p c after @p a, @p b (indices 0 .. kCorpusAlpha-1; @p a < 0: no second context). */
     double p(int a, int b, int c) const;
@@ -60,9 +66,9 @@ public:
     double onset(int step, bool prev) const;
     /** @brief The chance of an accent and of a slide on sixteenth @p step (0 .. 15). */
     double accent(int step) const;
-    double slide(int step) const;
+    double slide(int step) const;   ///< @copydoc accent
 private:
-    const CorpusRole& r_;
+    const CorpusRole& r_;   ///< the role's counts
     std::vector<float> p1_;                    ///< order 1 with Witten-Bell back-off to order 0, [a][c]
     std::vector<float> p2_;                    ///< order 2 interpolated, [a][b][c]
 };

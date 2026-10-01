@@ -6,7 +6,7 @@
 #include "EditorTheme.h"
 #include "ParhelionData.h"
 
-void drawLogo(juce::Graphics& g, juce::Rectangle<float> r);   // PluginEditor.cpp
+void drawLogo(juce::Graphics& g, juce::Rectangle<float> r);   ///< PluginEditor.cpp
 #include <cmath>
 
 namespace parhui {

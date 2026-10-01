@@ -16,13 +16,17 @@
 /** @brief The Style tab. */
 class StylePage final : public juce::Component, private juce::Timer {
 public:
+    /** @brief The tab for @p p. */
     explicit StylePage(ParhelionProcessor& p);
+    /** @brief The profile's numbers and the button on top, the custom style's knobs under them. */
     void resized() override;
+    /** @brief The style's profile beside the references' medians. */
     void paint(juce::Graphics& g) override;
 
 private:
+    /** @brief Follows the style chosen. */
     void timerCallback() override;
-    ParhelionProcessor& proc_;
+    ParhelionProcessor& proc_;   ///< the processor
     ScrollingPage knobs_;   ///< compose.style, morph_to, morph (the Compose module's page)
     int knobsH_ = 150;      ///< its height: as tall as it needs, where the chart keeps its room
     juce::String shown_;    ///< the profile's numbers as last drawn

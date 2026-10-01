@@ -10,7 +10,7 @@
 namespace parh {
 
 namespace {
-constexpr double kTwoPiD = 6.283185307179586;
+constexpr double kTwoPiD = 6.283185307179586;   ///< 2 pi
 /** Totality raised its percussive ping by 12 dB; a pad is continuous, so Parhelion's cloud needs none. */
 constexpr float kMakeupDb = 0.0f;
 }

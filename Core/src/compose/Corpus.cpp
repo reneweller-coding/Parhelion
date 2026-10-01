@@ -9,7 +9,7 @@
 namespace parh {
 
 namespace {
-constexpr int A = kCorpusAlpha;
+constexpr int A = kCorpusAlpha;   ///< the steps of the alphabet, shortly
 }
 
 StepModel::StepModel(CorpusRoleId role) : r_(kCorpusRoles[static_cast<int>(role)])

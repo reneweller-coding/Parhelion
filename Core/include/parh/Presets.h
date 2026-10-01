@@ -41,8 +41,8 @@ namespace parh {
 
 /** @brief One preset: its group (a submenu), its name, and the values it sets (knob index in its module, value). */
 struct SoundPreset {
-    std::string group;
-    std::string name;
+    std::string group;   ///< its group (a submenu)
+    std::string name;   ///< its name
     int groupIndex = -1;                                  ///< its group within the bank's sixteen
     float style[5] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };    ///< its group's fit to Uplifting, Progressive, Dream House, Acid, Deep
     uint32_t roles = 0;                                   ///< a kit lane's roles it is made for (bit PercRole), 0: any

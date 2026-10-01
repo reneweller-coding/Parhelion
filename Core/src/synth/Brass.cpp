@@ -10,12 +10,19 @@
 namespace parh {
 
 namespace {
-constexpr double kPiD = 3.14159265358979323846;
-constexpr int kLineMax = 4096;
-constexpr double kRho = 1.2, kC = 343.0;
+constexpr double kPiD = 3.14159265358979323846;   ///< pi
+constexpr int kLineMax = 4096;   ///< the bore's longest delay, samples
+constexpr double kRho = 1.2;   ///< air's density, kg/m^3
+constexpr double kC = 343.0;   ///< the speed of sound, m/s
 constexpr double kBoreArea = 1.5e-4;             ///< m^2 (a horn's or a trombone's bore)
 constexpr double kZc = kRho * kC / kBoreArea;    ///< the bore's characteristic impedance
-constexpr double kLipWidth = 0.01, kLipMass = 1.5, kLipRest = 1e-4, kLipQ = 7.0, kLipRatio = 0.8, kBellReflection = 0.95;
+constexpr double kLipWidth = 0.01;   ///< the lips' width, m
+constexpr double kLipMass = 1.5;   ///< the lips' mass per area, kg/m^2
+constexpr double kLipRest = 1e-4;   ///< the lips' rest opening, m
+constexpr double kLipQ = 7.0;   ///< the lips' quality factor
+constexpr double kLipRatio = 0.8;   ///< the lips' own frequency over the note's
+constexpr double kBellReflection = 0.95;   ///< the bell's reflection
+/** @brief sub-steps of the lips per sample */
 constexpr int kLipSteps = 2;}
 
 void Brass::prepare(double sampleRate, uint64_t seed)

@@ -30,6 +30,7 @@ namespace parh {
 struct Chord {
     int degree = 0;       ///< scale degree of the root (0-based)
     int tones[3] = {};    ///< semitones above the key's root
+    /** @brief The root, semitones above the key's root. */
     int root() const { return tones[0]; }
 };
 

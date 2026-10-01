@@ -81,9 +81,11 @@ private:
     std::atomic<int> outcome_{ 0 };            ///< 1 switched, -1 missed (the audio thread was past the sample)
     std::atomic<int64_t> taken_{ -1 };         ///< where the last fade began
     int fadePos_ = 0;                          ///< audio thread: samples of the fade done
-    int maxBlock_ = 512;
-    std::vector<float> fadeL_, fadeR_;         ///< audio thread: the second engine's samples during the fade
-    std::vector<float> workL_, workR_;         ///< worker: where the pre-roll is rendered to
+    int maxBlock_ = 512;   ///< the largest block the audio thread is given
+    std::vector<float> fadeL_;   ///< audio thread: the second engine's samples during the fade, left
+    std::vector<float> fadeR_;   ///< ... right
+    std::vector<float> workL_;   ///< worker: where the pre-roll is rendered to, left
+    std::vector<float> workR_;   ///< ... right
 };
 
 /**

@@ -7,10 +7,11 @@
 
 namespace parh {
 
-// 144250 windows, 2097152 bits, 8 hashes
+/// 144250 windows, 2097152 bits, 8 hashes
 const int kMemoBloomBits = 2097152;
-const int kMemoBloomK = 8;
+const int kMemoBloomK = 8;   ///< hashes per window
 const uint64_t kMemoProbeHash = 0xCF4D6AD0B64DA544ull;
+/// The filter's bits, 64 a word.
 const uint64_t kMemoBloom[32768] = {
     0x2789BB0923D8A884ull, 0x13E3684A85A91017ull, 0xC0FBCF28715E9F50ull, 0x5627A4B7EF4264FAull,
     0x1517422C85624A4Cull, 0x50A4A814C9901049ull, 0x1F8D99F922C471CBull, 0xF896848CCA137111ull,

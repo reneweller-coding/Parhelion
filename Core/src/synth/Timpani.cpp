@@ -12,12 +12,18 @@ namespace parh {
 
 namespace {
 
-constexpr double kPiD = 3.14159265358979323846;
-using cd = std::complex<double>;
+constexpr double kPiD = 3.14159265358979323846;   ///< pi
+using cd = std::complex<double>;   ///< A complex number.
 
 /** @brief A mode: (m, n), the zero j_mn of J_m, its frequency relative to (1,1) with the air, its decay (s, T60). */
-struct Mode { int m; double j, ratio, t60, radiation; };
-// Rossing's measurements on a 65 cm kettle drum, rounded; the (0,n) modes short (they radiate as monopoles).
+struct Mode {
+    int m;              ///< the nodal diameters
+    double j;           ///< the zero j_mn of J_m
+    double ratio;       ///< its frequency relative to (1,1), with the air
+    double t60;         ///< its decay to -60 dB, s
+    double radiation;   ///< how well it radiates
+};
+/// Rossing's measurements on a 65 cm kettle drum, rounded; the (0,n) modes short (they radiate as monopoles).
 const Mode kMeasured[12] = {
     { 1, 3.832, 1.00, 3.0, 0.8 }, { 2, 5.136, 1.50, 2.2, 0.6 }, { 3, 6.380, 1.98, 1.6, 0.5 }, { 4, 7.588, 2.44, 1.2, 0.4 },
     { 5, 8.771, 2.90, 0.9, 0.3 }, { 6, 9.936, 3.35, 0.7, 0.25 }, { 0, 2.405, 0.85, 0.35, 1.0 }, { 0, 5.520, 1.70, 0.25, 0.6 },
@@ -28,7 +34,7 @@ double besselJ(int m, double x);
 
 /** @brief The whole set: the measured twelve and the ideal membrane's next modes, by frequency. */
 struct ModeTable {
-    Mode modes[kTimpaniModes];
+    Mode modes[kTimpaniModes];   ///< the modes, by frequency
     ModeTable()
     {
         int n = 0;
@@ -65,6 +71,7 @@ struct ModeTable {
     }
 };
 
+/** @brief The mode table, built on first use. */
 const ModeTable& table()
 {
     static const ModeTable t;
@@ -85,8 +92,10 @@ double besselJ(int m, double x)
     return sum;
 }
 
-constexpr double kMalletMass = 0.02, kMalletP = 2.3, kMembraneMass = 0.12;   ///< kg, exponent, kg (the membrane's modal mass)
-constexpr int kOs = 4;
+constexpr double kMalletMass = 0.02;   ///< the mallet's mass, kg
+constexpr double kMalletP = 2.3;   ///< the felt's exponent
+constexpr double kMembraneMass = 0.12;   ///< the membrane's modal mass, kg
+constexpr int kOs = 4;   ///< sub-steps per sample while the mallet touches
 
 } // namespace
 

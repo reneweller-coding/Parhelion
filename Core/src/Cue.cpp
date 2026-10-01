@@ -34,17 +34,20 @@ namespace parh {
 
 namespace {
 
+/** @brief Copies @p src into @p dst, cut at 23 characters and terminated. */
 void copyText(char (&dst)[24], const char* src)
 {
     std::strncpy(dst, src, sizeof(dst) - 1);
     dst[sizeof(dst) - 1] = 0;
 }
 
+/** @brief Appends @p v big-endian (OSC). */
 void put32(std::vector<uint8_t>& out, uint32_t v)
 {
     for (int s = 24; s >= 0; s -= 8) out.push_back(static_cast<uint8_t>(v >> s));
 }
 
+/** @brief Appends @p s as an OSC string: terminated and padded to four bytes. */
 void putString(std::vector<uint8_t>& out, const char* s)
 {
     const size_t n = std::strlen(s);

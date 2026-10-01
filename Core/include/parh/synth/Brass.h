@@ -37,23 +37,31 @@
 
 namespace parh {
 
-constexpr int kBrassNotes = 6;
-constexpr int kBrassPlayers = 4;
+constexpr int kBrassNotes = 6;   ///< notes at once
+constexpr int kBrassPlayers = 4;   ///< players on a note at most
 
+/** @brief The brass section: lips on a bore, a player each, a few players a note (see the file comment). */
 class Brass {
 public:
-    static constexpr int kMaxBlock = 32;
+    static constexpr int kMaxBlock = 32;   ///< the longest block process() renders at once
 
+    /** @brief Sets the sample rate and the seed of the players' streams, and falls silent. */
     void prepare(double sampleRate, uint64_t seed);
+    /** @brief Reads the effective parameter values (indexed by brass::). */
     void update(const float* v);
+    /** @brief Players take up @p pitch at @p velocity (0..1), @p late samples after its ideal start; @p unused is not read. */
     void noteOn(int pitch, float velocity, bool unused, double late);
+    /** @brief The players of @p pitch stop blowing. */
     void noteOff(int pitch);
+    /** @brief Silence: every player off. */
     void reset();
     /** @brief Players on a note (1 .. kBrassPlayers, at most the quality's limit): the knob, through update(). */
     void setPlayers(int n) { players_ = n < 1 ? 1 : (n > playerLimit_ ? playerLimit_ : n); }
     /** @brief The quality's limit on the players (Deck::setQuest), as StringSection::setPlayerLimit. */
     void setPlayerLimit(int n) { playerLimit_ = n < 1 ? 1 : (n > kBrassPlayers ? kBrassPlayers : n); }
+    /** @brief Renders @p n samples, replacing @p L and @p R. */
     void process(float* L, float* R, int n);
+    /** @brief How many players blow now (for the tests). */
     int activePlayers() const;
     /** @brief The deck's shared modulation sources (Modulation.h). */
     void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
@@ -63,45 +71,65 @@ public:
 private:
     /** @brief Note @p s's modulation now, onto its players. */
     void modNote(int s);
+    /** @brief One player on one note: his lips, his bore, his ear. */
     struct Player {
-        bool on = false, held = false;
-        int note = -1;
-        double y = 0.0, v = 0.0;          ///< lip displacement (m) and velocity
+        bool on = false;   ///< he plays
+        bool held = false;   ///< the key is held
+        int note = -1;   ///< the note slot he plays, -1 none
+        double y = 0.0;   ///< the lip displacement, m
+        double v = 0.0;   ///< the lip velocity, m/s
         double wl = 0.0;                  ///< lip angular frequency
-        double bell = 0.0, bellA = 0.7;   ///< the bell's low pass: state, coefficient
+        double bell = 0.0;   ///< the bell's low pass: its state
+        double bellA = 0.7;   ///< its coefficient
         double delay = 100.0;             ///< the bore's round trip, samples
-        double pm = 0.0, target = 5000.0; ///< mouth pressure now and the note's
-        double t = 0.0, released = -1.0, start = 0.0;
-        double vibHz = 5.0, vibPhase = 0.0;
-        float panL = 0.7f, panR = 0.7f;
+        double pm = 0.0;   ///< the mouth pressure now
+        double target = 5000.0;   ///< the note's
+        double t = 0.0;   ///< seconds since the note began
+        double released = -1.0;   ///< seconds since its release, -1 while held
+        double start = 0.0;   ///< seconds until he sets in
+        double vibHz = 5.0;   ///< his vibrato's rate, Hz
+        double vibPhase = 0.0;   ///< his vibrato's phase, radians
+        float panL = 0.7f;   ///< the pan's gain, left
+        float panR = 0.7f;   ///< the pan's gain, right
         float pan0 = 0.0f;                ///< where the player sits (the modulation moves from here; Phase 5b)
-        double target0 = 5000.0, f0 = 100.0;   ///< the note's pressure and pitch as they began
-        float out = 0.0f, dc = 0.0f;
+        double target0 = 5000.0;   ///< the note's mouth pressure as it began
+        double f0 = 100.0;   ///< the note's pitch as it began, Hz
+        float out = 0.0f;   ///< the last sample that left the bell
+        float dc = 0.0f;   ///< the DC blocker's state
         std::vector<float> line;          ///< the outgoing wave's delay
-        int write = 0;
+        int write = 0;   ///< where the delay is written
         double period = 200.0;            ///< the note's period, samples
-        double lastCross = -1.0, mean = 0.0, prevX = 0.0;
-        int64_t clock = 0;
-        int crossings = 0;
-        Rng rng;
-        int quiet = 0;
+        double lastCross = -1.0;   ///< the last upward zero crossing, samples (-1 none)
+        double mean = 0.0;   ///< the outgoing wave's slow mean (the crossings are taken around it)
+        double prevX = 0.0;   ///< the last sample around the mean
+        int64_t clock = 0;   ///< samples since the note began
+        int crossings = 0;   ///< the crossings counted
+        Rng rng;   ///< his own random stream
+        int quiet = 0;   ///< cells he has been silent (he stops after a few)
     };
-    double sr_ = 48000.0;
-    uint64_t seed_ = 1;
-    int players_ = 3;
+    double sr_ = 48000.0;   ///< the sample rate, Hz
+    uint64_t seed_ = 1;   ///< the players' streams' seed
+    int players_ = 3;   ///< players on a note
     int playerLimit_ = kBrassPlayers;   ///< setPlayerLimit()
-    uint32_t counter_ = 0;
-    float level_ = 1.0f, pressure_ = 1.0f, brassiness_ = 0.35f, attackMs_ = 40.0f, releaseMs_ = 150.0f, vibratoCents_ = 6.0f;
-    float width_ = 0.6f, lowCutHz_ = 50.0f;
-    Svf lowCut_[2];
-    Player player_[kBrassNotes * kBrassPlayers];
-    int notePitch_[kBrassNotes] = {};
-    bool noteOn_[kBrassNotes] = {};
-    double noteAge_[kBrassNotes] = {};
-    // The modulation (Phase 5b): a Modulator per note; a note's blare and vibrato depth as the matrix leaves them.
+    uint32_t counter_ = 0;   ///< counts the notes started (each player's stream)
+    float level_ = 1.0f;   ///< brass.level, linear
+    float pressure_ = 1.0f;   ///< the mouth pressure's factor
+    float brassiness_ = 0.35f;   ///< the blare's amount
+    float attackMs_ = 40.0f;   ///< the attack, ms
+    float releaseMs_ = 150.0f;   ///< the release, ms
+    float vibratoCents_ = 6.0f;   ///< the vibrato's depth, cents
+    float width_ = 0.6f;   ///< the width
+    float lowCutHz_ = 50.0f;   ///< the low cut, Hz
+    Svf lowCut_[2];   ///< the low cut, per channel
+    Player player_[kBrassNotes * kBrassPlayers];   ///< the players, kBrassPlayers per note
+    int notePitch_[kBrassNotes] = {};   ///< per note slot: its pitch
+    bool noteOn_[kBrassNotes] = {};   ///< per note slot: it sounds
+    double noteAge_[kBrassNotes] = {};   ///< per note slot: seconds since it began
+    /// The modulation (Phase 5b): a Modulator per note; a note's blare and vibrato depth as the matrix leaves them.
     NoteModulation<kBrassNotes> mod_;
-    float noteBrass_[kBrassNotes] = {}, noteVib_[kBrassNotes] = {};
-    int64_t pos_ = 0;
+    float noteBrass_[kBrassNotes] = {};   ///< per note slot: its blare as the matrix leaves it
+    float noteVib_[kBrassNotes] = {};   ///< per note slot: its vibrato's depth as the matrix leaves it
+    int64_t pos_ = 0;   ///< samples since the last reset (the cells)
 };
 
 } // namespace parh

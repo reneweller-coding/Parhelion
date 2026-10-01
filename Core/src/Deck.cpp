@@ -19,8 +19,8 @@ constexpr float kGlueMix = 0.35f;       ///< the glue in parallel (PLAN 7.4)
 /** The rooms' makeup: the FDN and the plate return quietly (Totality: +22 dB for its room at sends of 0.25 to 0.4). The
  *  returns' knobs sit on top; [I] until the reference measurement (PLAN 13.4). */
 constexpr float kRoomMakeupDb = 0.0f;
-constexpr float kPlateMakeupDb = 0.0f;
-constexpr float kHallMakeupDb = 0.0f;
+constexpr float kPlateMakeupDb = 0.0f;   ///< the plate's makeup, dB
+constexpr float kHallMakeupDb = 0.0f;   ///< the hall's makeup, dB
 constexpr double kLeadSeconds = 0.5;    ///< a deck starts playing this long before its first note
 constexpr double kTailSeconds = 20.0;   ///< and plays on this long after its last (rooms, delays)
 }
@@ -355,6 +355,11 @@ void Deck::updateCell(int64_t sample)
     if (live_)
         for (int k = 0; k < perform::kMutes; ++k)
             if (params_->getBool(params_->id(Module::Perform, 0, perform::MuteKick + k))) mutes_ |= 1u << k;
+    // The keyboard (live only, 01.10.2026): what it plays, whether that replaces the composer's notes, whether the
+    // composer plays at all.
+    keyTarget_ = live_ ? params_->getInt(params_->id(Module::Perform, 0, perform::KeyboardPart)) : perform::keys::Off;
+    keyReplace_ = !live_ || params_->getInt(params_->id(Module::Perform, 0, perform::KeyboardMode)) == 0;
+    composerOff_ = live_ && !params_->getBool(params_->id(Module::Perform, 0, perform::Composer));
 
     float c[compose::Count];
     readCell(Module::Compose, 0, c);
@@ -557,6 +562,7 @@ void Deck::dispatchUntil(int64_t sample)
 void Deck::dispatch(const Ev& e)
 {
     const Part part = static_cast<Part>(e.part);
+    if (e.on != 0 && !liveEvent_ && silenced(part)) return;   // the keyboard's or nobody's (01.10.2026)
     switch (part) {
     case Part::Ghost:
         // The pump (PLAN 7.3): every duck starts on the ghost kick, whether a kick plays or not.
@@ -932,6 +938,99 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
             }
         }
     }
+}
+
+int Deck::targetOf(Part part)
+{
+    switch (part) {
+    case Part::Kick: return perform::keys::Kit;
+    case Part::Sub:
+    case Part::Bass: return perform::keys::Bass;
+    case Part::Acid: return perform::keys::Acid;
+    case Part::Piano: return perform::keys::Piano;
+    case Part::Strings: return perform::keys::Strings;
+    case Part::Choir: return perform::keys::Choir;
+    case Part::Brass: return perform::keys::Brass;
+    default:
+        if (const int pi = polyOf(part); pi >= 0) return perform::keys::Lead + pi;
+        return laneOf(part) >= 0 ? perform::keys::Kit : perform::keys::Off;
+    }
+}
+
+bool Deck::silenced(Part part) const
+{
+    if (composerOff_) return true;
+    if (keyTarget_ == perform::keys::Off || !keyReplace_) return false;
+    const int t = targetOf(part);
+    if (t == perform::keys::Off) return false;
+    // By channel, a part is the player's from its first played key on (until liveAllOff).
+    if (keyTarget_ == perform::keys::ByChannel) return ((keyPlayed_ >> t) & 1u) != 0;
+    return keyTarget_ == t;
+}
+
+void Deck::liveNote(int64_t sample, int target, int pitch, float velocity, bool on)
+{
+    if (!loaded_ || target <= perform::keys::Off || target >= perform::keys::ByChannel || pitch < 0 || pitch > 127) return;
+    constexpr int kHeld = 1 << 30;   // a gate that does not run out: the key's release ends the note
+    Ev e{};
+    e.sample = sample;
+    e.on = on ? 1 : 0;
+    e.pitch = pitch;
+    e.velocity = std::clamp(velocity, 0.0f, 1.0f);
+    e.accent = velocity > 0.86f;   // a hard key is the 303's accent
+    e.id = 0x40000000 + pitch;     // a key's own id: its release finds its note
+    e.lengthBeats = 1.0;           // not short: a string section is not bitten staccato
+    e.gate = kHeld;
+    switch (target) {
+    case perform::keys::Kit:
+        if (!on) return;   // one-shots: a release does nothing
+        if (pitch == 36) e.part = static_cast<uint8_t>(Part::Kick);
+        else if (pitch > 36 && pitch <= 36 + kPercLanes) e.part = static_cast<uint8_t>(percPart(pitch - 37));
+        else return;
+        break;
+    case perform::keys::Bass: e.part = static_cast<uint8_t>(Part::Bass); break;
+    case perform::keys::Acid: e.part = static_cast<uint8_t>(Part::Acid); break;
+    case perform::keys::Piano: e.part = static_cast<uint8_t>(Part::Piano); break;
+    case perform::keys::Strings: e.part = static_cast<uint8_t>(Part::Strings); break;
+    case perform::keys::Choir: e.part = static_cast<uint8_t>(Part::Choir); break;
+    case perform::keys::Brass: e.part = static_cast<uint8_t>(Part::Brass); break;
+    default: {
+        // A polyphonic voice: its note holds until the key's release, which its gate does not know of.
+        const int pi = target - perform::keys::Lead;
+        if (pi < 0 || pi >= kPolyInstances) return;
+        if (!on) {
+            poly_[pi].noteOff(pitch);
+            liveKey_[pitch] = 0;
+            return;
+        }
+        e.part = static_cast<uint8_t>(Part::Lead) + static_cast<uint8_t>(pi);
+        break;
+    }
+    }
+    if (target == perform::keys::Bass || target == perform::keys::Acid) {
+        // A mono voice: one id for all its keys; a key pressed while another is held slides there, the release of a
+        // key that no longer sounds does nothing.
+        int& held = liveHeld_[target];
+        e.id = 0x40000000;
+        if (on) { e.slide = held != 0; held = pitch + 1; }
+        else if (held != pitch + 1) return;
+        else held = 0;
+    } else if (target != perform::keys::Kit) {
+        liveKey_[pitch] = on ? static_cast<uint8_t>(target + 1) : 0;
+    }
+    liveEvent_ = true;
+    dispatch(e);
+    liveEvent_ = false;
+    if (on) keyPlayed_ |= 1u << target;
+}
+
+void Deck::liveAllOff()
+{
+    for (int t : { perform::keys::Bass, perform::keys::Acid })
+        if (liveHeld_[t] != 0) liveNote(0, t, liveHeld_[t] - 1, 0.0f, false);
+    for (int k = 0; k < 128; ++k)
+        if (liveKey_[k] != 0) liveNote(0, liveKey_[k] - 1, k, 0.0f, false);
+    keyPlayed_ = 0;
 }
 
 } // namespace parh

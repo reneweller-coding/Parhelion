@@ -20,9 +20,10 @@ const char* const kDramaturgyNames[] = { "Warm-up", "Peak", "Closing", "Sunrise"
 
 namespace {
 
-constexpr double kBar = 4.0;
-constexpr double kPiD = 3.14159265358979323846;
+constexpr double kBar = 4.0;   ///< beats per bar
+constexpr double kPiD = 3.14159265358979323846;   ///< pi
 
+/** @brief The FNV-1a hash of @p s. */
 uint64_t hashName(const std::string& s)
 {
     uint64_t h = 1469598103934665603ull;   // FNV-1a
@@ -51,6 +52,7 @@ int scaleFor(const StyleProfile& prof, bool minor, float u)
     return drawWeighted(w.data(), 6, u);
 }
 
+/** @brief Appends @p src, moved @p offset beats later, to @p dst (tempo and length are the caller's). */
 void appendShifted(Score& dst, const Score& src, double offset)
 {
     for (NoteEvent n : src.notes) { n.beat += offset; dst.notes.push_back(n); }
@@ -63,6 +65,7 @@ void appendShifted(Score& dst, const Score& src, double offset)
     for (LayerBlock b : src.layers) { b.beat += offset; dst.layers.push_back(b); }
 }
 
+/** @brief A step of knob @p id to @p value at @p beat, as an offset from the knob in @p p. */
 Gesture stepOf(const ParamStore& p, int id, double beat, float value)
 {
     Gesture g;
@@ -74,6 +77,7 @@ Gesture stepOf(const ParamStore& p, int id, double beat, float value)
     return g;
 }
 
+/** @brief A ramp of knob @p id from @p beat over @p length beats, @p from to @p to in @p shape, as offsets from the knob. */
 Gesture rampOf(const ParamStore& p, int id, double beat, double length, float from, float to, GestureShape shape)
 {
     Gesture g;
@@ -107,6 +111,7 @@ void homeBetween(Score& deck, const std::vector<std::pair<double, std::vector<Ge
     }
 }
 
+/** @brief Whether scale @p scale is a minor one (all but Ionian). */
 bool minorScale(int scale) { return scale != static_cast<int>(Scale::Ionian); }
 
 } // namespace

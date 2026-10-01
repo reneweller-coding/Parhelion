@@ -64,7 +64,7 @@ constexpr int kPianoBassBreak = 45;      ///< the first plain-wire key (MIDI); w
 
 /** @brief The instruments (piano.instrument). */
 enum class PianoInstrument : int { Grand = 0, BabyGrand, Upright, Soft, Count };
-constexpr int kPianoInstruments = static_cast<int>(PianoInstrument::Count);
+constexpr int kPianoInstruments = static_cast<int>(PianoInstrument::Count);   ///< how many instruments there are
 extern const char* const kPianoInstrumentNames[kPianoInstruments];
 
 /** @brief The knobs that change the instrument (the design); the others act while it plays (Piano.h). */
@@ -101,6 +101,7 @@ struct PianoSpec {
     float highBank = 7.95f;       ///< dB on the high bank (the board above its computed modes) against the modes
     float boardLoss = 0.539f;     ///< factor on the board's loss factor (less: the body rings longer)
     /** @} */
+    /** @brief Whether two specs build the same design (the cache). */
     bool operator==(const PianoSpec&) const = default;
 };
 
@@ -108,68 +109,99 @@ struct PianoSpec {
 struct PianoModes {
     int count = 0;                 ///< modes that sound
     int padded = 0;                ///< count rounded up to 8
-    std::vector<float> pr, pi;     ///< e^(lambda T)
-    std::vector<float> gr, gi;     ///< (e^(lambda T) - 1) / lambda: the input's gain
+    std::vector<float> pr;   ///< e^(lambda T): real part
+    std::vector<float> pi;   ///< ... imaginary part
+    std::vector<float> gr;   ///< (e^(lambda T) - 1) / lambda, the input's gain: real part
+    std::vector<float> gi;   ///< ... imaginary part
+    /** @brief Room for @p n modes, padded to a multiple of 8 with silent ones. */
     void resize(int n);
 };
 
 /** @brief One key: its strings' coupled modes, its hammer, where it meets the board. */
 struct PianoKey {
-    int midi = 60;
+    int midi = 60;   ///< its MIDI note
     double f0 = 261.6;           ///< the string's ideal fundamental (the first partial is f0 sqrt(1 + B))
-    double length = 0.62, tension = 700.0, mu = 0.007, coreArea = 8.7e-7, B = 4e-4, z0 = 2.2, strikeRatio = 0.125;
-    int strings = 3;
-    bool wound = false, damper = true;
+    double length = 0.62;   ///< the speaking length, m
+    double tension = 700.0;   ///< the tension, N
+    double mu = 0.007;   ///< the mass per length, kg/m
+    double coreArea = 8.7e-7;   ///< the steel core's cross section, m^2
+    double B = 4e-4;   ///< the inharmonicity
+    double z0 = 2.2;   ///< the string's wave impedance, kg/s
+    double strikeRatio = 0.125;   ///< where the hammer strikes, a share of the length
+    int strings = 3;   ///< strings in the course
+    bool wound = false;   ///< a wound string
+    bool damper = true;   ///< it has a damper (none above F6)
     // The hammer.
-    double hammerMass = 0.0087, q0 = 3e10, hammerP = 2.5, hammerEps = 0.85, hammerTau = 1e-5;
+    double hammerMass = 0.0087;   ///< the hammer's mass, kg
+    double q0 = 3e10;   ///< the felt's stiffness (Stulov)
+    double hammerP = 2.5;   ///< the felt's exponent
+    double hammerEps = 0.85;   ///< the felt's hysteresis
+    double hammerTau = 1e-5;   ///< the felt's relaxation time, s
     int oversample = 4;          ///< sub-steps per sample while the hammer touches
     // The coupled modes (vertical and horizontal courses).
-    PianoModes modes;
-    std::vector<float> spr, spi, sgr, sgi;   ///< pole and input gain per sub-step
-    std::vector<float> br, bi;               ///< bridge force: Re(b z)
-    std::vector<float> hr, hi;               ///< displacement under the hammer: Re(h z)
-    std::vector<float> dr, di;               ///< the partial number times the course's mean displacement: Re(d z)
+    PianoModes modes;   ///< the course's coupled modes
+    std::vector<float> spr;   ///< per sub-step: pole, real part
+    std::vector<float> spi;   ///< ... imaginary part
+    std::vector<float> sgr;   ///< ... input gain, real part
+    std::vector<float> sgi;   ///< ... imaginary part
+    std::vector<float> br;   ///< the bridge force's weights: real part
+    std::vector<float> bi;   ///< ... imaginary part (Re(b z))
+    std::vector<float> hr;   ///< the displacement under the hammer's weights: real part
+    std::vector<float> hi;   ///< ... imaginary part (Re(h z))
+    std::vector<float> dr;   ///< the partial number times the course's mean displacement: real part
+    std::vector<float> di;   ///< ... imaginary part (Re(d z))
     std::vector<float> omegaT;               ///< the mode's angle per sample (the tension turns it)
     std::vector<float> damperSigma;          ///< the damper's added decay at full contact, 1/s
     int partials = 0;                        ///< partials per string
     // The tension (Kirchhoff-Carrier): the relative rise of every frequency is tensionGain * sum |d z|^2.
-    double tensionGain = 0.0;
-    // The longitudinal modes: excited by the square of the bridge force (the local stretch at the termination).
+    double tensionGain = 0.0;   ///< the relative rise of every frequency per sum |d z|^2
+    /// The longitudinal modes: excited by the square of the bridge force (the local stretch at the termination).
     int longCount = 0;
-    float lpr[kPianoLongModes] = {}, lpi[kPianoLongModes] = {}, lgr[kPianoLongModes] = {}, lgi[kPianoLongModes] = {};
-    float lcr[kPianoLongModes] = {}, lci[kPianoLongModes] = {};   ///< output: Re(c z), peak gain 1
+    float lpr[kPianoLongModes] = {};   ///< the longitudinal modes: pole, real part
+    float lpi[kPianoLongModes] = {};   ///< ... imaginary part
+    float lgr[kPianoLongModes] = {};   ///< ... input gain, real part
+    float lgi[kPianoLongModes] = {};   ///< ... imaginary part
+    float lcr[kPianoLongModes] = {};   ///< their output weights: real part
+    float lci[kPianoLongModes] = {};   ///< ... imaginary part (Re(c z), peak gain 1)
     double longDrive = 0.0;                  ///< E S / (2 T^2): the longitudinal force per squared bridge force
     // The course as a sympathetic string: its first partials, driven by the bridge's acceleration.
     PianoModes sym;                          ///< input: the bridge's acceleration at the key's regions
-    std::vector<float> symOutR, symOutI;     ///< bridge force: Re(c z)
+    std::vector<float> symOutR;   ///< the sympathetic partials' bridge force: real part
+    std::vector<float> symOutI;   ///< ... imaginary part (Re(c z))
     std::vector<float> symDamper;            ///< the damper's added decay, 1/s
     // The board.
     int region = 0;                          ///< the first of the two region points the force is shared between
-    float regionW0 = 1.0f, regionW1 = 0.0f;
+    float regionW0 = 1.0f;   ///< the force's share at the region
+    float regionW1 = 0.0f;   ///< ... at the next
     float pan = 0.0f;                        ///< -1 bass .. 1 treble (the high bank's image)
 };
 
 /** @brief The soundboard: its low modes (driven at the region points) and the high bank. */
 struct PianoBoard {
-    PianoModes modes;
+    PianoModes modes;   ///< the board's low modes
     std::vector<float> shape;          ///< [kPianoRegions][padded]: the mode shapes at the region points
-    std::vector<float> micL, micC, micR;   ///< the shapes at three listening points, over the reference angular frequency
-    std::vector<float> accR, accI;     ///< acceleration = Re(acc z): radiated (times the listening weights), and the
+    std::vector<float> micL;   ///< the shapes at the bass-side listening point
+    std::vector<float> micC;   ///< ... at the middle
+    std::vector<float> micR;   ///< ... at the treble side (over the reference angular frequency)
+    std::vector<float> accR;   ///< the acceleration's weights: real part
+    std::vector<float> accI;   ///< ... imaginary part (Re(acc z): radiated, and the sympathetic strings' drive)
                                        ///< sympathetic strings' drive
-    std::vector<double> freq, loss;    ///< Hz and loss factor per mode (the tests, the admittance)
+    std::vector<double> freq;   ///< per mode: its frequency, Hz
+    std::vector<double> loss;   ///< per mode: its loss factor
     std::vector<float> keyShape;       ///< [kPianoKeys][count]: the shapes at every key's bridge point (the admittance)
     PianoModes high;                   ///< the high bank (log-spaced, above the modes)
     std::vector<float> highShape;      ///< [kPianoRegions][padded]
-    std::vector<float> highL, highR;
+    std::vector<float> highL;   ///< the high bank's radiation, left
+    std::vector<float> highR;   ///< ... right
     double yInf = 1e-3;                ///< the ribbed plate's characteristic mobility, s/kg
     double modeTop = 1200.0;           ///< the highest mode computed, Hz
 };
 
 /** @brief A whole instrument at one sample rate. */
 struct PianoDesign {
-    PianoSpec spec;
-    double sampleRate = 48000.0;
-    PianoBoard board;
+    PianoSpec spec;   ///< the spec it was built for
+    double sampleRate = 48000.0;   ///< the sample rate it was built for, Hz
+    PianoBoard board;   ///< the soundboard
     std::vector<PianoKey> keys;        ///< kPianoKeys
     float outGain = 1.0f;              ///< the radiated velocity to full scale
 };

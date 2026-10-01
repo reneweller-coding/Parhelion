@@ -92,37 +92,49 @@ public:
     const std::vector<float>& metalTable() const { return metal_; }
 
 private:
+    /** @brief Computes lane @p lane's coefficients from its values (and its shift). */
     void computeCoefs(int lane);
+    /** @brief Sets lane @p lane's auto-pan rate from its period in bars and the tempo. */
     void updatePanRate(int lane);
+    /** @brief Sets every lane's auto-pan offset and direction, so the lanes of a role move as a group. */
     void assignPanGroups();
+    /** @brief Builds the 909 metal table (six square waves at their ratios, band-passed). */
     void buildMetalTable();
 
-    double sr_ = 48000.0;
-    PercState s_;
-    PercCoefs c_;
-    float values_[kPercLanes][perc::Count] = {};
-    bool  valid_[kPercLanes] = {};
-    int   keyRoot_[kPercLanes] = {}, scale_[kPercLanes] = {};
-    int   role_[kPercLanes] = {};
-    int   engine_[kPercLanes] = {};
-    int   choke_[kPercLanes] = {};
+    double sr_ = 48000.0;   ///< the sample rate, Hz
+    PercState s_;   ///< the lanes' states
+    PercCoefs c_;   ///< the lanes' coefficients
+    float values_[kPercLanes][perc::Count] = {};   ///< per lane: its values, indexed by perc::
+    bool  valid_[kPercLanes] = {};   ///< per lane: values_ has been set
+    int   keyRoot_[kPercLanes] = {};   ///< per lane: the key's root it was tuned to
+    int   scale_[kPercLanes] = {};   ///< per lane: the scale it was tuned to
+    int   role_[kPercLanes] = {};   ///< per lane: its role (PercRole)
+    int   engine_[kPercLanes] = {};   ///< per lane: its engine (PercEngine)
+    int   choke_[kPercLanes] = {};   ///< per lane: its choke group, 0 none
     bool  metalNoise_[kPercLanes] = {};   ///< the lane's noise is the 909 table
-    double tunedHz_[kPercLanes] = {};
-    double shiftMul_[kPercLanes] = {};
-    double bpm_ = 130.0;
-    bool   panning_ = false;
-    float modeAmp_[kPercModes][kPercLanes] = {};
-    double modeW_[kPercModes][kPercLanes] = {};
-    double modeR_[kPercModes][kPercLanes] = {};
-    Rng   noiseRng_[kPercLanes];
-    float noiseTail_[kPercLanes] = {}, noiseFast_[kPercLanes] = {};
-    int   burstsLeft_[kPercLanes] = {};
-    double burstTimer_[kPercLanes] = {}, burstSpacing_[kPercLanes] = {};
-    float burstVel_[kPercLanes] = {};
-    float chokeFactor_ = 0.999f;
-    double metalPos_[kPercLanes] = {}, metalStep_[kPercLanes] = {};   ///< where each lane reads the metal table, and how fast
+    double tunedHz_[kPercLanes] = {};   ///< per lane: the frequency it is tuned to
+    double shiftMul_[kPercLanes] = {};   ///< per lane: the last hit's shift as a factor
+    double bpm_ = 130.0;   ///< the tempo
+    bool   panning_ = false;   ///< any lane moves in the panorama
+    float modeAmp_[kPercModes][kPercLanes] = {};   ///< per mode and lane: its amplitude
+    double modeW_[kPercModes][kPercLanes] = {};   ///< per mode and lane: its angle per sample
+    double modeR_[kPercModes][kPercLanes] = {};   ///< per mode and lane: its radius per sample (the decay)
+    Rng   noiseRng_[kPercLanes];   ///< per lane: the noise's stream
+    float noiseTail_[kPercLanes] = {};   ///< per lane: the noise envelope's factor per sample in the tail
+    float noiseFast_[kPercLanes] = {};   ///< ... and between a clap's bursts
+    int   burstsLeft_[kPercLanes] = {};   ///< per lane: the clap's bursts still to come
+    double burstTimer_[kPercLanes] = {};   ///< per lane: samples to the next burst
+    double burstSpacing_[kPercLanes] = {};   ///< per lane: samples between bursts
+    float burstVel_[kPercLanes] = {};   ///< per lane: the bursts' velocity
+    float chokeFactor_ = 0.999f;   ///< the per-sample factor of a choked lane (8 ms)
+    double metalPos_[kPercLanes] = {};   ///< per lane: where it reads the metal table
+    double metalStep_[kPercLanes] = {};   ///< per lane: how fast it reads the metal table
     std::vector<float> metal_;   ///< the 909 metal table at kMetalRate
-    std::vector<float> noise_, reset_, dNoise_, outL_, outR_;
+    std::vector<float> noise_;   ///< per sample and lane: the white noise of the block
+    std::vector<float> reset_;   ///< per sample and lane: the value the noise envelope restarts at, 0 none
+    std::vector<float> dNoise_;   ///< per sample and lane: the noise envelope's factor
+    std::vector<float> outL_;   ///< per sample and lane: the output, left
+    std::vector<float> outR_;   ///< per sample and lane: the output, right
 };
 
 } // namespace parh
