@@ -1,6 +1,6 @@
 # Parhelion release notes
 
-## Next: the family's panel (01.10.2026, not yet released)
+## 1.1.0 (01.10.2026): the family's panel -- the first public release
 
 **Play it yourself.** A Keyboard group on the Perform page: Keyboard Plays sends the keys of a MIDI keyboard to a voice
 (the kit, the bass, the 303, the six polyphonic voices, the piano, the strings, the choir, the brass, or by channel), with the sound its page has; Replace leaves that voice's generated notes out, Layer plays over
@@ -47,7 +47,7 @@ leaves the headset silent.
 
 **Fixed.** The console's strip names no longer point into a freed list.
 
-## 1.0.1 (01.10.2026)
+## 1.0.1 (01.10.2026, built, not published)
 
 **A track or a DJ mix.** The top bar chooses between a single Track and a DJ mix with two buttons and one Length beside
 them (a track 2 to 14 minutes, a mix 10 minutes to 12 hours); a click composes it, Compose reads "Compose track" or
@@ -64,7 +64,7 @@ kick alone in 1 of 30 openings). A mix's first track -- nothing is mixed into it
 often as not, the kick after it; every later track opens with its DJ intro. `parh_render --seconds S` renders only the
 beginning.
 
-## 1.0.0 (30.09.2026)
+## 1.0.0 (30.09.2026, built, not published)
 
 The first release: a generator of trance -- tracks and DJ sets composed from a seed and synthesised in real time -- as a
 VST3 plugin, a standalone application for Windows, a command-line renderer and an app for Meta Quest.
