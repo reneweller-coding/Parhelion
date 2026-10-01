@@ -13,3 +13,8 @@ Tools/refs_audio/
 Deploy/stage/
 build-release*.log
 Deploy/out/
+# The family's layout (01.10.2026): bin/<preset> what can be started, dist/ what is handed out,
+# work/ local data, renders and logs (cmake/Family.cmake).
+bin/
+dist/
+work/

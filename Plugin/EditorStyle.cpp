@@ -97,7 +97,7 @@ void StylePage::timerCallback()
 void StylePage::resized()
 {
     auto r = getLocalBounds().reduced(10);
-    knobsH_ = std::min(knobs_.contentHeight(r.getWidth()), std::max(120, r.getHeight() - 330));   // the chart keeps 330
+    knobsH_ = std::min(knobs_.contentHeight(r.getWidth()), std::max(120, r.getHeight() - 300));   // the chart keeps 300 (330 until 01.10.2026: a section of the knobs fits whole)
     knobs_.setBounds(r.removeFromTop(knobsH_));
 }
 

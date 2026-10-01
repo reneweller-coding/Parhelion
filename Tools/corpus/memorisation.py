@@ -21,7 +21,7 @@ the engine tests every lead window it writes and draws again on a hit (Memo.h), 
 not only for the ones rendered here. A Bloom filter of 64-bit hashes cannot be read back into notes.
 
     python Tools/corpus/memorisation.py --emit                   # build the filter
-    python Tools/corpus/memorisation.py --check out/memo/*.mid   # count hits in rendered tracks
+    python Tools/corpus/memorisation.py --check work/memo/*.mid   # count hits in rendered tracks
     python Tools/corpus/memorisation.py --reference              # the EMP packs against the transcriptions
 """
 import argparse

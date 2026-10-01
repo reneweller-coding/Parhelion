@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $ndk = Join-Path $Sdk "ndk\$NdkVersion"
-$build = Join-Path $root "build-quest-tools"
+$build = Join-Path $root "build\quest-tools"
 
 & cmake -S $root -B $build -G "Unix Makefiles" `
     -DCMAKE_MAKE_PROGRAM="$ndk\prebuilt\windows-x86_64\bin\make.exe" `

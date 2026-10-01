@@ -51,15 +51,28 @@ everything: [docs/PLAN.md](docs/PLAN.md). The research it rests on: [docs/resear
 
 ## Build
 
-```
-cmake -S . -B build -G "Visual Studio 18 2026" -A x64
-cmake --build build --config Release
-cd build && ctest -C Release
+The same in every instrument of the family (`build.ps1`, `CMakePresets.json`, `cmake/Family.cmake`):
+
+```powershell
+.\build.ps1               # Visual Studio's compiler, Release: build\msvc (the solution), the programs in bin\msvc
+.\build.ps1 icx           # Intel's oneAPI compiler: build\icx, the programs in bin\icx
+.\build.ps1 msvc -Test    # and the tests (ctest)
+.\build.ps1 icx -Run      # and start the standalone
+.\build.ps1 quest         # the Meta Quest app: bin\quest\ParhelionQuest.apk
 ```
 
+| Folder | What is in it |
+|---|---|
+| `bin\msvc`, `bin\icx` | what can be started: the standalone, the VST3, the renderer (and the files they read) |
+| `build\<preset>` | the build trees -- `build\msvc\Parhelion.slnx` for Visual Studio |
+| `dist\` | the release: setup, portable zip, checksums (`Deploy\build_release.ps1`, from `build\release`) |
+| `work\` | local data, renders and logs, never in git |
+
+Without the script: `cmake --preset msvc`, `cmake --build --preset msvc`, `ctest --preset msvc`; the icx presets need
+Visual Studio's and oneAPI's environment, which `build.ps1` sets up.
+
 The plugin is built with the rest (`PARH_BUILD_PLUGIN`, on by default; JUCE 9.0.1 from `ThirdParty/JUCE`, the sibling
-Phosphene's checkout, or fetched): `build/Plugin/Parhelion_artefacts/Release/VST3/Parhelion.vst3` and
-`.../Standalone/Parhelion.exe`. ctest loads the VST3 as a host does (`parh_vst3test`) and, where Tracktion's pluginval
+Phosphene's checkout, or fetched): `bin\msvc\Parhelion.vst3` and `bin\msvc\Parhelion.exe`. ctest loads the VST3 as a host does (`parh_vst3test`) and, where Tracktion's pluginval
 is unpacked into `ThirdParty/pluginval`, validates it at strictness 10.
 
 The manual: `parh_render --dump-params`, the screenshots of every page and `Tools/manual/chapters.txt` make it.
@@ -72,7 +85,7 @@ python Tools/manual/make_preview.py
 
 A release -- the build with Intel's icx where oneAPI is installed (else MSVC), static runtime, the tests, pluginval,
 the screenshots and the manual from that build, a checked stage, checksums, a portable zip and the setup (Inno Setup),
-with `-Quest` the Meta Quest APK beside them -- lands in `Deploy/out`:
+with `-Quest` the Meta Quest APK beside them -- lands in `dist\`:
 
 ```
 powershell -ExecutionPolicy Bypass -File Deploy\build_release.ps1 -Quest
@@ -81,15 +94,15 @@ powershell -ExecutionPolicy Bypass -File Deploy\build_release.ps1 -Quest
 ## Render
 
 ```
-build/Tools/render/Release/parh_render --seed 7 --out study.wav --midi study.mid --stems stems
-build/Tools/render/Release/parh_render --seed 7 --set "compose.key=F; compose.bpm=136" --out study_f.wav
-build/Tools/render/Release/parh_render --seed 7 --plan
-build/Tools/render/Release/parh_render --seed 7 --style "Dream House" --out dream.wav --midi dream.mid
-build/Tools/render/Release/parh_render --seed 7 --reroll motif --out other_motif.wav
-build/Tools/render/Release/parh_render --seed 7 --reroll section5 --reroll arp --save-set curated.parhset --out curated.wav
-build/Tools/render/Release/parh_render --study --out study.wav
-build/Tools/render/Release/parh_render --seed 7 --dj 120 --set "set.dramaturgy=Sunrise; set.journey=Wander" --out set.wav
-build/Tools/render/Release/parh_render --seed 7 --out track.wav --loops loops --plan-json track.json
+bin/msvc/parh_render.exe --seed 7 --out study.wav --midi study.mid --stems stems
+bin/msvc/parh_render.exe --seed 7 --set "compose.key=F; compose.bpm=136" --out study_f.wav
+bin/msvc/parh_render.exe --seed 7 --plan
+bin/msvc/parh_render.exe --seed 7 --style "Dream House" --out dream.wav --midi dream.mid
+bin/msvc/parh_render.exe --seed 7 --reroll motif --out other_motif.wav
+bin/msvc/parh_render.exe --seed 7 --reroll section5 --reroll arp --save-set curated.parhset --out curated.wav
+bin/msvc/parh_render.exe --study --out study.wav
+bin/msvc/parh_render.exe --seed 7 --dj 120 --set "set.dramaturgy=Sunrise; set.journey=Wander" --out set.wav
+bin/msvc/parh_render.exe --seed 7 --out track.wav --loops loops --plan-json track.json
 python Tools/eval_report.py --plan track.json --wav track.wav --out docs/eval/report.md
 python Tools/calibrate.py --seeds 1,2,3 --jobs 8
 ```

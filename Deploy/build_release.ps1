@@ -6,13 +6,13 @@
     Copied from Totality's Deploy\build_release.ps1 at 459cc33 (30.09.2026), itself after Ephemeris'; Parhelion has no
     data files either.
 
-      1. configure and build build-release (Release, static runtime, AVX2) -- with Intel's icx where oneAPI is
+      1. configure and build build\release (CMakePresets.json's release preset: icx, static runtime, AVX2) where oneAPI is
          installed (Totality measured the engine 10 to 15 % faster than MSVC's, pluginval passing; -Compiler msvc
          builds with MSVC)
       2. run the tests (ctest), unless -SkipTests; pluginval at strictness 10 where it is unpacked
       3. the manual: the screenshots from this build's standalone, the social preview, Tools\manual\make_manual.py
          with this build's parh_render
-      4. stage what is installed under Deploy\stage, and nothing else
+      4. stage what is installed under dist\stage, and nothing else
       5. check the stage: every file there, the binaries without a DLL dependency on the MSVC or Intel runtime
       6. SHA256SUMS.txt, the portable zip, and the setup with Inno Setup (ISCC), unless -NoSetup
       7. with -Quest: the Meta Quest APK (Quest\build_apk.ps1) beside them, as Parhelion-<version>-Quest.apk
@@ -38,7 +38,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $deploy = Join-Path $root "Deploy"
-$build = Join-Path $root "build-release"
+$build = Join-Path $root "build\release-msvc"   # -Compiler msvc; icx: build\release
 
 $project = Get-Content (Join-Path $root "CMakeLists.txt") -Raw
 if ($project -notmatch 'project\(\s*Parhelion\s+VERSION\s+([0-9.]+)') { throw "no version in CMakeLists.txt" }
@@ -51,7 +51,7 @@ if ($Compiler -eq "") { $Compiler = if ($icxVars) { "icx" } else { "msvc" } }
 Write-Host "compiler: $Compiler"
 if ($Compiler -eq "icx") {
     if (-not $icxVars) { throw "oneAPI's icx not found" }
-    $build = Join-Path $root "build-release-icx"
+    $build = Join-Path $root "build\release"
     $vcvars = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\*\VC\Auxiliary\Build\vcvars64.bat" | Select-Object -First 1
     $ninja = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\*\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe" | Select-Object -First 1
     $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer"
@@ -62,8 +62,9 @@ if ($Compiler -eq "icx") {
         "set PATH=$installer;%PATH%",
         "call `"$($icxVars.FullName)`" intel64 > nul",
         "set PATH=$($ninja.DirectoryName);%PATH%",
-        "cmake -S `"$root`" -B `"$build`" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icx -DPARH_STATIC_RUNTIME=ON -DPARH_BUILD_PLUGIN=ON -DPARH_BUILD_TOOLS=ON || exit /b 1",
-        "cmake --build `"$build`" --parallel 8 || exit /b 1"
+        "cd /d `"$root`"",
+        "cmake --preset release || exit /b 1",
+        "cmake --build --preset release --parallel 8 || exit /b 1"
     ) | Set-Content -Encoding ascii $script
     & cmd /c $script
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
@@ -120,7 +121,7 @@ if ($LASTEXITCODE -ne 0) { throw "screenshots failed" }
 if ($LASTEXITCODE -ne 0) { throw "manual failed" }
 
 # 4. Stage.
-$stage = Join-Path $deploy "stage"
+$stage = Join-Path $root "dist\stage"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force $stage | Out-Null
 $vst3Dir = Get-ChildItem -Recurse (Join-Path $build "Plugin\Parhelion_artefacts") -Filter Parhelion.vst3 -Directory | Select-Object -First 1
@@ -151,7 +152,7 @@ if ($dumpbin) {
 }
 
 # 6. Checksums, portable zip, setup.
-$out = Join-Path $deploy "out"
+$out = Join-Path $root "dist"
 New-Item -ItemType Directory -Force $out | Out-Null
 $sums = Get-ChildItem -Recurse -File $stage | Sort-Object FullName | ForEach-Object {
     $rel = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
@@ -177,6 +178,6 @@ if ($Quest) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "Quest\build_apk.ps1")
     if ($LASTEXITCODE -ne 0) { throw "Quest APK failed" }
     $apk = Join-Path $out "Parhelion-$Version-Quest.apk"
-    Copy-Item (Join-Path $root "build-quest\ParhelionQuest.apk") $apk -Force
+    Copy-Item (Join-Path $root "bin\quest\ParhelionQuest.apk") $apk -Force
     Write-Host "wrote $apk"
 }

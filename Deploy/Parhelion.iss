@@ -1,6 +1,6 @@
 ; Parhelion -- the Windows installer (copied from Totality's Deploy\Totality.iss at 459cc33, itself after Ephemeris').
 ;
-; Built by Deploy\build_release.ps1, which stages everything under Deploy\stage first and only then calls the
+; Built by Deploy\build_release.ps1, which stages everything under dist\stage first and only then calls the
 ; compiler. Nothing in here reaches into a build tree: what is in the staging folder is exactly what gets
 ; installed, so the payload can be looked at before the setup is made.
 ;
@@ -15,7 +15,7 @@
 #endif
 #define AppName "Parhelion"
 #define Publisher "Rene Weller"
-#define Stage "stage"
+#define Stage "..\dist\stage"
 
 [Setup]
 AppId={{57E53AE8-CF7A-497E-8082-2209893AD9BB}
@@ -27,7 +27,7 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 LicenseFile={#Stage}\LICENSE.txt
-OutputDir=out
+OutputDir=..\dist
 OutputBaseFilename={#AppName}-{#Version}-Setup
 SetupIconFile={#Stage}\parhelion.ico
 UninstallDisplayIcon={app}\Parhelion.exe

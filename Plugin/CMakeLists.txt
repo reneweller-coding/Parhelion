@@ -39,3 +39,7 @@ target_link_libraries(Parhelion
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
+
+# Into bin/<preset> after every build (cmake/Family.cmake, 01.10.2026): the standalone and the VST3 bundle.
+family_bin(Parhelion_Standalone)
+family_bin(Parhelion_VST3 VST3)

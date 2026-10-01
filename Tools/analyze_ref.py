@@ -26,7 +26,7 @@ Only statistics leave this tool: Tools/ref_stats.json holds a row per recording 
 
     python Tools/analyze_ref.py                      # every recording of ref_sets.txt
     python Tools/analyze_ref.py --only uplifting
-    python Tools/analyze_ref.py out/track.wav        # a render, printed the same way
+    python Tools/analyze_ref.py work/renders/track.wav        # a render, printed the same way
 
 @note The decoding, the loudness, the tempo and the grid are copied from Totality `Tools/analyze_ref.py` at 4d3c0d2
       (29.09.2026); the measures are Parhelion's.

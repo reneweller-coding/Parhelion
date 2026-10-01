@@ -1,6 +1,6 @@
 """Fit the piano's voicing (PianoSpec, PianoDesign.h) to a reference piano (30.09.2026).
 
-    python Tools/pianoref/fit.py ref.wav [--probe build/Tools/pianoprobe/Release/parh_pianoprobe.exe] [--evals 320]
+    python Tools/pianoref/fit.py ref.wav [--probe build/msvc/Tools/pianoprobe/Release/parh_pianoprobe.exe] [--evals 320]
                                  [--work dir] [--show key=value ...]
 
 ref.wav plays notes_mid.py's notes (see compare.py for how to render it with Pianoteq). Every evaluation renders the same
@@ -124,9 +124,9 @@ LOGS = {"felt", "coupling", "radiation", "radiation-end", "knock", "body-corner"
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("ref")
-    ap.add_argument("--probe", default=str(ROOT / "build" / "Tools" / "pianoprobe" / "Release" / "parh_pianoprobe.exe"))
+    ap.add_argument("--probe", default=str(ROOT / "build" / "msvc" / "Tools" / "pianoprobe" / "Release" / "parh_pianoprobe.exe"))
     ap.add_argument("--evals", type=int, default=320)
-    ap.add_argument("--work", default=str(ROOT / "out" / "pianoref"))
+    ap.add_argument("--work", default=str(ROOT / "work" / "pianoref"))
     ap.add_argument("--show", nargs="*")
     a = ap.parse_args()
     work = Path(a.work)

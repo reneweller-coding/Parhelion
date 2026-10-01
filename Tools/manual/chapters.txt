@@ -71,6 +71,11 @@ seed, Play and Mute. Its second row: the thumbs -- a verdict on what plays, for 
 Under the header the whole track or set at a glance; a click jumps there. The tabs come in one order everywhere: Set,
 Arrange, the instrument's own pages -- a page of several has small tabs of its own --, Mixer, Perform, Export, Style.
 
+A page taller than the window shows its groups in sections, one at a time, with a switch at its top right: a synth's
+sound and its modulation apart (Sound, Modulation), and where even those do not fit, cut further, each named after its
+first group (Filter, LFO, Matrix ...). At the window's usual size, 1280 by 860, no page scrolls. The overview above the
+tabs can be folded away in the settings; the pages then get its height.
+
 A colour says what a control does, the same on every page and in every generator of the family: the sources, the
 filters, the envelopes, what moves by itself, the room and the mix. A knob the composer moves has a thin ring round
 it that shows where it stands at this moment. A double click sets a control to its default; a right click offers
@@ -79,8 +84,8 @@ MIDI learn, forgetting the controller, and the default.
 Undo and Redo take back and bring back what was changed -- a knob, a new seed, a reroll, a preset, a loaded set --
 one step at a time; the button's tooltip names the step. Help opens this manual by topic, with the page in front, the
 keys and the headset as topics of their own. The settings hold the update check (it asks GitHub once a day whether a
-newer Parhelion is out; nothing else is sent), the picture behind the panel, the headset, the window's size, full
-screen, the keys and About.
+newer Parhelion is out; nothing else is sent), the picture behind the panel, the overview, the headset, the window's
+size, full screen, the keys and About.
 
     Space                 play / stop
     Ctrl+Z                undo
@@ -227,6 +232,11 @@ ruled out. A saved set does not carry the ratings: it plays back the same only w
 
 == Low End | kick sub bass acid pump | 2 ==
 
+[image screenshots/tab_03.png: Low End: the sub.]
+[image screenshots/tab_04.png: Low End: the bass.]
+[image screenshots/tab_05.png: Low End: the 303.]
+[image screenshots/tab_06.png: Low End: the pump.]
+
 The low end is one system. The kick is tuned to the key (or its fifth, or its flat seventh); it has three engines (a
 swept sine, a resonator, a modelled 909) and a top layer, and its drive and clip run at four times the rate. The sub
 bass is a sine under the bass line, ducked by every kick and, with Kick Lock, locked to its phase, so that the two
@@ -242,7 +252,7 @@ The pump is trance's sidechain: a ghost kick, silent and on a track of its own, 
 dB, with the attack, hold and release here, and the returns of the rooms by Return Duck. It gives the pads and the
 leads their breathing without a compressor; in a breakdown the composer lets it go and ramps it back in for the drop.
 
-== Drums | perc mix | 3 ==
+== Drums | perc mix | 7 ==
 
 Twelve lanes, each a small drum synthesiser: a role (the closed, rolling and open hats, the ride, the clap and its
 ghost, the snare, the rim, the shaker, toms, congas, noise, the crash, the tambourine), an engine (noise, metal -- the
@@ -252,7 +262,7 @@ The snare plays the roll into the drop, from quarters to thirty-seconds; the cra
 The mix module holds the buses: the hats and the percussion with their level and low pass, the drum bus's saturation,
 the group low cut the builds draw up, and the synth bus's level -- the fader the energy curve moves.
 
-== Synths | lead counter pluck arp pad stab | 4 ==
+== Synths | lead counter pluck arp pad stab | 8 ==
 
 Six voices of one synthesiser, each with its own role and bank: the lead, the counter-melody, the pluck, the arp,
 the pad and the stab. Two oscillators -- the supersaw after Adam Szabo's measurements of the Roland JP-8000 (seven
@@ -266,7 +276,9 @@ syncopated sixteenths; the arp breaks them up; the pad holds them, gated in the 
 the stab hits them in the drops (every other block of the first drop, the main drop from its second block on). Which
 voices play in which block is the layer matrix's.
 
-== Keys | piano cloud | 5 ==
+== Keys | piano cloud | 9 ==
+
+[image screenshots/tab_10.png: Keys: the grain cloud.]
 
 The piano is a physical model, not a sample: for every key a string of the length, tension and stiffness of a real
 instrument (four of them: Grand, Baby Grand, Upright and Soft, the slightly muffled piano of Dream House), one to three
@@ -280,7 +292,11 @@ chord change.
 The grain cloud hears the pad, the pluck and the piano and scatters them in grains into the plate -- Deep's haze and
 Dream House's breath.
 
-== Orchestra | strings choir brass timpani | 6 ==
+== Orchestra | strings choir brass timpani | 11 ==
+
+[image screenshots/tab_12.png: Orchestra: the choir.]
+[image screenshots/tab_13.png: Orchestra: the brass.]
+[image screenshots/tab_14.png: Orchestra: the timpani.]
 
 The Cinematic tracks of Uplifting (and some of Dream House and Deep) bring an orchestra, all of it modelled. The
 strings: six players a note, each a modal string under a bow with the friction of rosin, their own intonation,
@@ -292,7 +308,9 @@ The strings enter with the main breakdown's tease and take the melody at its pea
 the second half of the main drop; at every drop the brass play a braam (the root low, its fifth, the octave) and the
 timpani strike, after a roll in the two bars before it.
 
-== Effects | sfx sends | 7 ==
+== Effects | sfx sends | 15 ==
+
+[image screenshots/tab_16.png: Effects: the sends.]
 
 The effects are synthesised as well: the riser and the sweep of the build, the reverse crash and the impact on the
 drop, the downlifter after it, the sub drop, swells, zaps and atmospheres, each from its own group of presets.
@@ -301,7 +319,10 @@ The sends: a room, a plate and a long hall, which every voice sends into by its 
 the percussion into the plate by the knobs here), each with a low cut at its input and its return ducked by the pump.
 The composer draws the hall long in a breakdown and short in a drop.
 
-== Mixer and Master | master deck | 8 ==
+== Mixer and Master | master deck | 17 ==
+
+[image screenshots/tab_18.png: The Mixer tab's second page: the buses and the master.]
+[image screenshots/tab_19.png: The Mixer tab's third page: the decks.]
 
 The Mixer tab has three pages. Console: a channel strip per part -- the kick, the bass, the drums, every synth, the
 keys, the orchestra, the effects -- with its level, its mute, its sound and its meter, and the output with its
@@ -317,7 +338,7 @@ A deck's channel is a DJ mixer's: the fader, a three-band isolator (200 Hz and 2
 dB), a filter that is a low pass to the left and a high pass to the right, and the send into the mixer's effects. In a
 set the composer moves them as a DJ would; in the plugin they are yours too.
 
-== Perform | perform | 9 ==
+== Perform | perform | 20 ==
 
 As at a mixer. Seven mutes -- kick, bass, hats, percussion, lead, the other synths, pads --: a muted group's notes stop
 and its tails ring out. The master filter takes the whole mix, the echo throw sends it into the mixer's echo, and the
@@ -337,7 +358,7 @@ beside the mutes shows what they do (The panel).
 
 The perform controls are live only: an export or parh_render plays the track as it was composed.
 
-== Export and cues | cue | 10 ==
+== Export and cues | cue | 21 ==
 
 The export renders what plays at 48 kHz: a 24-bit WAV with cue markers (the bass's entry, the breakdowns, the drops,
 the main drop, the outro; in a set every track and its bass swap) and the same cues as JSON beside it
@@ -358,7 +379,7 @@ PARH_CUE_HOST.
     /parh/op s          the layer matrix's change ("add lead", "filter pluck", "remove kick")
     /parh/key s         the key as a Camelot label ("8A")
 
-== Style | | 11 ==
+== Style | | 22 ==
 
 Where the knobs' profile stands among the five styles, on six axes: the tempo, the density of the drums, how much the
 lead carries, the share of the breakdowns, the length of the breakdown's reverb and the brightness of the palette the
@@ -369,7 +390,7 @@ drop, the spectral centroid and the width above 200 Hz.
 
 == Meta Quest | | - ==
 
-The whole generator runs on the headset (build-quest\ParhelionQuest.apk, see Quest/README.md). The hands are the hands
+The whole generator runs on the headset (bin\quest\ParhelionQuest.apk, see Quest/README.md). The hands are the hands
 at the mixer: left pinch play and stop, right pinch kick out and in, the right pinch held Breakdown now or Drop now
 (handed over on a beat, without a gap: a second engine takes over from the first), both hands together the next track;
 the left hand's height the master filter, the right's the echo throw -- the grammar of every generator's headset (The

@@ -23,7 +23,7 @@ Quest/
 ```powershell
 powershell -File Quest\fetch_thirdparty.ps1
 powershell -File Quest\build_apk.ps1
-adb install -r build-quest\ParhelionQuest.apk
+adb install -r bin\quest\ParhelionQuest.apk
 ```
 
 Needs NDK r27 (`C:\Android-Buildtools\sdk\ndk\27.2.12479018`), build-tools 34, platform android-34 and JDK 17 -- the
@@ -40,7 +40,7 @@ translation layer: 10 of 10).
 `build_tools.ps1` builds the renderer and the tests for arm64. With the headset attached (developer mode):
 
 ```
-adb push build-quest-tools\Tests\parh_vectest build-quest-tools\Tools\render\parh_render /data/local/tmp/
+adb push build\quest-tools\Tests\parh_vectest build\quest-tools\Tools\render\parh_render /data/local/tmp/
 adb shell chmod +x /data/local/tmp/parh_vectest /data/local/tmp/parh_render
 adb shell /data/local/tmp/parh_vectest
 adb shell /data/local/tmp/parh_render --seed 5 --dj 24 --bench --quality quest

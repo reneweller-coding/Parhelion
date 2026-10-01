@@ -1,6 +1,6 @@
 """Calibration of the style profiles against the reference tracks (PLAN 13.4, Phase 4c).
 
-Renders tracks of every style with parh_render (or takes them from out/calib if they are there), measures them with
+Renders tracks of every style with parh_render (or takes them from work/calib if they are there), measures them with
 exactly the analysis the references went through (analyze_ref.measure), and sets every measure against the range of
 the style's references: the minimum, the median and the maximum of the recordings in Tools/ref_stats.json. A measure
 outside the range is marked; the acceptance of Phase 4c is a track of every style inside its references' corridor on
@@ -12,7 +12,7 @@ of the bands, the width, the pump).
     python Tools/calibrate.py --force            # render again
     python Tools/calibrate.py --force --jobs 6   # six renders at a time
 
-Only statistics are printed; the rendered audio stays in out/calib (not in the repository).
+Only statistics are printed; the rendered audio stays in work/calib (not in the repository).
 """
 import argparse
 import json
@@ -40,9 +40,9 @@ def render(style, seed, out, force):
     wav = out / f"{style.replace(' ', '')}_{seed}.wav"
     if wav.exists() and not force:
         return wav
-    exe = ROOT / "build" / "Tools" / "render" / "Release" / "parh_render.exe"
+    exe = ROOT / "bin" / "msvc" / "parh_render.exe"
     if not exe.exists():
-        exe = ROOT / "build" / "Tools" / "render" / "parh_render"
+        exe = ROOT / "bin" / "icx" / "parh_render.exe"
     with open(wav.with_suffix(".log"), "w", encoding="utf-8", newline="\n") as log:
         subprocess.run([str(exe), "--seed", str(seed), "--style", style, "--out", str(wav)], check=True, stdout=log,
                        stderr=subprocess.STDOUT)
@@ -57,7 +57,7 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=1, help="renders at a time")
     a = ap.parse_args()
     stats = json.loads((HERE / "ref_stats.json").read_text(encoding="utf-8"))
-    out = ROOT / "out" / "calib"
+    out = ROOT / "work" / "calib"
     out.mkdir(parents=True, exist_ok=True)
     seeds = [int(s) for s in a.seeds.split(",") if s]
     summary = {}

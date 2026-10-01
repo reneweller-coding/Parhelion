@@ -177,6 +177,8 @@ ParamPage::ParamPage(ParhelionProcessor& p, std::vector<std::pair<Module, int>> 
             addAndMakeVisible(b);
         }
     }
+    section_.onChange = [this](int) { applySection(); refit(); };
+    addChildComponent(section_);
     build();
 }
 
@@ -291,10 +293,73 @@ void ParamPage::build()
         }
         if (!more.cells.empty()) boxes_.push_back(std::move(more));
     }
+    // The sections are planned again for the new boxes (plan(), when the page is measured next).
+    plannedWidth_ = -1;
+    sectionOf_.assign(boxes_.size(), 0);
+    split_ = false;
+    section_.setVisible(false);
+    applySection();
+    if (getWidth() > 0) refit();
     frame::keepKeysForEditor(*this);   // the keys stay the editor's (Space plays, not the switch last clicked)
 }
 
-int ParamPage::top() const { return instances_ > 1 ? 32 : 0; }
+bool ParamPage::shown(size_t box) const
+{
+    if (measuring_ != nullptr) return std::find(measuring_->begin(), measuring_->end(), static_cast<int>(box)) != measuring_->end();
+    return !split_ || (box < sectionOf_.size() && sectionOf_[box] == section_.current());
+}
+
+void ParamPage::plan(int width)
+{
+    if (width == plannedWidth_ && available_ == plannedAvailable_) return;
+    plannedWidth_ = width;
+    plannedAvailable_ = available_;
+    juce::StringArray titles;
+    for (const Box& b : boxes_) titles.add(b.title);
+    // A section's height as the page lays it out: its boxes alone, the row the switch needs, the margins.
+    auto height = [this, width](const std::vector<int>& set) {
+        const std::vector<Box> kept = boxes_;
+        measuring_ = &set;
+        const int h = layoutBoxes({ 10, 10, width - 20, 100 }, false);
+        measuring_ = nullptr;
+        boxes_ = kept;
+        return 20 + 32 + h + 10;
+    };
+    const frame::SectionPlan p = frame::planSections(titles, available_, height);
+    sectionOf_.assign(boxes_.size(), 0);
+    for (size_t s = 0; s < p.groups.size(); ++s)
+        for (int b : p.groups[s]) sectionOf_[static_cast<size_t>(b)] = static_cast<int>(s);
+    split_ = p.groups.size() > 1;
+    if (split_) section_.setNames(p.names);
+    section_.setVisible(split_);
+    applySection();
+}
+
+void ParamPage::applySection()
+{
+    for (size_t b = 0; b < boxes_.size(); ++b) {
+        const Box& box = boxes_[b];
+        const bool on = shown(b);
+        for (const Cell& c : box.cells) {
+            controls_[c.control]->setVisible(on);
+            if (c.kind != 4) labels_[c.control]->setVisible(on);
+        }
+    }
+}
+
+void ParamPage::refit()
+{
+    resized();
+    repaint();
+    // The page that hosts this one measures again: the section shown is shorter or taller than the other.
+    for (auto* p = getParentComponent(); p != nullptr; p = p->getParentComponent())
+        if (dynamic_cast<juce::Viewport*>(p) != nullptr) {
+            if (auto* host = p->getParentComponent()) host->resized();
+            break;
+        }
+}
+
+int ParamPage::top() const { return instances_ > 1 || split_ ? 32 : 0; }
 
 juce::String ParamPage::describe() const
 {
@@ -344,6 +409,7 @@ int ParamPage::layoutBoxes(juce::Rectangle<int> area, bool apply)
     };
     for (size_t b = 0; b < boxes_.size(); ++b) {
         Box& box = boxes_[b];
+        if (!shown(b)) { box.bounds = {}; continue; }
         const int inner = width - 2 * kPad;
         std::vector<std::pair<int, int>> rows;
         int rw = 0, rh = 0;
@@ -388,6 +454,7 @@ int ParamPage::layoutBoxes(juce::Rectangle<int> area, bool apply)
 
 int ParamPage::heightFor(int width) const
 {
+    const_cast<ParamPage*>(this)->plan(width);   // the sections for this width first
     auto* self = const_cast<ParamPage*>(this);
     const std::vector<Box> kept = boxes_;
     const int h = self->layoutBoxes({ 10, 10, width - 20, 100 }, false);
@@ -398,6 +465,7 @@ int ParamPage::heightFor(int width) const
 void ParamPage::paint(juce::Graphics& g)
 {
     for (const Box& box : boxes_) {
+        if (!shown(static_cast<size_t>(&box - boxes_.data()))) continue;
         const auto r = box.bounds.toFloat();
         g.setColour(parhui::colour::group);
         g.fillRoundedRectangle(r, 6.0f);
@@ -415,8 +483,9 @@ void ParamPage::paint(juce::Graphics& g)
 void ParamPage::resized()
 {
     auto area = getLocalBounds().reduced(10);
-    if (instances_ > 1) {
+    if (instances_ > 1 || split_) {
         auto top = area.removeFromTop(26);
+        if (split_) { section_.setBounds(top.removeFromRight(section_.bestWidth())); top.removeFromRight(10); }
         const int w = std::min(96, top.getWidth() / std::max(1, instances_));
         for (auto* b : instanceButtons_) b->setBounds(top.removeFromLeft(w).reduced(2, 0));
     }
@@ -436,6 +505,7 @@ ScrollingPage::ScrollingPage(std::unique_ptr<ParamPage> page) : page_(std::move(
 void ScrollingPage::resized()
 {
     view_.setBounds(getLocalBounds());
+    page_->setAvailableHeight(getHeight());   // the sections are cut to it (01.10.2026)
     int w = getWidth(), h = page_->heightFor(w);
     if (h > getHeight()) { w -= view_.getScrollBarThickness(); h = page_->heightFor(w); }
     page_->setSize(w, std::max(h, getHeight()));
@@ -1095,20 +1165,31 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
     auto page = [&](const char* name, std::vector<std::pair<M, int>> groups, int instances = 1, std::vector<juce::String> names = {}) {
         tabs_.addTab(name, kPanel, new ScrollingPage(std::make_unique<ParamPage>(proc_, std::move(groups), instances, std::move(names))), true);
     };
+    // A tab of several modules: a small tab each (frame::SubTabs, 01.10.2026), so that no page has to scroll far.
+    auto modules = [&](const char* name, std::vector<std::pair<M, const char*>> mods) {
+        auto st = std::make_unique<frame::SubTabs>(parhui::skin());
+        for (const auto& mod : mods) {
+            const M m = mod.first;
+            st->add(mod.second, [this, m] {
+                return std::unique_ptr<juce::Component>(new ScrollingPage(std::make_unique<ParamPage>(proc_, std::vector<std::pair<M, int>>{ { m, 0 } })));
+            });
+        }
+        tabs_.addTab(name, kPanel, st.release(), true);
+    };
     page("Set", { { M::Compose, 0 }, { M::Set, 0 }, { M::DjFx, 0 } });
     auto* arrangePage = new ArrangePage(proc_);
     tabs_.addTab("Arrange", kPanel, arrangePage, true);
     arrange_.setDetail(&arrangePage->view());
-    page("Low End", { { M::Kick, 0 }, { M::Sub, 0 }, { M::Bass, 0 }, { M::Acid, 0 }, { M::Pump, 0 } });
+    modules("Low End", { { M::Kick, "Kick" }, { M::Sub, "Sub" }, { M::Bass, "Bass" }, { M::Acid, "Acid" }, { M::Pump, "Pump" } });
     std::vector<juce::String> lanes;
     for (int l = 0; l < kPercLanes; ++l) lanes.push_back("Lane " + juce::String(l + 1));
     page("Drums", { { M::Perc, 0 }, { M::Mix, 0 } }, kPercLanes, lanes);
     std::vector<juce::String> voices;
     for (int v = 0; v < kPolyInstances; ++v) voices.push_back(juce::String(kPolyInstanceNames[v]).substring(0, 1).toUpperCase() + juce::String(kPolyInstanceNames[v]).substring(1));
     page("Synths", { { M::Poly, 0 } }, kPolyInstances, voices);
-    page("Keys", { { M::Piano, 0 }, { M::Cloud, 0 } });
-    page("Orchestra", { { M::Strings, 0 }, { M::Choir, 0 }, { M::Brass, 0 }, { M::Timpani, 0 } });
-    page("Effects", { { M::Sfx, 0 }, { M::Sends, 0 } });
+    modules("Keys", { { M::Piano, "Piano" }, { M::Cloud, "Cloud" } });
+    modules("Orchestra", { { M::Strings, "Strings" }, { M::Choir, "Choir" }, { M::Brass, "Brass" }, { M::Timpani, "Timpani" } });
+    modules("Effects", { { M::Sfx, "SFX" }, { M::Sends, "Sends" } });
     tabs_.addTab("Mixer", kPanel, new MixerPage(proc_), true);
     tabs_.addTab("Perform", kPanel, new PerformPage(proc_), true);
     tabs_.addTab("Export", kPanel, new ExportPage(proc_), true);
@@ -1120,11 +1201,14 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
 
     setResizable(true, true);
     setResizeLimits(800, 520, 4800, 3100);
-    setSize(1180, 760);
+    setSize(1280, 860);   // the family's window size (01.10.2026)
 
     if (const char* shot = std::getenv("PARH_SHOT")) {
         shotPath_ = shot;
         if (const char* tab = std::getenv("PARH_TAB")) tabs_.setCurrentTabIndex(juce::String(tab).getIntValue());
+        // PARH_SUBTAB: the small tab of a tab of several (Low End, Keys, Orchestra, Effects, Mixer).
+        if (const char* st = std::getenv("PARH_SUBTAB"))
+            if (auto* subs = dynamic_cast<frame::SubTabs*>(tabs_.getCurrentContentComponent())) subs->show(juce::String(st).getIntValue());
         if (const char* zoom = std::getenv("PARH_SHOT_ZOOM")) {
             const juce::String z(zoom);
             arrangePage->view().zoomTo(z.upToFirstOccurrenceOf(":", false, false).getDoubleValue(), z.fromFirstOccurrenceOf(":", false, false).getDoubleValue());
@@ -1227,8 +1311,13 @@ void ParhelionEditor::showHelp(bool on)
         helpView_->onClose = [this] { showHelp(false); };
         helpView_->extraTopics = [this] {
             std::vector<std::pair<juce::String, juce::String>> t;
-            if (auto* sp = dynamic_cast<ScrollingPage*>(tabs_.getCurrentContentComponent()))
-                t.emplace_back("This tab: " + tabs_.getCurrentTabName(), sp->page().describe());
+            juce::Component* page = tabs_.getCurrentContentComponent();
+            juce::String name = tabs_.getCurrentTabName();
+            if (auto* st = dynamic_cast<frame::SubTabs*>(page)) {   // a tab of several modules: its small tab in front
+                name << ": " << st->name(st->current());
+                page = st->page();
+            }
+            if (auto* sp = dynamic_cast<ScrollingPage*>(page)) t.emplace_back("This tab: " + name, sp->page().describe());
             t.emplace_back("Keys", frame::keysText());
             t.emplace_back("Headset (Meta Quest)", frame::headsetGrammar("the kick out and in", "Breakdown now (in a breakdown, a break or a build: Drop now)") + "\n\n" + proc_.headset().statusText());
             return t;
@@ -1255,14 +1344,14 @@ void ParhelionEditor::showSettings()
     m.isFullScreen = [this] { return fullScreen(); };
     m.toggleFullScreen = [this] { toggleFullScreen(); };
     m.setWindowScale = [this](float k) {
-        if (!fullScreen()) setSize(juce::roundToInt(1180.0f * k), juce::roundToInt(760.0f * k));
+        if (!fullScreen()) setSize(juce::roundToInt(1280.0f * k), juce::roundToInt(860.0f * k));
     };
     m.headsetStatus = [this] { return proc_.headset().statusText(); };
     m.about = [] { return juce::String("Trance -- uplifting, progressive, dream, acid, deep -- composed and synthesised.\ngithub.com/reneweller-coding/Parhelion"); };
     m.show(settings_);
 }
 
-void ParhelionEditor::changeListenerCallback(juce::ChangeBroadcaster*) { body_.repaint(); }
+void ParhelionEditor::changeListenerCallback(juce::ChangeBroadcaster*) { layoutBody(); body_.repaint(); }   // the settings changed
 
 void ParhelionEditor::showLength(bool mix)
 {
@@ -1308,8 +1397,11 @@ void ParhelionEditor::layoutBody()
     h.tools = { &headsetIcon_, nullptr, &undo_, &redo_, nullptr, &help_, &settings_ };
     frame::layoutHeader(area, h);
     headerBottom_ = area.getY();
-    arrange_.setBounds(area.removeFromTop(96));
-    area.removeFromTop(8);
+    // The overview, unless the settings fold it away (01.10.2026): then the pages get its height.
+    const bool overview = frame::Settings::of("Parhelion").overview();
+    arrange_.setVisible(overview);
+    arrange_.setBounds(area.removeFromTop(overview ? 96 : 0));
+    area.removeFromTop(overview ? 8 : 4);
     tabs_.setBounds(area);
     if (helpView_ != nullptr) helpView_->setBounds(area);
 }
@@ -1376,6 +1468,15 @@ void ParhelionEditor::timerCallback()
     // moves the playhead there first.
     if (shotPath_.isNotEmpty() && !proc_.isComposing() && shotTicks_ == 0)
         if (const char* at = std::getenv("PARH_SHOT_AT")) proc_.seekTo(std::atof(at));
+    // PARH_PAGE_REPORT=<file> (01.10.2026): how far every page reaches past the window, a line each (Frame.h, pageReport),
+    // then quit -- which page still scrolls at the usual size.
+    if (const char* report = std::getenv("PARH_PAGE_REPORT"); report != nullptr && !proc_.isComposing()) {
+        static int reportTicks = 0;
+        if (++reportTicks == 8) {
+            juce::File(report).replaceWithText(frame::pageReport(tabs_));
+            if (juce::JUCEApplicationBase::isStandaloneApp()) juce::JUCEApplicationBase::quit();
+        }
+    }
     // PARH_SHOT_FULL: the window grows until nothing of the page in front scrolls, so the picture shows all of it.
     if (shotPath_.isNotEmpty() && !proc_.isComposing() && (shotTicks_ == 6 || shotTicks_ == 12) && std::getenv("PARH_SHOT_FULL") != nullptr) {
         std::function<int(juce::Component&)> overflow = [&](juce::Component& c) {
