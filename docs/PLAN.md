@@ -58,7 +58,8 @@ ein Zoom "etwa mit dem Mausrad"; sein Mix "begann ... wieder mit einer Solo-Kick
   der Closed Hat ein; erste Tracks ohne Kick 6 von 12, spätere mit 17 von 17. Gerendert (12 Mixe zu 12 min, Seeds
   101-112, die ersten 75 s mit Stems): Takt 1-8 ohne Kick auf Pad, Atmosphäre und dem angedeuteten Arp 7, Kick mit Hats
   und Pad 5, die Kick allein 0 (vorher gehört in allen 12).
-- `parh_render --seconds S`: nur der Anfang. ctest 37/37.
+- `parh_render --seconds S`: nur der Anfang. ctest 37/37. Release 1.0.1 neu gebaut (icx): 37/37, pluginval Strenge 10,
+  keine Laufzeit-DLL; Setup, Zip und Quest-APK in Deploy/out, Handbuch und Bilder aus diesem Build (neu: zoom.png).
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der
