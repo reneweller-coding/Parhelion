@@ -123,6 +123,8 @@ public:
     void setLevelBalance(int d, const std::vector<BalanceDb>& bal) { decks_[d].setLevelBalance(bal); }
     /** @brief Phase 18: every deck keeps its parts' loudest samples from now on (Deck::watchPeaks), or stops. */
     void watchPeaks(bool on) { for (Deck& d : decks_) d.watchPeaks(on); }
+    /** @brief The mixer page's strip meters: every deck adds into @p sink from now on (null: stops). */
+    void setMeterSink(MeterSink* sink) { for (Deck& d : decks_) d.setMeterSink(sink); }
     /** @brief Deck @p d (0 .. 2). */
     const Deck& deck(int d) const { return decks_[d]; }
     /** @brief The kick of deck A (for the tests). */

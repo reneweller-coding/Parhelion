@@ -58,11 +58,34 @@
 #include "parh/synth/Sfx.h"
 #include "parh/synth/SubBass.h"
 #include "parh/synth/Synth.h"
+#include <atomic>
 #include <cstdint>
 #include <limits>
 #include <vector>
 
 namespace parh {
+
+/**
+ * @brief Where the decks add the levels of the mixer's strips while the plugin's mixer page looks (01.10.2026): per strip
+ *        (the stems' order, Deck::Stem) the loudest sample and the sum of squares since the page last took them. Written
+ *        by the audio thread (both decks into one), read and reset by the message thread; null in a deck: nothing is
+ *        measured, nothing costs.
+ */
+struct MeterSink {
+    static constexpr int kStrips = 22;   ///< Deck::kStems
+    std::atomic<float> peak[kStrips] = {};
+    std::atomic<double> sum[kStrips] = {};
+    /** @brief Adds one block's readings (audio thread). */
+    void add(const float* pk, const double* ss)
+    {
+        for (int s = 0; s < kStrips; ++s) {
+            float was = peak[s].load(std::memory_order_relaxed);
+            while (pk[s] > was && !peak[s].compare_exchange_weak(was, pk[s], std::memory_order_relaxed)) {}
+            double w = sum[s].load(std::memory_order_relaxed);
+            while (!sum[s].compare_exchange_weak(w, w + ss[s], std::memory_order_relaxed)) {}
+        }
+    }
+};
 
 /** @brief One deck. */
 class Deck {
@@ -71,6 +94,7 @@ public:
     enum Stem : int { kStemKick = 0, kStemSub, kStemBass, kStemAcid, kStemHats, kStemPerc, kStemLead, kStemCounter, kStemPluck,
                       kStemArp, kStemPad, kStemStab, kStemPiano, kStemStrings, kStemChoir, kStemBrass, kStemTimpani, kStemRoom,
                       kStemPlate, kStemHall, kStemCloud, kStemFx, kStems };
+    static_assert(static_cast<int>(kStems) == MeterSink::kStrips, "a strip per stem");
     static constexpr int kRaster = 32;   ///< the engine's parameter raster, samples
     static constexpr int64_t kNever = std::numeric_limits<int64_t>::max();
 
@@ -115,6 +139,8 @@ public:
     const Score& score() const { return score_; }
     /** @brief Whether it has a score. */
     bool loaded() const { return loaded_; }
+    /** @brief From now on adds the strips' levels into @p sink (null: stops). */
+    void setMeterSink(MeterSink* sink) { meter_ = sink; }
     /** @brief The value of parameter @p id as this deck plays it: the knob plus its score's automation. */
     float played(int id) const;
     /** @brief Reads a module instance as played. */
@@ -280,6 +306,7 @@ private:
     float balGain_[kBalParts] = {};
     float balTarget_[kBalParts] = {};
     bool watch_ = false;
+    MeterSink* meter_ = nullptr;     ///< setMeterSink
     float kickPeak_ = 0.0f, partPeak_[kBalParts] = {};
     std::vector<BalanceDb> lateBal_;
 

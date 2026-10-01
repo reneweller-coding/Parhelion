@@ -4,6 +4,7 @@
  * @note Copied from Totality `Plugin/EditorPerform.cpp` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
  */
 #include "EditorPerform.h"
+#include "parh/Presets.h"
 #include <cmath>
 
 using namespace parh;
@@ -74,7 +75,7 @@ PerformPage::PerformPage(ParhelionProcessor& p) : proc_(p)
     breakdownNow_.setTooltip("From the next 8-bar line: a breakdown, its build and a drop after it (a track, not a set)");
     dropNow_.setTooltip("From the next 8-bar line: the drop at once, after a beat of silence (a track, not a set)");
     breakdownNow_.setColour(juce::TextButton::buttonColourId, parhui::familyColour(parhui::Family::Space).withAlpha(0.35f));
-    dropNow_.setColour(juce::TextButton::buttonColourId, parhui::colour::amber.withAlpha(0.35f));
+    dropNow_.setColour(juce::TextButton::buttonColourId, parhui::colour::sun.withAlpha(0.35f));
     auto now = [this](SectionKind kind, const char* what) {
         const int bar = proc_.performNow(kind);
         now_.setText(bar < 0 ? juce::String("nothing to rewrite now (a set, or composing)")
@@ -114,6 +115,10 @@ PerformPage::PerformPage(ParhelionProcessor& p) : proc_(p)
 
 void PerformPage::timerCallback()
 {
+    // The headset's group: shown while one sends (or always, as the settings say), its hands live.
+    const bool hs = proc_.headset().shown(frame::Settings::of("Parhelion").headset());
+    if (hs != headset_) { headset_ = hs; resized(); }
+    if (headset_) repaint(headsetArea_);
     const ParamStore& s = proc_.store();
     for (int d = 0; d < kDecks; ++d)
         for (int b = 0; b < 3; ++b)
@@ -165,11 +170,11 @@ void PerformPage::resized()
         learn_[li++]->setBounds(strip.removeFromBottom(26).reduced(10, 3));
         strips_[d].fader.setBounds(strip.reduced(10, 0));
     }
+    headsetArea_ = headset_ ? r.withTrimmedLeft(20) : juce::Rectangle<int>();
 }
 
 void PerformPage::paint(juce::Graphics& g)
 {
-    g.fillAll(parhui::colour::panel);
     g.setColour(parhui::colour::dim);
     g.setFont(juce::FontOptions(13.0f));
     auto r = getLocalBounds().reduced(16);
@@ -185,23 +190,20 @@ void PerformPage::paint(juce::Graphics& g)
         g.drawText(juce::String("DECK ") + juce::String::charToString(static_cast<juce::juce_wchar>('A' + d)) + (d == 2 ? " (loops)" : ""),
                    b.getX(), b.getY() - 22, 200, 18, juce::Justification::left);
     }
+    if (headset_ && !headsetArea_.isEmpty())   // the headset (the frame): what the hands do, and how they stand now
+        frame::drawHeadsetBox(g, headsetArea_, parhui::skin(), proc_.headset(), "kick out / in", "breakdown / drop now");
 }
 
 // ---------------------------------------------------------------------------------------------------
 
-MixerPage::MixerPage(ParhelionProcessor& p)
-    : proc_(p),
-      knobs_(std::make_unique<ParamPage>(p, std::vector<std::pair<Module, int>>{ { Module::Mix, 0 }, { Module::Master, 0 }, { Module::Pump, 0 },
-                                                                                  { Module::Deck, 0 }, { Module::Deck, 1 }, { Module::Deck, 2 } }))
+DecksPage::DecksPage(ParhelionProcessor& p)
+    : knobs_(std::make_unique<ParamPage>(p, std::vector<std::pair<Module, int>>{ { Module::Deck, 0 }, { Module::Deck, 1 }, { Module::Deck, 2 } }))
 {
     addAndMakeVisible(knobs_);
-    startTimerHz(20);
 }
 
-void MixerPage::timerCallback()
+void DecksPage::meter(const float* pk, const float* rms, float out, float lufs)
 {
-    float pk[kDecks], rms[kDecks], out = 0.0f, lufs = -70.0f;
-    proc_.takeMeters(pk, rms, out, lufs);
     for (int d = 0; d < kDecks; ++d) {
         peak_[d] = std::max(pk[d], peak_[d] * 0.85f);
         rms_[d] = rms[d];
@@ -213,15 +215,15 @@ void MixerPage::timerCallback()
     repaint(getLocalBounds().withWidth(220));
 }
 
-void MixerPage::resized()
+void DecksPage::resized()
 {
     knobs_.setBounds(getLocalBounds().withTrimmedLeft(220));
 }
 
-void MixerPage::paint(juce::Graphics& g)
+void DecksPage::paint(juce::Graphics& g)
 {
     using namespace parhui::colour;
-    g.fillAll(panel);
+
     auto r = getLocalBounds().withWidth(220).reduced(12);
     g.setColour(ink);
     g.setFont(juce::FontOptions(20.0f, juce::Font::bold));
@@ -242,7 +244,7 @@ void MixerPage::paint(juce::Graphics& g)
         g.setColour(group);
         g.fillRect(m);
         const float pdb = toDb(i < kDecks ? peak_[i] : out_), rdb = i < kDecks ? toDb(rms_[i]) : pdb;
-        const juce::Colour c = i < kDecks ? parhui::deckColour(i) : amber;
+        const juce::Colour c = i < kDecks ? parhui::deckColour(i) : accent;
         g.setColour(c.withAlpha(0.35f));
         g.fillRect(juce::Rectangle<float>(static_cast<float>(m.getX()), yOf(pdb, m), static_cast<float>(m.getWidth()), static_cast<float>(m.getBottom()) - yOf(pdb, m)));
         if (i < kDecks) {
@@ -260,4 +262,153 @@ void MixerPage::paint(juce::Graphics& g)
         const float y = yOf(static_cast<float>(db), r.withTrimmedBottom(22));
         g.fillRect(static_cast<float>(r.getX()), y, static_cast<float>(r.getWidth()), 1.0f);
     }
+}
+
+// ---------------------------------------------------------------------------------------------------
+
+namespace {
+/** @brief A strip of the console: its name, its meter (a stem), its synth, its fader, pan and sends, its mute. */
+struct StripSpec {
+    std::string name;
+    int meter;
+    Module synth;
+    int instance;
+    std::string fader;
+    std::vector<std::pair<std::string, std::string>> knobs;   ///< key, label; "Pan" is not a send
+    int mute;                                                   ///< perform::Mute* offset from MuteKick, -1 none
+};
+} // namespace
+
+MixerPage::MixerPage(ParhelionProcessor& p)
+    : proc_(p), live_([this](int id) { return proc_.playedNormalised(id); }), tabs_(parhui::skin())
+{
+    actions_.learn = [this](int id) { proc_.learn(id); };
+    actions_.controllerFor = [this](int id) { return proc_.controllerFor(id); };
+    actions_.forget = [this](int id) { proc_.forget(id); };
+    actions_.reset = [this](int id) { proc_.resetToDefault(id); };
+    actions_.describe = [this](int id) { return juce::String(proc_.store().desc(id).name) + "  (" + proc_.store().key(id) + ")"; };
+    using F = parhui::Family;
+    tabs_.add("Console", [this] {
+        auto console = std::make_unique<frame::Console>(parhui::skin());
+        console_ = console.get();
+        ParamStore& s = proc_.store();
+        using D = Deck;
+        using Keys = std::vector<std::pair<std::string, std::string>>;
+        const Keys poly = { { "pan", "Pan" }, { "room_send", "Room" }, { "plate_send", "Plate" }, { "hall_send", "Hall" }, { "delay_send", "Delay" } };
+        const Keys orch = { { "room_send", "Room" }, { "plate_send", "Plate" }, { "hall_send", "Hall" } };
+        auto with = [](const std::string& prefix, const Keys& keys) {
+            Keys out;
+            for (const auto& [k, l] : keys) out.emplace_back(prefix + "." + k, l);
+            return out;
+        };
+        std::vector<StripSpec> specs = {
+            { "Kick", D::kStemKick, Module::Kick, 0, "kick.level", {}, 0 },
+            { "Sub", D::kStemSub, Module::Sub, 0, "sub.level", {}, 1 },
+            { "Bass", D::kStemBass, Module::Bass, 0, "bass.level", { { "bass.pan", "Pan" }, { "bass.room_send", "Room" }, { "bass.plate_send", "Plate" } }, 1 },
+            { "303", D::kStemAcid, Module::Acid, 0, "acid.level", { { "acid.pan", "Pan" }, { "acid.room_send", "Room" }, { "acid.plate_send", "Plate" } }, 1 },
+            { "Hats", D::kStemHats, Module::Count, 0, "mix.hats_level", { { "sends.hats_send", "Room" } }, 2 },
+            { "Perc", D::kStemPerc, Module::Count, 0, "mix.perc_level", { { "sends.perc_send", "Plate" } }, 3 },
+        };
+        static const int kPolyMute[kPolyInstances] = { 4, 4, 5, 5, 6, 6 };
+        for (int v = 0; v < kPolyInstances; ++v) {
+            const std::string n = kPolyInstanceNames[v];
+            specs.push_back({ std::string(1, static_cast<char>(std::toupper(n[0]))) + n.substr(1), D::kStemLead + v, Module::Poly, v, n + ".level",
+                              with(n, poly), kPolyMute[v] });
+        }
+        specs.push_back({ "Piano", D::kStemPiano, Module::Piano, 0, "piano.level", with("piano", orch), -1 });
+        specs.push_back({ "Strings", D::kStemStrings, Module::Strings, 0, "strings.level", with("strings", orch), -1 });
+        specs.push_back({ "Choir", D::kStemChoir, Module::Choir, 0, "choir.level", with("choir", orch), -1 });
+        specs.push_back({ "Brass", D::kStemBrass, Module::Brass, 0, "brass.level", with("brass", orch), -1 });
+        specs.push_back({ "Timpani", D::kStemTimpani, Module::Timpani, 0, "timpani.level", with("timpani", orch), -1 });
+        specs.push_back({ "FX", D::kStemFx, Module::Sfx, 0, "sfx.level", with("sfx", orch), -1 });
+        specs.push_back({ "Room", D::kStemRoom, Module::Count, 0, "sends.room_return", {}, -1 });
+        specs.push_back({ "Plate", D::kStemPlate, Module::Count, 0, "sends.plate_return", {}, -1 });
+        specs.push_back({ "Hall", D::kStemHall, Module::Count, 0, "sends.hall_return", {}, -1 });
+        specs.push_back({ "Cloud", D::kStemCloud, Module::Count, 0, "cloud.level", { { "cloud.plate_send", "Plate" } }, -1 });
+        auto control = [&](const std::string& key, const juce::String& label, bool send) {
+            frame::ChannelStrip::Control c;
+            c.id = s.find(key);
+            c.param = c.id >= 0 ? proc_.parameter(c.id) : nullptr;
+            c.label = label;
+            c.send = send;
+            return c;
+        };
+        sounds_.clear();
+        for (const StripSpec& sp : specs) {
+            std::vector<frame::ChannelStrip::Control> knobs;
+            for (const auto& [key, label] : sp.knobs) knobs.push_back(control(key, label, label != "Pan"));
+            const F family = sp.meter >= D::kStemRoom && sp.meter <= D::kStemCloud ? F::Space
+                           : sp.meter <= D::kStemPerc ? F::Source : sp.meter <= D::kStemStab ? F::Filter : F::Envelope;
+            auto& strip = console->add(std::make_unique<frame::ChannelStrip>(parhui::skin(), sp.name, parhui::familyColour(family),
+                                                                              control(sp.fader, juce::String(sp.name) + " level", false), knobs, &actions_, &live_));
+            sounds_.push_back({ sp.meter, { sp.synth, sp.instance } });
+            if (sp.mute >= 0) {
+                auto* m = mutes_.add(new juce::TextButton("M"));
+                m->setClickingTogglesState(true);
+                m->setColour(juce::TextButton::buttonOnColourId, parhui::colour::onset.withAlpha(0.6f));
+                m->setTooltip("Mute the group (as on the Perform page)");
+                m->setWantsKeyboardFocus(false);
+                muteLinks_.push_back(std::make_unique<juce::ButtonParameterAttachment>(*proc_.parameter(s.id(Module::Perform, 0, perform::MuteKick + sp.mute)), *m));
+                strip.setHeadButton(m);
+            }
+        }
+        // The output: the master's level, and the meter of what leaves.
+        console->add(std::make_unique<frame::ChannelStrip>(parhui::skin(), "Out", parhui::colour::accent, control("master.level", "Master level", false),
+                                                           std::vector<frame::ChannelStrip::Control>{}, &actions_, &live_));
+        return std::unique_ptr<juce::Component>(std::move(console));
+    });
+    tabs_.add("Buses and Master", [this] {
+        return std::unique_ptr<juce::Component>(std::make_unique<ScrollingPage>(
+            std::make_unique<ParamPage>(proc_, std::vector<std::pair<Module, int>>{ { Module::Mix, 0 }, { Module::Master, 0 }, { Module::Pump, 0 } })));
+    });
+    tabs_.add("Decks", [this] {
+        auto d = std::make_unique<DecksPage>(proc_);
+        decks_ = d.get();
+        return std::unique_ptr<juce::Component>(std::move(d));
+    });
+    addAndMakeVisible(tabs_);
+    startTimerHz(30);
+}
+
+void MixerPage::timerCallback()
+{
+    if (!isShowing()) return;
+    const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const double dt = lastPoll_ > 0.0 ? juce::jlimit(0.0, 0.5, now - lastPoll_) : 1.0 / 30.0;
+    lastPoll_ = now;
+    float pk[kDecks], rms[kDecks], out = 0.0f, lufs = -70.0f;
+    proc_.takeMeters(pk, rms, out, lufs);
+    float spk[MeterSink::kStrips], srms[MeterSink::kStrips];
+    proc_.takeStripMeters(spk, srms);
+    if (decks_ != nullptr && decks_->isShowing()) decks_->meter(pk, rms, out, lufs);
+    lufs_ = lufs;
+    if (console_ != nullptr && console_->isShowing()) {
+        for (int i = 0; i < console_->size() && i < static_cast<int>(sounds_.size()); ++i) {
+            const int m = sounds_[static_cast<size_t>(i)].first;
+            console_->strip(i).meter(spk[m], srms[m], dt);
+        }
+        if (console_->size() > static_cast<int>(sounds_.size())) console_->strip(console_->size() - 1).meter(out, out * 0.7071f, dt);
+        // Now and then: the sound each synth's strip plays.
+        if (++tick_ % 15 == 0)
+            for (size_t i = 0; i < sounds_.size(); ++i) {
+                const auto [m, inst] = sounds_[i].second;
+                juce::String name;
+                if (m != Module::Count)
+                    if (const int index = proc_.composedPreset(m, inst); index >= 0) name = factoryPresets(m, inst)[static_cast<size_t>(index)].name;
+                console_->strip(static_cast<int>(i)).setSound(name);
+            }
+        repaint(getLocalBounds().removeFromTop(36));
+    }
+}
+
+void MixerPage::resized() { tabs_.setBounds(getLocalBounds()); }
+
+void MixerPage::paint(juce::Graphics& g)
+{
+    // The loudness at the console's top right.
+    if (tabs_.current() != 0) return;
+    g.setColour(parhui::colour::ink);
+    g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
+    g.drawText(lufs_ > -69.0f ? juce::String(lufs_, 1) + " LUFS" : juce::String("-- LUFS"), getLocalBounds().removeFromTop(36).reduced(14, 0),
+               juce::Justification::centredRight);
 }

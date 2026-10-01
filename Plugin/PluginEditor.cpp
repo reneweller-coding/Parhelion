@@ -7,6 +7,7 @@
 #include "EditorPerform.h"
 #include "EditorStyle.h"
 #include "parh/Presets.h"
+#include "ParhelionData.h"
 #include <cstdlib>
 
 using namespace parh;
@@ -14,7 +15,7 @@ using namespace parh;
 namespace {
 
 const juce::Colour kBack = parhui::colour::bg, kPanel = parhui::colour::panel, kInk = parhui::colour::ink, kDim = parhui::colour::dim,
-                   kAccent = parhui::colour::amber, kOnset = parhui::colour::onset;
+                   kAccent = parhui::colour::accent, kOnset = parhui::colour::onset, kSun = parhui::colour::sun;
 
 /** @brief Colour of a block by its marker: the edges dark, the body brighter towards the peak, a reduction the motion's teal. */
 juce::Colour blockColour(const juce::String& name)
@@ -152,14 +153,19 @@ void PresetBar::paint(juce::Graphics&) {}
 // ---------------------------------------------------------------------------------------------------
 
 ParamPage::ParamPage(ParhelionProcessor& p, std::vector<std::pair<Module, int>> groups, int instances, std::vector<juce::String> names)
-    : proc_(p), groups_(std::move(groups)), instances_(instances)
+    : proc_(p), live_([this](int id) { return proc_.playedNormalised(id); }), groups_(std::move(groups)), instances_(instances)
 {
+    actions_.learn = [this](int id) { proc_.learn(id); };
+    actions_.controllerFor = [this](int id) { return proc_.controllerFor(id); };
+    actions_.forget = [this](int id) { proc_.forget(id); };
+    actions_.reset = [this](int id) { proc_.resetToDefault(id); };
+    actions_.describe = [this](int id) { return juce::String(proc_.store().desc(id).name) + "  (" + proc_.store().key(id) + ")"; };
     if (instances_ > 1) {
         for (int i = 0; i < instances_; ++i) {
             auto* b = instanceButtons_.add(new juce::TextButton(i < static_cast<int>(names.size()) ? names[static_cast<size_t>(i)] : juce::String(i + 1)));
             b->setClickingTogglesState(true);
             b->setRadioGroupId(0x5041);   // "PA"
-            b->setColour(juce::TextButton::buttonOnColourId, parhui::colour::amber.withAlpha(0.45f));
+            b->setColour(juce::TextButton::buttonOnColourId, parhui::colour::accent.withAlpha(0.45f));
             b->setToggleState(i == 0, juce::dontSendNotification);
             b->onClick = [this, i] {
                 if (selected_ == i) return;
@@ -176,6 +182,7 @@ ParamPage::ParamPage(ParhelionProcessor& p, std::vector<std::pair<Module, int>> 
 
 void ParamPage::build()
 {
+    live_.clear();
     sliders_.clear();
     combos_.clear();
     buttons_.clear();
@@ -202,7 +209,7 @@ void ParamPage::build()
         Cell cell;
         cell.big = big;
         if (d.curve == Curve::Choice && d.choices != nullptr) {
-            auto* box = new juce::ComboBox();
+            auto* box = new frame::Choice(&actions_, id);
             for (int c = 0; c <= static_cast<int>(d.maxValue); ++c) box->addItem(d.choices[c], c + 1);
             box->setColour(juce::ComboBox::arrowColourId, colour);
             controls_.add(box);
@@ -210,19 +217,21 @@ void ParamPage::build()
             cell.kind = 1;
             cell.narrow = narrow;
         } else if (d.curve == Curve::Toggle) {
-            auto* b = new juce::ToggleButton();
+            auto* b = new frame::Switch(&actions_, id);
             b->setColour(juce::ToggleButton::tickColourId, colour);
             controls_.add(b);
             buttons_.push_back(std::make_unique<juce::ButtonParameterAttachment>(*param, *b));
             cell.kind = 2;
         } else {
-            auto* sl = new juce::Slider(juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow);
+            auto* sl = new frame::Knob(juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow, &actions_, id);
             sl->setTextBoxStyle(juce::Slider::TextBoxBelow, false, big ? 96 : 70, 16);
             sl->setColour(juce::Slider::rotarySliderFillColourId, colour);
             sl->setTextValueSuffix(d.unit[0] != 0 ? juce::String(" ") + d.unit : juce::String());
             sl->setTooltip(juce::String(s.key(id)) + ": " + d.name + (d.unit[0] != 0 ? juce::String(" (") + d.unit + ")" : juce::String()));
             controls_.add(sl);
             sliders_.push_back(std::make_unique<juce::SliderParameterAttachment>(*param, *sl));
+            sl->setDoubleClickReturnValue(true, d.defValue);
+            live_.add(*sl, id);
         }
         addAndMakeVisible(controls_.getLast());
         cell.control = controls_.size() - 1;
@@ -282,9 +291,36 @@ void ParamPage::build()
         }
         if (!more.cells.empty()) boxes_.push_back(std::move(more));
     }
+    frame::keepKeysForEditor(*this);   // the keys stay the editor's (Space plays, not the switch last clicked)
 }
 
 int ParamPage::top() const { return instances_ > 1 ? 32 : 0; }
+
+juce::String ParamPage::describe() const
+{
+    juce::String t;
+    const ParamStore& s = proc_.store();
+    for (const Box& box : boxes_) {
+        t << box.title.toUpperCase() << "\n";
+        for (const Cell& c : box.cells) {
+            if (c.kind == 4) { t << "  the presets: the 1024 of this synth in sixteen groups, and the composer's choice\n"; continue; }
+            int id = -1;
+            if (auto* k = dynamic_cast<frame::Knob*>(controls_[c.control])) id = k->id();
+            else if (auto* m = dynamic_cast<frame::Choice*>(controls_[c.control])) id = m->id();
+            else if (auto* w = dynamic_cast<frame::Switch*>(controls_[c.control])) id = w->id();
+            if (id < 0) continue;
+            const ParamDesc& d = s.desc(id);
+            t << "  " << d.name << ": ";
+            if (d.curve == Curve::Toggle) t << (s.getBool(id) ? "on" : "off");
+            else if (d.curve == Curve::Choice && d.choices != nullptr) t << d.choices[s.getInt(id)];
+            else t << juce::String(s.get(id), 2) << (d.unit[0] != 0 ? juce::String(" ") + d.unit : juce::String())
+                   << "   (" << juce::String(d.minValue, 2) << " .. " << juce::String(d.maxValue, 2) << ", default " << juce::String(d.defValue, 2) << ")";
+            t << "   [" << s.key(id) << "]\n";
+        }
+        t << "\n";
+    }
+    return t.trimEnd();
+}
 
 int ParamPage::layoutBoxes(juce::Rectangle<int> area, bool apply)
 {
@@ -656,7 +692,7 @@ void ArrangeView::paint(juce::Graphics& g)
                 end = s.beat + s.length;
             }
             if (!first) {
-                g.setColour((playing_.isSet ? c.brighter(0.6f) : kAccent).withAlpha(0.85f));
+                g.setColour((playing_.isSet ? c.brighter(0.6f) : kSun).withAlpha(0.85f));
                 g.strokePath(energy, juce::PathStrokeType(detailed_ ? 2.0f : 1.4f));
             }
         }
@@ -833,7 +869,7 @@ void ArrangePage::resized()
     view_.setBounds(r);
 }
 
-void ArrangePage::paint(juce::Graphics& g) { g.fillAll(kPanel); }
+void ArrangePage::paint(juce::Graphics&) {}
 
 // ---------------------------------------------------------------------------------------------------
 
@@ -843,23 +879,32 @@ ExportPage::ExportPage(ParhelionProcessor& p) : proc_(p)
     stems_.onClick = [this] { exportWith(ParhelionProcessor::kStems); };
     loops_.onClick = [this] { exportWith(ParhelionProcessor::kLoops); };
     all_.onClick = [this] { exportWith(ParhelionProcessor::kStems | ParhelionProcessor::kLoops); };
-    save_.onClick = [this] {
-        documents().createDirectory();
-        chooser_ = std::make_unique<juce::FileChooser>("Save set", documents().getChildFile("parhelion.parhset"), "*.parhset");
-        chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this](const juce::FileChooser& fc) { if (fc.getResult() != juce::File()) proc_.saveSet(fc.getResult().withFileExtension(".parhset")); });
-    };
-    load_.onClick = [this] {
-        chooser_ = std::make_unique<juce::FileChooser>("Load set", documents(), "*.parhset");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this](const juce::FileChooser& fc) { if (fc.getResult().existsAsFile()) proc_.loadSet(fc.getResult()); });
-    };
+    save_.onClick = [this] { save(); };
+    load_.onClick = [this] { load(); };
+    save_.setTooltip("Save the set: seed, lengths, rerolls and every changed knob (Ctrl+S)");
+    load_.setTooltip("Load a set and compose it (Ctrl+O)");
+    wav_.setTooltip("Export what plays (Ctrl+E)");
     for (auto* b : { &wav_, &stems_, &loops_, &all_, &save_, &load_ }) addAndMakeVisible(b);
     status_.setColour(juce::Label::textColourId, kInk);
     addAndMakeVisible(status_);
     cue_ = std::make_unique<ParamPage>(proc_, std::vector<std::pair<Module, int>>{ { Module::Cue, 0 } });
     addAndMakeVisible(*cue_);
     startTimerHz(4);
+}
+
+void ExportPage::save()
+{
+    documents().createDirectory();
+    chooser_ = std::make_unique<juce::FileChooser>("Save set", documents().getChildFile("parhelion.parhset"), "*.parhset");
+    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
+                          [this](const juce::FileChooser& fc) { if (fc.getResult() != juce::File()) proc_.saveSet(fc.getResult().withFileExtension(".parhset")); });
+}
+
+void ExportPage::load()
+{
+    chooser_ = std::make_unique<juce::FileChooser>("Load set", documents(), "*.parhset");
+    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                          [this](const juce::FileChooser& fc) { if (fc.getResult().existsAsFile()) proc_.loadSet(fc.getResult()); });
 }
 
 void ExportPage::exportWith(int extras)
@@ -890,7 +935,6 @@ void ExportPage::resized()
 
 void ExportPage::paint(juce::Graphics& g)
 {
-    g.fillAll(kPanel);
     g.setColour(kDim);
     g.setFont(juce::FontOptions(13.0f));
     const juce::String text =
@@ -951,12 +995,16 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
 {
     setLookAndFeel(&lnf_);
     addAndMakeVisible(body_);
-    body_.painter = [this](juce::Graphics& g) { g.fillAll(kBack); drawLogo(g, logo_); };
+    // The backdrop (strong behind the header, faint behind the pages), the logo and the name: the frame's (Frame.h).
+    body_.painter = [this](juce::Graphics& g) {
+        backdrop_.paint(g, body_.getLocalBounds(), headerBottom_, parhui::skin(), frame::Settings::of("Parhelion").backdrop());
+        drawLogo(g, logo_);
+        frame::drawTitle(g, parhui::skin(), title_.getBounds().toFloat(), 21.0f);
+    };
     body_.onResize = [this] { layoutBody(); };
+    frame::Settings::of("Parhelion").addChangeListener(this);
     ParamStore& s = proc_.store();
-    title_.setText("PARHELION", juce::dontSendNotification);
-    title_.setFont(juce::FontOptions(20.0f, juce::Font::bold));
-    title_.setColour(juce::Label::textColourId, kAccent);
+    title_.setInterceptsMouseClicks(false, false);
     body_.addAndMakeVisible(title_);
 
     auto combo = [&](juce::ComboBox& box, int id) {
@@ -968,6 +1016,9 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
     combo(style_, s.id(Module::Compose, 0, compose::Style));
     combo(key_, s.id(Module::Compose, 0, compose::Key));
     combo(scale_, s.id(Module::Compose, 0, compose::Scale));
+    style_.setTooltip("The style the next track is composed in");
+    key_.setTooltip("The key");
+    scale_.setTooltip("The scale");
     // One track or a DJ mix (a set of tracks on two decks, 01.10.2026 -- the user: "In der GUI ist es etwas verwirrend, ob
     // man jetzt einen Einzeltrack erzeugt oder einen Mix"; after Totality's Phase 21): two buttons that compose what they
     // name, and one length, the one of what is chosen (compose.minutes or set.minutes).
@@ -976,12 +1027,8 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
                         "mix's course on the Set page)");
     trackMode_.onClick = [this] { proc_.chooseMix(false); };
     mixMode_.onClick = [this] { proc_.chooseMix(true); };
-    trackMode_.setConnectedEdges(juce::Button::ConnectedOnRight);
-    mixMode_.setConnectedEdges(juce::Button::ConnectedOnLeft);
-    for (auto* b : { &trackMode_, &mixMode_ }) {
-        b->setColour(juce::TextButton::buttonOnColourId, kAccent.withAlpha(0.5f));
-        body_.addAndMakeVisible(b);
-    }
+    frame::connectModes({ &trackMode_, &mixMode_ }, kAccent.withAlpha(0.42f));
+    for (auto* b : { &trackMode_, &mixMode_ }) body_.addAndMakeVisible(b);
     length_.setSliderStyle(juce::Slider::LinearHorizontal);
     length_.setTextBoxStyle(juce::Slider::TextBoxRight, false, 62, 20);
     length_.onValueChange = [this] {
@@ -990,6 +1037,8 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
         proc_.setFromUi(lengthOfMix_ ? st.id(Module::Set, 0, set::Minutes) : st.id(Module::Compose, 0, compose::Minutes),
                         static_cast<float>(length_.getValue()));
     };
+    length_.onDragStart = [this] { proc_.beginStep("Length"); };   // a drag is one step, not one per pixel
+    length_.onDragEnd = [this] { proc_.endStep(); };
     lengthLabel_.setText("Length", juce::dontSendNotification);
     lengthLabel_.setColour(juce::Label::textColourId, kDim);
     lengthLabel_.setJustificationType(juce::Justification::centredRight);
@@ -1000,6 +1049,9 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
     compose_.onClick = [this] { proc_.compose(); };
     seed_.onClick = [this] { proc_.newSeed(); };
     play_.onClick = [this] { proc_.setPlaying(!proc_.isPlaying()); };
+    compose_.setTooltip("Compose with the knobs as they stand, the seed and the rerolls");
+    seed_.setTooltip("A new seed: another track (or mix) from the same settings");
+    play_.setTooltip("Play and stop (Space)");
     for (auto* b : { &compose_, &seed_, &play_ }) body_.addAndMakeVisible(b);
     // Mute, as in Phosphene: silence at the output; PARH_MUTE (or the screenshot mode) holds it on.
     mute_.setClickingTogglesState(true);
@@ -1009,29 +1061,32 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
     mute_.setTooltip(proc_.muteForced() ? "Muted by PARH_MUTE: an automated run makes no sound" : "Silence the output");
     mute_.onClick = [this] { proc_.setMuted(mute_.getToggleState()); };
     body_.addAndMakeVisible(mute_);
-    play_.setColour(juce::TextButton::buttonColourId, kAccent.withAlpha(0.22f));
-    compose_.setColour(juce::TextButton::buttonColourId, kAccent.withAlpha(0.14f));
-    // The update check: once a day it asks GitHub for the latest release (nothing else is sent); a newer one shows here.
-    checkUpdates_.setToggleState(updates_->enabled(), juce::dontSendNotification);
-    checkUpdates_.setTooltip("Once a day, ask GitHub whether a newer Parhelion is out (nothing else is sent, nothing is downloaded)");
-    checkUpdates_.onClick = [this] { updates_->setEnabled(checkUpdates_.getToggleState()); };
-    body_.addAndMakeVisible(checkUpdates_);
+    play_.setColour(juce::TextButton::buttonColourId, kAccent.withAlpha(0.2f));
+    compose_.setColour(juce::TextButton::buttonColourId, kAccent.withAlpha(0.12f));
+    // The update check (the settings switch it): once a day it asks GitHub for the latest release; a newer one shows here.
     update_.setColour(juce::HyperlinkButton::textColourId, kAccent);
     update_.setTooltip("Open the release page");
     body_.addChildComponent(update_);
-    full_.setTooltip("Full screen (F11; Esc leaves it)");
-    full_.onClick = [this] { toggleFullScreen(); };
-    body_.addChildComponent(full_);
-    setWantsKeyboardFocus(true);
+    // The tools at the right end of the second row: undo, redo, help, settings -- and the headset, while one sends.
+    undo_.onClick = [this] { proc_.undo(); };
+    redo_.onClick = [this] { proc_.redo(); };
+    help_.onClick = [this] { showHelp(helpView_ == nullptr || !helpView_->isVisible()); };
+    settings_.onClick = [this] { showSettings(); };
+    headsetIcon_.onClick = [this] {
+        for (int i = 0; i < tabs_.getNumTabs(); ++i)
+            if (tabs_.getTabNames()[i] == "Perform") tabs_.setCurrentTabIndex(i);
+    };
+    for (auto* b : { &undo_, &redo_, &help_, &settings_ }) body_.addAndMakeVisible(b);
+    body_.addChildComponent(headsetIcon_);
     // Phase 17: rate the track under the playhead; with Favor Ratings (the Set page) the ratings weigh what comes.
-    like_.setTooltip("I like this track: its kind and its sounds come more often (with Favor Ratings)");
-    dislike_.setTooltip("Not this one: its kind and its sounds come less often (with Favor Ratings)");
     like_.onClick = [this] { rated_ = proc_.rate(1); ratedTicks_ = 60; };
     dislike_.onClick = [this] { rated_ = proc_.rate(-1); ratedTicks_ = 60; };
     body_.addAndMakeVisible(like_);
     body_.addAndMakeVisible(dislike_);
     rerolls_.setColour(juce::Label::textColourId, kDim);
+    rerolls_.setJustificationType(juce::Justification::centredRight);
     status_.setColour(juce::Label::textColourId, kInk);
+    status_.setMinimumHorizontalScale(0.8f);
     body_.addAndMakeVisible(rerolls_);
     body_.addAndMakeVisible(status_);
 
@@ -1058,7 +1113,10 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
     tabs_.addTab("Perform", kPanel, new PerformPage(proc_), true);
     tabs_.addTab("Export", kPanel, new ExportPage(proc_), true);
     tabs_.addTab("Style", kPanel, new StylePage(proc_), true);
+    tabs_.setOutline(0);
     body_.addAndMakeVisible(tabs_);
+    frame::keepKeysForEditor(body_);
+    setWantsKeyboardFocus(true);
 
     setResizable(true, true);
     setResizeLimits(800, 520, 4800, 3100);
@@ -1075,6 +1133,15 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
             const juce::String sz(size);
             setSize(sz.upToFirstOccurrenceOf("x", false, false).getIntValue(), sz.fromFirstOccurrenceOf("x", false, false).getIntValue());
         }
+        if (std::getenv("PARH_SHOT_HELP") != nullptr) showHelp(true);
+        if (std::getenv("PARH_SHOT_HEADSET") != nullptr) {   // the headset's controls in the pictures: hands as if one sent them
+            frame::Hands hands;
+            hands.height[0] = 0.62f;
+            hands.height[1] = 0.8f;
+            hands.tracked[0] = hands.tracked[1] = true;
+            proc_.headset().inject(hands);
+            shotHands_ = true;
+        }
     }
     startTimerHz(15);
 }
@@ -1082,6 +1149,7 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
 ParhelionEditor::~ParhelionEditor()
 {
     stopTimer();
+    frame::Settings::of("Parhelion").removeChangeListener(this);
     setLookAndFeel(nullptr);
 }
 
@@ -1105,31 +1173,96 @@ void ParhelionEditor::parentHierarchyChanged()
         if (window != nullptr)
             window->setTitleBarButtonsRequired(juce::DocumentWindow::minimiseButton | juce::DocumentWindow::maximiseButton
                                                    | juce::DocumentWindow::closeButton, false);
-        safe->full_.setVisible(window != nullptr);
         safe->layoutBody();
     });
+}
+
+bool ParhelionEditor::standalone() const { return findParentComponentOfClass<juce::DocumentWindow>() != nullptr; }
+
+bool ParhelionEditor::fullScreen() const
+{
+    auto* window = findParentComponentOfClass<juce::DocumentWindow>();
+    return window != nullptr && juce::Desktop::getInstance().getKioskModeComponent() == window;
 }
 
 void ParhelionEditor::toggleFullScreen()
 {
     auto* window = findParentComponentOfClass<juce::DocumentWindow>();
     if (window == nullptr) return;
-    auto& desktop = juce::Desktop::getInstance();
-    const bool on = desktop.getKioskModeComponent() != window;
-    desktop.setKioskModeComponent(on ? window : nullptr, false);
-    full_.setToggleState(on, juce::dontSendNotification);
+    juce::Desktop::getInstance().setKioskModeComponent(fullScreen() ? nullptr : window, false);
     grabKeyboardFocus();
+}
+
+ExportPage* ParhelionEditor::exportPage() const
+{
+    for (int i = 0; i < tabs_.getNumTabs(); ++i)
+        if (auto* e = dynamic_cast<ExportPage*>(tabs_.getTabContentComponent(i))) return e;
+    return nullptr;
 }
 
 bool ParhelionEditor::keyPressed(const juce::KeyPress& key)
 {
-    if (key.getKeyCode() == juce::KeyPress::F11Key) { toggleFullScreen(); return true; }
-    if (key.getKeyCode() == juce::KeyPress::escapeKey && juce::Desktop::getInstance().getKioskModeComponent() != nullptr) {
-        toggleFullScreen();
-        return true;
+    frame::Keys k;
+    if (standalone()) {   // in a host, Space and F11 are the host's
+        k.playStop = [this] { proc_.setPlaying(!proc_.isPlaying()); };
+        k.fullScreen = [this] { toggleFullScreen(); };
     }
-    return false;
+    k.undo = [this] { proc_.undo(); };
+    k.redo = [this] { proc_.redo(); };
+    k.help = [this] { showHelp(helpView_ == nullptr || !helpView_->isVisible()); };
+    k.escape = [this] {
+        if (helpView_ != nullptr && helpView_->isVisible()) showHelp(false);
+        else if (fullScreen()) toggleFullScreen();
+    };
+    k.save = [this] { if (auto* e = exportPage()) e->save(); };
+    k.open = [this] { if (auto* e = exportPage()) e->load(); };
+    k.exportFile = [this] { if (auto* e = exportPage()) e->exportWith(0); };
+    return frame::handleKey(key, k);
 }
+
+void ParhelionEditor::showHelp(bool on)
+{
+    if (on && helpView_ == nullptr) {
+        helpView_ = std::make_unique<frame::HelpView>(juce::String::fromUTF8(ParhelionData::chapters_txt, ParhelionData::chapters_txtSize), parhui::skin());
+        helpView_->onClose = [this] { showHelp(false); };
+        helpView_->extraTopics = [this] {
+            std::vector<std::pair<juce::String, juce::String>> t;
+            if (auto* sp = dynamic_cast<ScrollingPage*>(tabs_.getCurrentContentComponent()))
+                t.emplace_back("This tab: " + tabs_.getCurrentTabName(), sp->page().describe());
+            t.emplace_back("Keys", frame::keysText());
+            t.emplace_back("Headset (Meta Quest)", frame::headsetGrammar("the kick out and in", "Breakdown now (in a breakdown, a break or a build: Drop now)") + "\n\n" + proc_.headset().statusText());
+            return t;
+        };
+        body_.addChildComponent(*helpView_);
+    }
+    help_.setToggleState(on, juce::dontSendNotification);
+    if (helpView_ == nullptr) return;
+    if (on) helpView_->refresh();
+    helpView_->setVisible(on);
+    layoutBody();
+    if (on) helpView_->grabKeyboardFocus();
+    else grabKeyboardFocus();
+}
+
+void ParhelionEditor::showSettings()
+{
+    frame::SettingsMenu m;
+    m.app = "Parhelion";
+    m.version = JucePlugin_VersionString;
+    m.updatesOn = [this] { return updates_->enabled(); };
+    m.setUpdates = [this](bool on) { updates_->setEnabled(on); };
+    m.canFullScreen = [this] { return standalone(); };
+    m.isFullScreen = [this] { return fullScreen(); };
+    m.toggleFullScreen = [this] { toggleFullScreen(); };
+    m.setWindowScale = [this](float k) {
+        if (!fullScreen()) setSize(juce::roundToInt(1180.0f * k), juce::roundToInt(760.0f * k));
+    };
+    m.headsetStatus = [this] { return proc_.headset().statusText(); };
+    m.about = [] { return juce::String("Trance -- uplifting, progressive, dream, acid, deep -- composed and synthesised.\ngithub.com/reneweller-coding/Parhelion"); };
+    m.show(settings_);
+}
+
+void ParhelionEditor::changeListenerCallback(juce::ChangeBroadcaster*) { body_.repaint(); }
 
 void ParhelionEditor::showLength(bool mix)
 {
@@ -1156,51 +1289,60 @@ void ParhelionEditor::showLength(bool mix)
 void ParhelionEditor::layoutBody()
 {
     auto area = body_.getLocalBounds().reduced(10);
-    auto top = area.removeFromTop(34);
-    mute_.setBounds(top.removeFromRight(proc_.muteForced() && shotPath_.isEmpty() ? 100 : 70).reduced(3));
-    play_.setBounds(top.removeFromRight(76).reduced(3));
-    seed_.setBounds(top.removeFromRight(90).reduced(3));
-    compose_.setBounds(top.removeFromRight(118).reduced(3));
-    top.removeFromRight(6);
-    logo_ = top.removeFromLeft(34).toFloat().reduced(2.0f);
-    title_.setBounds(top.removeFromLeft(112));
-    style_.setBounds(top.removeFromLeft(120).reduced(3));
-    key_.setBounds(top.removeFromLeft(64).reduced(3));
-    scale_.setBounds(top.removeFromLeft(120).reduced(3));
-    top.removeFromLeft(10);
-    trackMode_.setBounds(top.removeFromLeft(66).reduced(0, 3));
-    mixMode_.setBounds(top.removeFromLeft(74).reduced(0, 3));
-    top.removeFromLeft(4);
-    lengthLabel_.setBounds(top.removeFromLeft(52));
-    length_.setBounds(top.withWidth(std::min(top.getWidth(), 220)).reduced(2));
-    area.removeFromTop(4);
-    auto third = area.removeFromTop(20);
-    if (full_.isVisible()) full_.setBounds(third.removeFromRight(100));
-    checkUpdates_.setBounds(third.removeFromRight(120));
-    update_.setBounds(third.removeFromRight(190));
-    like_.setBounds(third.removeFromLeft(26).reduced(1));
-    dislike_.setBounds(third.removeFromLeft(26).reduced(1));
-    third.removeFromLeft(6);
-    status_.setBounds(third.removeFromLeft(third.getWidth() * 3 / 5));
-    rerolls_.setBounds(third);
-    area.removeFromTop(4);
+    frame::Header h;
+    h.logo = &logo_;
+    h.title = &title_;
+    h.titleWidth = static_cast<int>(frame::titleWidth(parhui::skin(), 21.0f)) + 12;
+    h.choices = { { &style_, 116 }, { &key_, 62 }, { &scale_, 116 } };
+    h.modes = { { &trackMode_, 64 }, { &mixMode_, 72 } };
+    h.lengthLabel = &lengthLabel_;
+    h.length = &length_;
+    h.actions = { { &compose_, 116 }, { &seed_, 88 } };
+    h.play = &play_;
+    h.mute = &mute_;
+    h.like = &like_;
+    h.dislike = &dislike_;
+    h.status = &status_;
+    h.curation = &rerolls_;
+    h.update = &update_;
+    h.tools = { &headsetIcon_, nullptr, &undo_, &redo_, nullptr, &help_, &settings_ };
+    frame::layoutHeader(area, h);
+    headerBottom_ = area.getY();
     arrange_.setBounds(area.removeFromTop(96));
     area.removeFromTop(8);
     tabs_.setBounds(area);
+    if (helpView_ != nullptr) helpView_->setBounds(area);
 }
 
 void ParhelionEditor::timerCallback()
 {
     if (ratedTicks_ > 0) --ratedTicks_;
+    if (shotHands_) proc_.headset().inject(proc_.headset().hands());
     status_.setText(ratedTicks_ > 0 && rated_.isNotEmpty() ? rated_ : proc_.status(), juce::dontSendNotification);
     rerolls_.setText(proc_.curationText(), juce::dontSendNotification);
     {
-        const juce::String v = checkUpdates_.getToggleState() ? updates_->newer() : juce::String();
+        const juce::String v = updates_->enabled() ? updates_->newer() : juce::String();
         if (v.isNotEmpty() && update_.getButtonText() != "Version " + v + " available") {
             update_.setButtonText("Version " + v + " available");
             update_.setURL(juce::URL(updates_->page()));
         }
-        update_.setVisible(v.isNotEmpty());
+        if (update_.isVisible() != v.isNotEmpty()) {
+            update_.setVisible(v.isNotEmpty());
+            layoutBody();
+        }
+    }
+    // Undo and redo say what they would take back; the headset's sign shows while one is there (or always, if asked).
+    {
+        const juce::String u = proc_.undoName(), r = proc_.redoName();
+        undo_.setEnabled(u.isNotEmpty());
+        redo_.setEnabled(r.isNotEmpty());
+        undo_.setTooltip(u.isEmpty() ? juce::String("Undo (Ctrl+Z)") : "Undo: " + u + " (Ctrl+Z)");
+        redo_.setTooltip(r.isEmpty() ? juce::String("Redo (Ctrl+Y)") : "Redo: " + r + " (Ctrl+Y)");
+        const bool hs = proc_.headset().shown(frame::Settings::of("Parhelion").headset());
+        if (headsetIcon_.isVisible() != hs) {
+            headsetIcon_.setVisible(hs);
+            layoutBody();
+        }
     }
     play_.setButtonText(proc_.isPlaying() ? "Stop" : "Play");
     // The choice and its length as the parameters have them (the Set page and a host move them too); Compose names
@@ -1217,7 +1359,7 @@ void ParhelionEditor::timerCallback()
             length_.setValue(v, juce::dontSendNotification);
         }
         compose_.setButtonText(mix ? "Compose mix" : "Compose track");
-        const juce::Colour c = kAccent.withAlpha(mix != proc_.playingMix() && !proc_.isComposing() ? 0.45f : 0.14f);
+        const juce::Colour c = kAccent.withAlpha(mix != proc_.playingMix() && !proc_.isComposing() ? 0.42f : 0.12f);
         if (compose_.findColour(juce::TextButton::buttonColourId) != c) compose_.setColour(juce::TextButton::buttonColourId, c);
     }
     const bool shown = proc_.muted() && shotPath_.isEmpty();

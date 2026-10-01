@@ -60,6 +60,53 @@ harmony, the motif, the lead, the bass, the 303, the arp, the pluck, the piano, 
 the sounds. In a set the rerolls act on the track under the playhead, and "reroll the whole track" or "reroll the
 mix's plan" draw more at once (the Arrange page).
 
+== The panel | | - ==
+
+Parhelion shares its panel with the other generators of the family -- Phosphene, Ephemeris and Totality (and, in part, Noctuary) -- so that what is learned on one holds
+on the others: the same places, the same keys, the same controllers, the same hands. Each keeps its own colours, its
+own letters and the picture behind its panel (Settings > Picture behind the panel takes it away).
+
+The header's first row: the logo, the style, the key and the scale, what is composed and its length, Compose, New
+seed, Play and Mute. Its second row: the thumbs -- a verdict on what plays, for the curation --, the status line, and at the right Undo, Redo, Help and the settings.
+Under the header the whole track or set at a glance; a click jumps there. The tabs come in one order everywhere: Set,
+Arrange, the instrument's own pages -- a page of several has small tabs of its own --, Mixer, Perform, Export, Style.
+
+A colour says what a control does, the same on every page and in every generator of the family: the sources, the
+filters, the envelopes, what moves by itself, the room and the mix. A knob the composer moves has a thin ring round
+it that shows where it stands at this moment. A double click sets a control to its default; a right click offers
+MIDI learn, forgetting the controller, and the default.
+
+Undo and Redo take back and bring back what was changed -- a knob, a new seed, a reroll, a preset, a loaded set --
+one step at a time; the button's tooltip names the step. Help opens this manual by topic, with the page in front, the
+keys and the headset as topics of their own. The settings hold the update check (it asks GitHub once a day whether a
+newer Parhelion is out; nothing else is sent), the picture behind the panel, the headset, the window's size, full
+screen, the keys and About.
+
+    Space                 play / stop
+    Ctrl+Z                undo
+    Ctrl+Y, Ctrl+Shift+Z  redo
+    F1                    help
+    F11                   full screen (the standalone); Esc leaves it and closes the help
+    Ctrl+S, Ctrl+O        save the set, open one
+    Ctrl+E                export
+
+The controllers every generator of the family listens to without learning: controller 74 (brightness) moves the master filter, 11 (the expression pedal) the echo throw; the mod wheel drives the voices' modulation and channel pressure their pressure (Perform).
+
+The headset. The controls of a Meta Quest's hands are shown only while a headset sends them -- or always, if the
+settings say so (Headset > Always show them); Off stops listening. The Quest app sends its hands to this computer in
+bridge mode: bridge_host = this computer's address in its parh.cfg (audio=0 leaves the headset silent), and Parhelion
+listens on port 9104. The hands mean the same in every generator of the family, on the headset alone and here:
+
+    left pinch            play / stop
+    both hands pinched    the next track (or set)
+    right pinch           kick out / kick in
+    right pinch held      Breakdown now, or Drop now in a breakdown, a break or a build
+    left hand up, down    the master filter: low pass below the middle, high pass above
+    right hand up         the echo throw
+
+A pinch acts when it opens again, so a pinch of both hands is never also one of each; a hand moves its control only
+while it does not pinch, and both glide and are centred: a hand at mid height plays what was composed.
+
 == The track and the set | compose set djfx | 0 ==
 
 A track has one of five forms, and each style draws its own. The Anthem is Uplifting's: intro, groove, a short break
@@ -256,6 +303,11 @@ The composer draws the hall long in a breakdown and short in a drop.
 
 == Mixer and Master | master deck | 8 ==
 
+The Mixer tab has three pages. Console: a channel strip per part -- the kick, the bass, the drums, every synth, the
+keys, the orchestra, the effects -- with its level, its mute, its sound and its meter, and the output with its
+loudness at the end (a narrow window scrolls the console sideways). Buses and Master: the parameters below. Decks: the
+DJ mixer's channels.
+
 The meters: each deck after its mixer channel, the output, and the loudness of the last 400 ms. Under them the mix
 buses (the Drums chapter), the pump (the Low End chapter) and the master: the glue compressor, a tilt of the highs
 against the lows, the side under Mono Below made mono, the level, a clipper at four times the rate and a true-peak
@@ -280,7 +332,8 @@ the first: the track is rewritten from both lines. A set is not rewritten -- its
 Every control can be learned from a MIDI controller: click learn, move the controller (a right click forgets it). By
 default controller 74 moves the filter, controller 11 the throw and the mod wheel the wheel; channel pressure is the
 matrices' pressure; the keys from middle C up (C to F#) toggle the seven mutes. The bindings are saved with the
-project.
+project. Controllers 74 and 11 are the same in every generator of the family; while a headset sends its hands, a box
+beside the mutes shows what they do (The panel).
 
 The perform controls are live only: an export or parh_render plays the track as it was composed.
 
@@ -319,10 +372,13 @@ drop, the spectral centroid and the width above 200 Hz.
 The whole generator runs on the headset (build-quest\ParhelionQuest.apk, see Quest/README.md). The hands are the hands
 at the mixer: left pinch play and stop, right pinch kick out and in, the right pinch held Breakdown now or Drop now
 (handed over on a beat, without a gap: a second engine takes over from the first), both hands together the next track;
-the left hand's height the master filter, the right's the echo throw. Above and ahead of the player the parhelion hangs
+the left hand's height the master filter, the right's the echo throw -- the grammar of every generator's headset (The
+panel). Above and ahead of the player the parhelion hangs
 in the sky at the size of a room: the sun swells with the kick, the halo is the bar with the parts' notes on it, the sun
 dogs burn with the track's energy, and the line through them is the track with its sections. A file parh.cfg in the
-app's folder sets the seed, the style, a set's length and any knob. The headset's quality plays fewer unison
+app's folder sets the seed, the style, a set's length and any knob; bridge_host (and bridge_port, 9104) send the
+hands to Parhelion on a computer instead, which then plays with them as with its own; audio=0 leaves the headset
+silent. The headset's quality plays fewer unison
 oscillators, voices and players and solves the filter models more lightly.
 
 == The command line | | - ==

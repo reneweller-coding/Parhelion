@@ -1,5 +1,33 @@
 # Parhelion release notes
 
+## Next: the family's panel (01.10.2026, not yet released)
+
+**One panel for the family.** Totality, Parhelion, Ephemeris and Phosphene share their panel now (Plugin/Frame.h,
+the same file in each, and Noctuary its right-hand tools): the header's two rows -- the logo, the style, the key and
+the scale, track or mix and its length, Compose, New seed, Play, Mute; the thumbs, the status, Undo, Redo, Help and the
+settings --, the overview under it, the tabs in one order (Set, Arrange, the instrument's own pages, Mixer, Perform,
+Export, Style), the same keys (Space, Ctrl+Z / Ctrl+Y, F1, F11, Esc, Ctrl+S / Ctrl+O / Ctrl+E) and the same right
+click on every control (MIDI learn, forget, the default). Each keeps its own colours and letters and has a picture
+behind its panel, generated for it and kept low in contrast (Settings > Picture behind the panel takes it away).
+
+**Undo and Redo** of every change -- a knob, a new seed, a reroll, a preset, a loaded set --, step by step, the step
+named in the tooltip. **Help** (F1): this manual inside the plugin, by topic, with the page in front, the keys and the
+headset as topics of their own (a new chapter, The panel). **Settings**: the update check, the picture, the headset,
+the window's size, full screen, the keys, About.
+
+**A live ring** round every knob the composer moves shows where it stands at this moment.
+
+**The mixer as a console.** The Mixer tab's first page is a channel strip per part -- level, mute, sound and meter --
+and the output with its loudness; the buses and the master, and the decks, are pages of their own.
+
+**The headset only when there is one.** The controls of a Meta Quest's hands are shown only while a headset sends them,
+or when the settings say Always. The Quest app sends its hands to the plugin in bridge mode (bridge_host in parh.cfg,
+port 9104) and the plugin plays with them in the grammar every generator's headset shares: left pinch play / stop,
+both hands the next track, right pinch kick out / in, held Breakdown now or Drop now, the left hand the master filter, the right the echo throw. audio=0
+leaves the headset silent.
+
+**Fixed.** The console's strip names no longer point into a freed list.
+
 ## 1.0.1 (01.10.2026)
 
 **A track or a DJ mix.** The top bar chooses between a single Track and a DJ mix with two buttons and one Length beside

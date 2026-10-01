@@ -27,6 +27,14 @@
  * **Cues** (PLAN 10.3, Cue.h): with cue.enabled the beats, bars, blocks, operations and keys go out as OSC over UDP to
  * `PARH_CUE_HOST` (default this machine) at cue.port, each at the moment it is heard.
  *
+ * **Undo** (01.10.2026, the frame): a knob turned on the panel, a preset, a new seed, a reroll, a loaded set or a choice of
+ * track or mix is a step (frame::UndoHistory); a step holds only what it changed, so taking it back never takes back the
+ * sounds the engine wrote on the knobs since. Knobs moved from MIDI or by a host's automation are not steps.
+ *
+ * **The headset** (01.10.2026, the frame): the hands of the Quest app in bridge mode arrive as OSC (frame::Headset) while
+ * the settings do not say Off: left pinch play and stop, both hands the next track, right pinch the kick out and in, the
+ * left hand's height the master filter, the right hand's the echo throw.
+ *
  * **Mute** (after Phosphene). The output can be muted: silence at the very end of processBlock, after the meters and the
  * test recording have read the block. `PARH_MUTE=1` -- and the screenshot mode `PARH_SHOT` -- start the plugin muted, and
  * then it never unmutes itself: an automated run makes no sound.
@@ -39,6 +47,7 @@
 #include "parh/SetFile.h"
 #include "parh/compose/Composer.h"
 #include "parh/compose/Set.h"
+#include "Frame.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <array>
@@ -90,7 +99,8 @@ struct Playing {
 };
 
 /** @brief The Parhelion processor. */
-class ParhelionProcessor final : public juce::AudioProcessor, private juce::Thread, private juce::Timer {
+class ParhelionProcessor final : public juce::AudioProcessor, private juce::Thread, private juce::Timer,
+                                private juce::AudioProcessorParameter::Listener {
 public:
     ParhelionProcessor();                                ///< registers every parameter and composes a first track
     ~ParhelionProcessor() override;                      ///< stops the composer and the exporter
@@ -189,12 +199,35 @@ public:
      *        output's peak, and its loudness over the last 400 ms (K-weighted, BS.1770), -70 in silence.
      */
     void takeMeters(float* deckPeak, float* deckRms, float& outPeak, float& momentaryLufs);
+    /**
+     * @brief The mixer's strips since the last call (message thread, the Mixer page): per parh::Deck::Stem the loudest
+     *        sample and the RMS, both decks together.
+     */
+    void takeStripMeters(float* peak, float* rms);
 
     // Muting.
     bool muted() const { return mute_.load(std::memory_order_relaxed); }   ///< the output is silenced
     /** @brief Mutes or unmutes; does nothing while `PARH_MUTE` forces it. */
     void setMuted(bool on) { if (!forceMute_) mute_.store(on, std::memory_order_relaxed); }
     bool muteForced() const { return forceMute_; }   ///< `PARH_MUTE` (or `PARH_SHOT`) was set: the switch is stuck on
+
+    // Undo (the frame).
+    bool undo();                                     ///< takes the last step back; false if there was none
+    bool redo();                                     ///< makes the last undone step again
+    juce::String undoName() const { return history_.undoName(); }   ///< what undo takes back (empty: nothing)
+    juce::String redoName() const { return history_.redoName(); }   ///< what redo makes again
+    /** @brief Opens a step of several knobs (a preset, a reset): they are undone together. Close with endStep. */
+    void beginStep(const juce::String& what);
+    void endStep();                                  ///< closes beginStep's step
+    /** @brief Store id @p id back to its default (one step). */
+    void resetToDefault(int id);
+
+    // The panel's live rings.
+    /** @brief The value store id @p id plays at the moment, normalised -- NaN where it is the knob's own. */
+    float playedNormalised(int id) const;
+
+    // The headset (the frame).
+    frame::Headset& headset() { return headset_; }   ///< the hands arriving from the Quest app
 
     // Performing.
     /** @brief Binds the next MIDI controller that arrives to store id @p id; -1 cancels. */
@@ -232,6 +265,13 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;   ///< restores them and composes
 
 private:
+    void parameterValueChanged(int, float) override {}
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;   ///< a knob on the panel: a step
+    std::vector<float> values() const;               ///< every store value (undo)
+    juce::String extraState() const;                 ///< seed, rerolls and the mix's length as text (undo)
+    void applyExtra(const juce::String& text);       ///< the inverse; composes if seed or rerolls changed
+    void applyStep(const frame::UndoStep& s, bool after);
+    void pollHeadset();                              ///< the hands' events, 30 times a second (message thread)
     void run() override;                             // the composer thread
     void timerCallback() override;                   // loads a finished score on the message thread
     /** @brief Composes with the knobs as they are (copied into @p snapshot). */
@@ -298,5 +338,11 @@ private:
     bool forceMute_ = false;                         ///< muteForced()
     std::atomic<double> hostBpm_{ 0.0 };             ///< the host's tempo as the audio thread last saw it, 0 outside a host
     std::atomic<double> playedBpm_{ 0.0 };           ///< the tempo the engine's score was loaded with, 0 as composed
+    parh::MeterSink meterSink_;                      ///< the strips' levels, added by the decks (the Mixer page)
+    std::atomic<int64_t> stripSamples_{ 0 };         ///< samples rendered since takeStripMeters
+    frame::UndoHistory history_;                     ///< undo and redo (message thread)
+    bool restoring_ = false;                         ///< an undo or the headset moves knobs: no step of their own
+    frame::Headset headset_;                         ///< the Quest's hands (message thread)
+    juce::TimedCallback headsetTick_{ [this] { pollHeadset(); } };
     uint32_t toldSounds_ = 0;                        ///< the engine's soundsVersion() the host was last told of
 };

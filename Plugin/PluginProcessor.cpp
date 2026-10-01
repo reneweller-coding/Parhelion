@@ -11,8 +11,10 @@
 #include "parh/Presets.h"
 #include "parh/WavWriter.h"
 #include <algorithm>
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 
 using namespace parh;
 
@@ -106,6 +108,7 @@ ParhelionProcessor::ParhelionProcessor()
         auto* p = new StoreParameter(s, id, juce::String(s.key(id)).replaceCharacter('.', ' ') + " (" + s.desc(id).name + ")");
         params_.push_back(p);
         addParameter(p);
+        p->addListener(this);   // undo: the panel's gestures (parameterGestureChanged)
     }
     engine_.setLive(true);   // the performer's controls act, the mixer is in a track's path (Engine.h)
     seed_ = static_cast<uint64_t>(juce::Time::currentTimeMillis() % 100000);
@@ -124,11 +127,13 @@ ParhelionProcessor::ParhelionProcessor()
     // Phase 17: the player's ratings, if any.
     ratings_ = loadRatings(ratingsFile().getFullPathName().toStdString());
     startTimerHz(10);
+    headsetTick_.startTimerHz(30);
     compose();
 }
 
 ParhelionProcessor::~ParhelionProcessor()
 {
+    headsetTick_.stopTimer();
     stopTimer();
     newer_ = true;
     stopThread(10000);
@@ -225,20 +230,24 @@ void ParhelionProcessor::compose()
 
 void ParhelionProcessor::newSeed()
 {
+    beginStep("New seed");
     {
         std::lock_guard<std::mutex> g(lock_);
         seed_ = static_cast<uint64_t>(juce::Random::getSystemRandom().nextInt64() & 0xFFFFFF);
         curation_ = Curation{};
     }
+    endStep();
     compose();
 }
 
 void ParhelionProcessor::reroll(const juce::String& unit)
 {
+    beginStep("reroll " + unit);
     {
         std::lock_guard<std::mutex> g(lock_);
         curation_.reroll(unit.toStdString());
     }
+    endStep();
     compose();
 }
 
@@ -248,8 +257,10 @@ void ParhelionProcessor::chooseMix(bool mix)
 {
     const int id = store().id(Module::Set, 0, set::Minutes);
     const bool was = mixChosen();
+    beginStep(mix ? "DJ mix" : "Track");
     if (was && !mix) mixMinutes_ = store().get(id);
     if (was != mix) setFromUi(id, mix ? std::max(10.0f, mixMinutes_) : 0.0f);
+    endStep();
     if (was != mix || playingMix() != mix) compose();
 }
 
@@ -296,6 +307,8 @@ void ParhelionProcessor::applyPreset(Module m, int instance, int index)
 {
     const std::vector<SoundPreset>& list = factoryPresets(m, instance);
     if (index < 0 || index >= static_cast<int>(list.size())) return;
+    beginStep(juce::String("preset ") + list[static_cast<size_t>(index)].name);
+    const juce::ScopedValueSetter<bool> one(restoring_, true);   // the knobs' gestures join the step, not steps of their own
     for (const auto& [k, v] : presetKnobs(m, instance, list[static_cast<size_t>(index)])) {
         const int id = store().id(m, instance, k);
         StoreParameter* p = parameter(id);
@@ -304,6 +317,8 @@ void ParhelionProcessor::applyPreset(Module m, int instance, int index)
         p->setValueNotifyingHost(store().toNormalised(id, v));
         p->endChangeGesture();
     }
+    restoring_ = false;
+    endStep();
 }
 
 juce::File ParhelionProcessor::userPresetFolder(Module m, int instance) const
@@ -341,15 +356,20 @@ juce::File ParhelionProcessor::saveUserPreset(Module m, int instance, const juce
 bool ParhelionProcessor::applyUserPreset(Module m, int instance, const juce::File& file)
 {
     if (!file.existsAsFile()) return false;
-    // The whole sound, as a factory preset has it: its knobs, the defaults for the rest it would set.
-    for (const auto& [k, v] : userPresetKnobs(store(), m, instance, file.loadFileAsString().toStdString())) {
-        const int id = store().id(m, instance, k);
-        StoreParameter* p = parameter(id);
-        if (p == nullptr) continue;
-        p->beginChangeGesture();
-        p->setValueNotifyingHost(store().toNormalised(id, v));
-        p->endChangeGesture();
+    beginStep("preset " + file.getFileNameWithoutExtension());
+    {
+        const juce::ScopedValueSetter<bool> one(restoring_, true);   // one step, not one per knob
+        // The whole sound, as a factory preset has it: its knobs, the defaults for the rest it would set.
+        for (const auto& [k, v] : userPresetKnobs(store(), m, instance, file.loadFileAsString().toStdString())) {
+            const int id = store().id(m, instance, k);
+            StoreParameter* p = parameter(id);
+            if (p == nullptr) continue;
+            p->beginChangeGesture();
+            p->setValueNotifyingHost(store().toNormalised(id, v));
+            p->endChangeGesture();
+        }
     }
+    endStep();
     return true;
 }
 
@@ -426,6 +446,7 @@ void ParhelionProcessor::loadEngine(const Playing& p)
 {
     const SetScore s = forPlayback(p);
     engine_.prepare(sampleRate_, blockSize_);
+    engine_.setMeterSink(&meterSink_);   // the Mixer page's strips (a handful of sums per sample)
     if (p.isSet) engine_.loadSet(s);
     else engine_.load(s.decks[0]);
     std::lock_guard<std::mutex> g(lock_);
@@ -522,6 +543,15 @@ void ParhelionProcessor::timerCallback()
     takeTrims();
 }
 
+void ParhelionProcessor::takeStripMeters(float* peak, float* rms)
+{
+    const double n = static_cast<double>(std::max<int64_t>(1, stripSamples_.exchange(0, std::memory_order_relaxed)));
+    for (int s = 0; s < MeterSink::kStrips; ++s) {
+        peak[s] = meterSink_.peak[s].exchange(0.0f, std::memory_order_relaxed);
+        rms[s] = static_cast<float>(std::sqrt(meterSink_.sum[s].exchange(0.0, std::memory_order_relaxed) / n));
+    }
+}
+
 void ParhelionProcessor::takeMeters(float* deckPeak, float* deckRms, float& outPeak, float& momentaryLufs)
 {
     const int n = meterCount_.exchange(0, std::memory_order_acquire);
@@ -613,6 +643,7 @@ void ParhelionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     }
     const double before = engine_.beat();
     engine_.process(buffer.getWritePointer(0), buffer.getWritePointer(1), n);
+    stripSamples_.fetch_add(n, std::memory_order_relaxed);
     position_ = engine_.beat();
     if (cues_.running()) {
         // The cues of this block, stamped with the moment it is heard (Cue.h); a jump starts the marks again.
@@ -678,7 +709,8 @@ bool ParhelionProcessor::loadSet(const juce::File& file)
 {
     SetFile sf;
     std::string err;
-    if (!parh::loadSet(file.getFullPathName().toRawUTF8(), sf, store(), &err)) return false;
+    beginStep("load " + file.getFileName());
+    if (!parh::loadSet(file.getFullPathName().toRawUTF8(), sf, store(), &err)) { endStep(); return false; }
     {
         std::lock_guard<std::mutex> g(lock_);
         seed_ = sf.seed;
@@ -688,6 +720,7 @@ bool ParhelionProcessor::loadSet(const juce::File& file)
     store().set(store().id(Module::Set, 0, set::Minutes), static_cast<float>(sf.set));
     for (int id = 0; id < store().count(); ++id)
         if (StoreParameter* p = parameter(id)) p->sendValueChangedMessageToListeners(p->getValue());
+    endStep();
     compose();
     return true;
 }
@@ -956,7 +989,148 @@ void ParhelionProcessor::setStateInformation(const void* data, int sizeInBytes)
         for (const auto& item : juce::StringArray::fromTokens(xml->getStringAttribute("rerolls"), ";", ""))
             if (item.contains("=")) curation_.rerolls[item.upToFirstOccurrenceOf("=", false, false).toStdString()] = item.fromFirstOccurrenceOf("=", false, false).getIntValue();
     }
+    history_.clear();   // a host's state is a new beginning
     compose();
+}
+
+// ---------------------------------------------------------------------------------------------------------------- undo
+
+std::vector<float> ParhelionProcessor::values() const
+{
+    const ParamStore& s = engine_.params();
+    std::vector<float> v(static_cast<size_t>(s.count()));
+    for (int id = 0; id < s.count(); ++id) v[static_cast<size_t>(id)] = s.get(id);
+    return v;
+}
+
+juce::String ParhelionProcessor::extraState() const
+{
+    std::lock_guard<std::mutex> g(lock_);
+    juce::String t;
+    t << "seed=" << juce::String(static_cast<juce::int64>(seed_)) << "\nmix=" << juce::String(mixMinutes_) << "\nrerolls=";
+    for (const auto& r : curation_.rerolls) t << r.first << ":" << r.second << ";";
+    return t;
+}
+
+void ParhelionProcessor::applyExtra(const juce::String& text)
+{
+    if (text == extraState()) return;
+    bool again = false;
+    {
+        std::lock_guard<std::mutex> g(lock_);
+        for (const juce::String& line : juce::StringArray::fromLines(text)) {
+            const juce::String k = line.upToFirstOccurrenceOf("=", false, false), v = line.fromFirstOccurrenceOf("=", false, false);
+            if (k == "seed") {
+                const uint64_t seed = static_cast<uint64_t>(v.getLargeIntValue());
+                again = again || seed != seed_;
+                seed_ = seed;
+            } else if (k == "mix") {
+                mixMinutes_ = v.getFloatValue();
+            } else if (k == "rerolls") {
+                Curation c;
+                for (const juce::String& item : juce::StringArray::fromTokens(v, ";", ""))
+                    if (item.contains(":")) c.rerolls[item.upToLastOccurrenceOf(":", false, false).toStdString()] = item.fromLastOccurrenceOf(":", false, false).getIntValue();
+                again = again || c.rerolls != curation_.rerolls;
+                curation_ = c;
+            }
+        }
+    }
+    if (again) compose();
+}
+
+void ParhelionProcessor::beginStep(const juce::String& what) { history_.begin(what, values(), extraState(), true); }
+
+void ParhelionProcessor::endStep() { history_.end(values(), extraState()); }
+
+void ParhelionProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting)
+{
+    // Only the panel's gestures, which come on the message thread: a controller's (perform(), the audio thread) and an
+    // undo's own are not steps.
+    if (restoring_ || !juce::MessageManager::existsAndIsCurrentThread()) return;
+    if (gestureIsStarting) {
+        const ParamStore& s = store();
+        history_.begin(parameterIndex >= 0 && parameterIndex < s.count() ? juce::String(s.desc(parameterIndex).name) : juce::String("knob"),
+                       values(), extraState(), false);
+        history_.touch(parameterIndex);
+    } else {
+        history_.end(values(), extraState());
+    }
+}
+
+void ParhelionProcessor::applyStep(const frame::UndoStep& step, bool after)
+{
+    const juce::ScopedValueSetter<bool> quiet(restoring_, true);
+    for (const auto& [id, before, now] : step.values) setFromUi(id, after ? now : before);
+    applyExtra(after ? step.extraAfter : step.extraBefore);
+}
+
+bool ParhelionProcessor::undo()
+{
+    if (const frame::UndoStep* s = history_.undo()) { applyStep(*s, false); return true; }
+    return false;
+}
+
+bool ParhelionProcessor::redo()
+{
+    if (const frame::UndoStep* s = history_.redo()) { applyStep(*s, true); return true; }
+    return false;
+}
+
+void ParhelionProcessor::resetToDefault(int id)
+{
+    if (id < 0 || id >= store().count()) return;
+    beginStep(juce::String(store().desc(id).name) + " to its default");
+    setFromUi(id, store().desc(id).defValue);
+    endStep();
+}
+
+float ParhelionProcessor::playedNormalised(int id) const
+{
+    const ParamStore& s = engine_.params();
+    if (id < 0 || id >= s.count()) return std::numeric_limits<float>::quiet_NaN();
+    const int lead = std::clamp(engine_.leadDeck(), 0, kDecks - 1);
+    const float v = engine_.deck(lead).played(id), k = s.get(id);
+    if (std::fabs(s.toNormalised(id, v) - s.toNormalised(id, k)) < 1.0e-4f) return std::numeric_limits<float>::quiet_NaN();
+    return s.toNormalised(id, v);
+}
+
+// ------------------------------------------------------------------------------------------------------------- headset
+
+void ParhelionProcessor::pollHeadset()
+{
+    frame::Settings& st = frame::Settings::of("Parhelion");
+    headset_.listen(st.headset() == frame::Settings::HeadsetMode::Off ? 0 : st.headsetPort());
+    const frame::HeadsetEvents e = headset_.poll();
+    const ParamStore& s = store();
+    {
+        // The hands' moves are performing, not editing: no steps of their own.
+        const juce::ScopedValueSetter<bool> quiet(restoring_, true);
+        if (e.playStop && wrapperType == wrapperType_Standalone) setPlaying(!isPlaying());
+        if (e.action) {
+            const int id = s.id(Module::Perform, 0, perform::MuteKick);
+            setFromUi(id, s.getBool(id) ? 0.0f : 1.0f);
+        }
+        if (e.filterMoved) setFromUi(s.id(Module::Perform, 0, perform::Filter), e.filter);
+        if (e.throwMoved) setFromUi(s.id(Module::Perform, 0, perform::Throw), e.throwAmount);
+    }
+    if (e.hold) {
+        // The performer's "now", as the Quest app has it: a drop in a breakdown, a break or a build, else a breakdown.
+        SectionKind kind = SectionKind::Breakdown;
+        const double beat = positionBeats();
+        const int t = trackAt(beat);
+        {
+            std::lock_guard<std::mutex> g(lock_);
+            if (t >= 0 && t < static_cast<int>(current_.tracks.size())) {
+                const Score& deck = current_.set.decks[static_cast<size_t>(current_.tracks[static_cast<size_t>(t)].deck)];
+                const Section* sec = nullptr;
+                for (const Section& x : deck.sections) { if (x.beat > beat) break; sec = &x; }
+                if (sec != nullptr && (sec->kind == SectionKind::Breakdown || sec->kind == SectionKind::Break || sec->kind == SectionKind::Build))
+                    kind = SectionKind::Drop;
+            }
+        }
+        performNow(kind);
+    }
+    if (e.next) newSeed();
 }
 
 juce::AudioProcessorEditor* ParhelionProcessor::createEditor() { return new ParhelionEditor(*this); }

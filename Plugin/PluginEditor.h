@@ -2,9 +2,9 @@
  * @file PluginEditor.h
  * @brief The plugin's panel (PLAN 10.1): the track or set on top, the instrument in tabs below.
  *
- * Top: style, key, scale, a single track or a DJ mix (a set) and its length, compose, a new seed, play, mute; a row of
- * rerolls (one per unit of the track under the playhead, SetFile.h) and the files; the arrange strip -- a set's tracks on
- * their decks, a track's sections, the layer matrix (every element per 8-bar block, on or filtered) under the energy
+ * Top, the shared frame's header (Frame.h, 01.10.2026): style, key, scale, a single track or a DJ mix (a set) and its
+ * length, compose, a new seed, play, mute; the ratings, the status and the rerolls, then undo, redo, help and the
+ * settings; the arrange strip -- a set's tracks on their decks, a track's sections, the layer matrix (every element per 8-bar block, on or filtered) under the energy
  * curve, the playhead, click to jump, the wheel to zoom. Below, the tabs of PLAN 9: Set, Arrange, Low End, Drums, Synths, Keys, Orchestra, Effects, Mixer,
  * Perform, Export, Style; every synth's page with its factory presets (the one the composer chose for the track that
  * plays shown and followed) and its modulation block (Modulation.h). The
@@ -54,7 +54,10 @@ private:
     juce::Label composed_;
 };
 
-/** @brief The parameters of module instances as knobs, menus and switches, in titled groups. */
+/**
+ * @brief The parameters of module instances as knobs, menus and switches, in titled groups: every control with the
+ *        frame's right-click menu (MIDI learn, forget, default), a double click to its default, and the live ring.
+ */
 class ParamPage final : public juce::Component {
 public:
     /**
@@ -70,10 +73,14 @@ public:
     void paint(juce::Graphics& g) override;   ///< the group boxes and their titles
     /** @brief The height the page needs at @p width (for a page in a viewport). */
     int heightFor(int width) const;
+    /** @brief The page's parameters in words, group by group (the help's topic for the tab). */
+    juce::String describe() const;
 
 private:
     void build();
     ParhelionProcessor& proc_;
+    frame::ControlActions actions_;               ///< the controls' right-click menu
+    frame::LiveRings live_;                       ///< where each knob's value plays
     std::vector<std::pair<parh::Module, int>> groups_;
     int instances_;
     /**
@@ -115,6 +122,7 @@ public:
     void resized() override;                                   ///< the page as wide as the view, as tall as it needs
     /** @brief How tall the page is at @p width (a page that should not scroll takes that much). */
     int contentHeight(int width) const { return page_->heightFor(width); }
+    const ParamPage& page() const { return *page_; }           ///< the page (the help describes it)
 private:
     juce::Viewport view_;
     std::unique_ptr<ParamPage> page_;
@@ -198,8 +206,13 @@ public:
     void paint(juce::Graphics& g) override;
 
 private:
+public:
+    void exportWith(int extras);   ///< asks for a file, then exports (Ctrl+E: plain)
+    void save();                   ///< asks for a file, then saves the set (Ctrl+S)
+    void load();                   ///< asks for a set, then loads it (Ctrl+O)
+
+private:
     void timerCallback() override;
-    void exportWith(int extras);
     ParhelionProcessor& proc_;
     juce::TextButton wav_{ "WAV + MIDI + cues" }, stems_{ "... with stems" }, loops_{ "... with DJ loops" }, all_{ "... with both" };
     juce::TextButton save_{ "Save .parhset" }, load_{ "Load .parhset" };
@@ -223,31 +236,42 @@ public:
 /** @brief The logo (Deploy/make_icon.py, drawn as vectors): the moon's dark disc, its rim, the corona in streamers. */
 void drawLogo(juce::Graphics& g, juce::Rectangle<float> r);
 
-/** @brief The editor. */
-class ParhelionEditor final : public juce::AudioProcessorEditor, private juce::Timer {
+/** @brief The editor: the frame's header and keys, the arrange strip, the tabs, the help over them. */
+class ParhelionEditor final : public juce::AudioProcessorEditor, private juce::Timer, private juce::ChangeListener {
 public:
     explicit ParhelionEditor(ParhelionProcessor& p);           ///< builds the panel for @p p
     ~ParhelionEditor() override;                           ///< stops the refresh timer
     void paint(juce::Graphics& g) override;            ///< the background
     void resized() override;                           ///< scales the body to the window
     void parentHierarchyChanged() override;            ///< the standalone's title bar gets a maximise button
-    bool keyPressed(const juce::KeyPress& key) override;   ///< F11: full screen (the standalone), Esc leaves it
+    bool keyPressed(const juce::KeyPress& key) override;   ///< the frame's keys (frame::handleKey)
 
 private:
     void timerCallback() override;
+    void changeListenerCallback(juce::ChangeBroadcaster*) override;   ///< the settings changed (the backdrop)
     void layoutBody();                                 ///< the top bar, the arrange strip, the tabs, at the design scale
     void toggleFullScreen();                           ///< the standalone's window full screen and back
+    bool fullScreen() const;                           ///< whether it is
+    bool standalone() const;                           ///< the editor sits in the standalone's window
     void showLength(bool mix);                         ///< the length slider for a track's minutes or a mix's
+    void showHelp(bool on);                            ///< the help over the tabs (F1)
+    void showSettings();                               ///< the settings menu
+    ExportPage* exportPage() const;                    ///< the Export tab's page
     ParhelionProcessor& proc_;
-    parhui::LookAndFeel lnf_;                           ///< first, so it outlives every component that uses it
+    frame::LookAndFeel lnf_{ parhui::skin() };          ///< first, so it outlives every component that uses it
     juce::TooltipWindow tooltips_{ nullptr, 700 };
     EditorBody body_;
-    juce::TextButton full_{ "Full screen" };
+    frame::Backdrop backdrop_;
+    int headerBottom_ = 0;                             ///< where the header ends (the backdrop is strong above)
     juce::SharedResourcePointer<UpdateCheck> updates_;
     juce::HyperlinkButton update_;
-    juce::ToggleButton checkUpdates_{ "Update check" };
-    juce::Label title_, status_, rerolls_;
+    juce::Label status_, rerolls_;
+    juce::Component title_;                            ///< the name's place (drawn by the body)
     juce::Rectangle<float> logo_;
+    frame::IconButton undo_{ frame::IconButton::Icon::Undo, "Undo (Ctrl+Z)" }, redo_{ frame::IconButton::Icon::Redo, "Redo (Ctrl+Y)" };
+    frame::IconButton help_{ frame::IconButton::Icon::Help, "Help (F1)" }, settings_{ frame::IconButton::Icon::Settings, "Settings" };
+    frame::IconButton headsetIcon_{ frame::IconButton::Icon::Headset, "A headset sends its hands: the Perform page shows them" };
+    std::unique_ptr<frame::HelpView> helpView_;
     juce::ComboBox style_, key_, scale_;
     /** One track or a DJ mix (set.minutes 0 or not, ParhelionProcessor::chooseMix), and the length of what is chosen. */
     juce::TextButton trackMode_{ "Track" }, mixMode_{ "DJ mix" };
@@ -256,7 +280,9 @@ private:
     bool lengthOfMix_ = false;                         ///< the slider shows set.minutes (else compose.minutes)
     bool syncing_ = false;                             ///< the slider is set from its parameter, not by a hand
     juce::TextButton compose_{ "Compose track" }, seed_{ "New seed" }, play_{ "Play" }, mute_{ "Mute" };
-    juce::TextButton like_{ "+" }, dislike_{ "-" };   ///< Phase 17: the ratings
+    /** Phase 17: the ratings, as thumbs since the frame (01.10.2026). */
+    frame::IconButton like_{ frame::IconButton::Icon::ThumbUp, "I like this track: its kind and its sounds come more often (with Favor Ratings)" };
+    frame::IconButton dislike_{ frame::IconButton::Icon::ThumbDown, "Not this one: its kind and its sounds come less often (with Favor Ratings)" };
     juce::String rated_;                             ///< what was rated last, shown a while
     int ratedTicks_ = 0;
     std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> combos_;
@@ -264,4 +290,5 @@ private:
     juce::TabbedComponent tabs_{ juce::TabbedButtonBar::TabsAtTop };
     juce::String shotPath_;
     int shotTicks_ = 0;
+    bool shotHands_ = false;                           ///< PARH_SHOT_HEADSET: the headset's hands kept alive
 };

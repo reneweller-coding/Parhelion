@@ -17,7 +17,12 @@ juce_add_plugin(Parhelion
     PRODUCT_NAME                "Parhelion"
     ICON_BIG                    "${CMAKE_SOURCE_DIR}/Deploy/parhelion.png")
 target_sources(Parhelion PRIVATE PluginProcessor.cpp PluginEditor.cpp EditorTheme.cpp EditorPerform.cpp
-                             EditorStyle.cpp UpdateCheck.cpp)
+                             EditorStyle.cpp UpdateCheck.cpp Frame.cpp)
+# The frame's pieces (01.10.2026): the picture behind the panel and the manual's prose for the help (F1).
+juce_add_binary_data(ParhelionData
+    HEADER_NAME ParhelionData.h
+    NAMESPACE ParhelionData
+    SOURCES Resources/backdrop.jpg ${CMAKE_SOURCE_DIR}/Tools/manual/chapters.txt)
 target_compile_definitions(Parhelion PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
@@ -28,7 +33,9 @@ target_compile_definitions(Parhelion PUBLIC
 target_link_libraries(Parhelion
     PRIVATE
         ParhelionCore
+        ParhelionData
         juce::juce_audio_utils
+        juce::juce_osc
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)

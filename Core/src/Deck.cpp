@@ -838,6 +838,33 @@ void Deck::render(int64_t sample, float* L, float* R, int n, float* const* stemL
         hallL_[k] *= hallReturn_ * g; hallR_[k] *= hallReturn_ * g;
         cloudL_[k] *= g; cloudR_[k] *= g;
     }
+    if (meter_ != nullptr) {
+        // The mixer page's meters, while it looks: the stems' signals, before the glue and the master.
+        float pk[kStems] = {};
+        double ss[kStems] = {};
+        for (int i = 0; i < n; ++i) {
+            const size_t k = static_cast<size_t>(i);
+            auto put = [&](int s, float l, float r) {
+                pk[s] = std::max(pk[s], std::max(std::fabs(l), std::fabs(r)));
+                ss[s] += 0.5 * (static_cast<double>(l) * l + static_cast<double>(r) * r);
+            };
+            put(kStemKick, kickBuf_[k], kickBuf_[k]);
+            put(kStemSub, subBuf_[k], subBuf_[k]);
+            put(kStemBass, bassL_[k], bassR_[k]);
+            put(kStemAcid, acidL_[k], acidR_[k]);
+            put(kStemHats, busH[0][i], busH[1][i]);
+            put(kStemPerc, busP[0][i], busP[1][i]);
+            for (int v = 0; v < kPolyInstances; ++v) put(kStemLead + v, polyL_[v][k], polyR_[v][k]);
+            put(kStemPiano, pianoL_[k], pianoR_[k]);
+            for (int o = 0; o < kOrch; ++o) put(kStemStrings + o, orchL_[o][k], orchR_[o][k]);
+            put(kStemRoom, roomL_[k], roomR_[k]);
+            put(kStemPlate, plateL_[k], plateR_[k]);
+            put(kStemHall, hallL_[k], hallR_[k]);
+            put(kStemCloud, cloudL_[k], cloudR_[k]);
+            put(kStemFx, fxL_[k], fxR_[k]);
+        }
+        meter_->add(pk, ss);
+    }
     if (stems) {
         for (int i = 0; i < n; ++i) {
             const size_t k = static_cast<size_t>(i);

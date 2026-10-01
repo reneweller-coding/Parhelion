@@ -103,7 +103,7 @@ void StylePage::resized()
 
 void StylePage::paint(juce::Graphics& g)
 {
-    g.fillAll(parhui::colour::panel);
+
     const StyleProfile now = profileOf(proc_.store());
     auto r = getLocalBounds().reduced(10);
     r.removeFromTop(knobsH_ + 10);
@@ -112,7 +112,7 @@ void StylePage::paint(juce::Graphics& g)
 
     // The six axes: a track each, the five styles as marks, the profile the knobs describe as a bar.
     g.setFont(juce::FontOptions(13.0f));
-    g.setColour(parhui::colour::amber);
+    g.setColour(parhui::colour::accent);
     g.drawText("The profile on the six axes of the sub-genres", chart.removeFromTop(22), juce::Justification::centredLeft);
     const int rows = static_cast<int>(axes().size());
     const float rowH = std::min(56.0f, static_cast<float>(chart.getHeight() - 24) / static_cast<float>(rows));
@@ -133,7 +133,7 @@ void StylePage::paint(juce::Graphics& g)
             g.fillEllipse(x - 4.0f, track.getCentreY() - 10.0f, 8.0f, 8.0f);
         }
         const float v = a.value(now), x = xOf(v);
-        g.setColour(parhui::colour::amber);
+        g.setColour(parhui::colour::accent);
         g.fillRect(juce::Rectangle<float>(track.getX(), track.getY(), x - track.getX(), track.getHeight()));
         g.fillEllipse(x - 6.0f, track.getCentreY() - 6.0f, 12.0f, 12.0f);
         g.setColour(parhui::colour::ink);
@@ -151,7 +151,7 @@ void StylePage::paint(juce::Graphics& g)
     }
 
     // The references' medians.
-    g.setColour(parhui::colour::amber);
+    g.setColour(parhui::colour::accent);
     g.setFont(juce::FontOptions(13.0f));
     g.drawText("The references (medians of 30 recordings)", table.removeFromTop(22), juce::Justification::centredLeft);
     const int cols = 5;

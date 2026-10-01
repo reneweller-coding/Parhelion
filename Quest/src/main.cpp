@@ -31,6 +31,9 @@
  * A hand only moves its control while it is *not* pinching, and both are smoothed with a 0.15 s one-pole: a hand at mid
  * height plays exactly what the composer wrote, and nothing ever jumps.
  *
+ * The grammar every generator's headset shares (01.10.2026): the desktop's frame (Plugin/Frame.h) reads the same hands
+ * from the bridge with the same rules and the same numbers.
+ *
  * **The parhelion in the sky** (the logo, Deploy/make_icon.py, at the size of a room): ahead and above, tilted towards the
  * player, the sun with its 22-degree halo and the two sun dogs on it. The sun swells after every kick; the halo is the
  * bar, once round, with every other part's notes as beads on rings about it and the playhead's hand sweeping them; the
@@ -48,6 +51,9 @@
  *   style=Uplifting     Uplifting, Progressive, Dream House, Acid or Deep
  *   osc_host=192.168.1.20   the score cues (Cue.h) to a visualiser such as Kaleidoscope; empty = off
  *   osc_port=9000
+ *   bridge_host=192.168.1.20   the hands to the desktop's Parhelion (01.10.2026): played from here, the same gestures
+ *   bridge_port=9104     its headset port (the desktop's settings, Headset)
+ *   audio=0             no sound here, the desktop plays (the same as mute=1)
  *   quality=desktop     everything (default here: quest, PLAN 10: fewer unison oscillators, voices and players)
  *   knobs=compose.key=D;set.dramaturgy=Sunrise     any knobs, repeatable
  * @endcode
@@ -62,6 +68,11 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <oboe/Oboe.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <atomic>
@@ -213,6 +224,8 @@ struct Config {
     double setMinutes = 0.0;        ///< a set of so many minutes instead of single tracks
     std::string oscHost;            ///< cue target (Cue.h), empty = off
     int oscPort = 9000;             ///< cue port
+    std::string bridgeHost;         ///< the bridge (01.10.2026): the hands to the desktop's Parhelion there; empty = off
+    int bridgePort = 9104;          ///< its headset port (the desktop's settings, Headset)
     std::string knobs;              ///< knob assignments, "key=value" separated by ';' or newlines
     bool quest = true;              ///< the Quest's quality (Engine::Quality); `quality=desktop` plays all
 };
@@ -239,6 +252,9 @@ Config readConfig(const char* dir)
         else if (k == "set_minutes") c.setMinutes = std::clamp(std::atof(v.c_str()), 0.0, 240.0);
         else if (k == "osc_host") c.oscHost = v;
         else if (k == "osc_port") c.oscPort = std::atoi(v.c_str());
+        else if (k == "bridge_host") c.bridgeHost = v;
+        else if (k == "bridge_port") c.bridgePort = std::atoi(v.c_str());
+        else if (k == "audio") { if (v == "0") c.mute = true; }   // no sound here: the desktop plays (the bridge)
         else if (k == "quality") c.quest = v != "desktop";
         else if (k == "style") { c.knobs += "compose.style=" + v; c.knobs += ";"; }
         else if (k == "knobs") { c.knobs += v; c.knobs += ";"; }
@@ -888,6 +904,79 @@ private:
     bool wasClosed_[2] = { false, false };
 };
 
+// ---------------------------------------------------------------- the bridge
+
+/**
+ * @brief The bridge mode (01.10.2026): the hands to the desktop's Parhelion over OSC (UDP), which then plays as if they were
+ *        its own -- the same gestures, read by its frame (Plugin/Frame.h, Headset) with the same rules as here.
+ *
+ * "/hands" with six floats: left height, right height, left pinch, right pinch, left tracked, right tracked (the heights
+ * 0..1 against the head and unsmoothed, the desktop smooths them; the others 0 or 1), about 30 times a second. Fire and
+ * forget: a desktop that is not there changes nothing. After Noctuary's bridge (AmbientSynth's Quest/src/main.cpp, OscOut).
+ */
+class HandBridge {
+public:
+    HandBridge() = default;
+    HandBridge(const HandBridge&) = delete;
+    HandBridge& operator=(const HandBridge&) = delete;
+    ~HandBridge() { close(); }
+    /** @brief Opens the UDP socket to @p host (a dotted IPv4 address, no names) and @p port; false if it cannot. */
+    bool open(const std::string& host, int port)
+    {
+        close();
+        sock_ = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (sock_ < 0) return false;
+        std::memset(&to_, 0, sizeof(to_));
+        to_.sin_family = AF_INET;
+        to_.sin_port = htons(static_cast<uint16_t>(port));
+        if (inet_pton(AF_INET, host.c_str(), &to_.sin_addr) != 1) { close(); return false; }
+        return true;
+    }
+    /** @brief Closes the socket; send() then does nothing. */
+    void close() { if (sock_ >= 0) ::close(sock_); sock_ = -1; }
+    /** @brief Whether the bridge is on. */
+    bool ok() const { return sock_ >= 0; }
+    /** @brief Sends the hands, at most 30 times a second; @p dt the seconds since the last frame (render thread). */
+    void send(const Hands& hands, double dt)
+    {
+        if (sock_ < 0) return;
+        since_ += dt;
+        if (since_ < 1.0 / 30.0) return;
+        since_ = 0.0;
+        float a[6];
+        for (int h = 0; h < 2; ++h) {
+            const Hands::Hand& s = hands.hand(h);
+            a[h] = s.height;
+            a[2 + h] = s.valid && s.closed ? 1.0f : 0.0f;
+            a[4 + h] = s.valid ? 1.0f : 0.0f;
+        }
+        char buf[64];
+        size_t pos = 0;
+        auto putStr = [&](const char* t) {
+            const size_t l = std::strlen(t) + 1;
+            std::memcpy(buf + pos, t, l);
+            pos += l;
+            while (pos & 3) buf[pos++] = 0;
+        };
+        putStr("/hands");
+        putStr(",ffffff");
+        for (const float f : a) {   // big-endian 32-bit words
+            uint32_t u;
+            std::memcpy(&u, &f, 4);
+            buf[pos++] = static_cast<char>(u >> 24);
+            buf[pos++] = static_cast<char>(u >> 16);
+            buf[pos++] = static_cast<char>(u >> 8);
+            buf[pos++] = static_cast<char>(u);
+        }
+        ::sendto(sock_, buf, pos, 0, reinterpret_cast<const sockaddr*>(&to_), sizeof(to_));
+    }
+
+private:
+    int sock_ = -1;        ///< the UDP socket, or -1 while closed
+    sockaddr_in to_{};     ///< the desktop's address and port
+    double since_ = 0.0;   ///< seconds since the last datagram
+};
+
 // ---------------------------------------------------------------- the app
 
 /** @brief One eye's swapchain and the framebuffer it is rendered through. */
@@ -913,6 +1002,12 @@ public:
                 LOGI("cues: OSC to %s:%d", config_.oscHost.c_str(), config_.oscPort);
                 player_.setCueSender(&cues_);
             } else LOGE("cues: cannot reach %s:%d", config_.oscHost.c_str(), config_.oscPort);
+        }
+        // The bridge (01.10.2026): the hands to the desktop's Parhelion, off unless parh.cfg names a host.
+        if (!config_.bridgeHost.empty()) {
+            if (bridge_.open(config_.bridgeHost, config_.bridgePort))
+                LOGI("bridge: the hands to %s:%d", config_.bridgeHost.c_str(), config_.bridgePort);
+            else LOGE("bridge: bad host %s (a dotted IPv4 address)", config_.bridgeHost.c_str());
         }
         if (!initLoader()) return false;
         if (!initInstance()) return false;
@@ -1656,6 +1751,7 @@ private:
         updateHands(fs.predictedDisplayTime);
         bool leftPinch = false, rightPinch = false;
         hands_.update(dt, leftPinch, rightPinch);
+        bridge_.send(hands_, dt);   // the bridge: the hands to the desktop (01.10.2026)
         if (player_.ready()) {
             gestures(dt);
             applyMacros();
@@ -1727,6 +1823,7 @@ private:
     std::atomic<bool> stopComposer_{ false };
     Scene scene_;
     Hands hands_;
+    HandBridge bridge_;                  ///< the bridge mode: the hands to the desktop's Parhelion (01.10.2026)
     int filterId_ = -1, throwId_ = -1, muteKickId_ = -1;   ///< perform.filter, .throw and .mute_kick: the hands' controls
     bool handWas_[2] = {}, spoiled_[2] = {}, bothFired_ = false;   ///< gestures(): the pinches as they were
     double held_[2] = {};                ///< how long each hand has pinched, seconds
