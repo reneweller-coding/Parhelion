@@ -33,7 +33,7 @@ y = 330
 for line in ("A generator of trance:", "tracks and DJ sets, composed,", "mixed and played by the", "program -- all synthesised."):
     d.text((62, y), line, font=font("segoeui.ttf", 26), fill=(226, 232, 244))
     y += 36
-for line in ("VST3 and standalone for Windows",):
+for line in ("VST3 and standalone for Windows,", "and an app for Meta Quest"):
     d.text((62, y + 18), line, font=font("segoeui.ttf", 19), fill=(138, 146, 170))
     y += 26
 out = os.path.join(ROOT, "docs", "social-preview.png")
