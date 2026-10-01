@@ -24,8 +24,41 @@ gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 ## Stand der Umsetzung
 
-Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 8 gebaut, Version 1.0.0 (30.09.2026; die Quest ohne Headset:
+Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 8 gebaut, Version 1.0.1 (01.10.2026; die Quest ohne Headset:
 gebaut, auf dem Gerät noch nicht gelaufen). Offen: die Hörrunden des Nutzers, die Messung auf der Quest.**
+
+**01.10.2026: Track oder Mix, der Zoom und der Anfang eines Mixes** (nach Totalitys Phase 21, b8099ec). Der Nutzer: "In
+der GUI ist es etwas verwirrend, ob man jetzt einen Einzeltrack erzeugt oder einen Mix"; bei langen Mixes und Tracks
+ein Zoom "etwa mit dem Mausrad"; sein Mix "begann ... wieder mit einer Solo-Kick".
+- **Track oder DJ-Mix.** Statt "Track min" und "Set min" (0 hieß: ein Track) zwei Knöpfe "Track | DJ mix" neben der
+  Tonart und ein Längenregler für das Gewählte (Track 2 bis 14 min, Mix 10 min bis 12 h, die ersten zwei Stunden über
+  den größten Teil des Wegs); ein Klick komponiert, Compose heißt "Compose track" oder "Compose mix" und leuchtet,
+  solange das Gespielte das andere ist; die Statuszeile beginnt mit "single track" oder "DJ mix of N tracks"; die
+  Länge des Mixes bleibt gemerkt (`ParhelionProcessor::chooseMix`, im State `mixMinutes`). `set.minutes` bleibt der
+  Parameter: Host, `.parhset`, Quest und `parh_render` unverändert.
+- **Zoom** (`ArrangeView`, oben und auf der Arrange-Seite): das Mausrad um den Zeiger bis auf vier Takte, Ziehen,
+  Shift + Rad oder ein seitliches Rad verschieben, Doppelklick zeigt alles; ein Lineal (die Takte eines Tracks, auf der
+  Arrange-Seite mit der Zeit, die Minuten eines Mixes); ab zwei Pixeln je Schlag stehen die Noten selbst in den Zeilen
+  der Layer-Matrix (die Kit-Spuren nach Composer.cpp: Closed Hat, Open Hat, Clap, Ride, Crash, der Rest Percussion; das
+  Piano auf der Zeile des Leads), die Zellen treten darunter zurück; ein gezoomtes Bild blättert mit dem Abspielkopf;
+  der Streifen oben markiert das Fenster der Arrange-Seite. `PARH_SHOT_ZOOM` für die Screenshots (docs/screenshots/
+  zoom.png), im Handbuch mit dem Bild des Mixes.
+- **Der Anfang, gemessen** (Tools/analyze_ref.py's Funktionen, die ersten acht Takte: die Kick im Tiefband innerhalb
+  8 dB des Körpers, die Hats 6..16 kHz und der gehaltene Klang innerhalb 20 dB des Drops). Die 30 Referenzen: ohne Kick
+  mit Atmosphäre 15, Kick + Hats + Atmosphäre 7, Kick + Atmosphäre 3, Kick + Hats 2, leise 1, **die Kick allein 1**
+  (Progressive und Dream House je 5 von 6 ohne Kick, Deep 3 von 5, Acid 2 von 6, Uplifting 1 von 7 -- dort meist Kick,
+  Hats und Atmosphäre). Wo die Kick spielt, spielen die Hats 2 bis 13 dB unter denen des Drops mit. Parhelion: der
+  erste Intro-Block war die Kick mit dem dunkel gefilterten Pad und der Atmosphäre, die Hats ab Takt 9; im Mix hat
+  jeder Track ein mischbares DJ-Intro, auch der erste -- über 200 Hz lag das Pad 12 bis 19 dB unter der Kick, als
+  dumpfes Brummen, Hats keine: gehört die Kick allein.
+- **Geändert**: die Closed Hat ab dem ersten Takt jedes Intros mit der Kick; der erste Track eines Mixes
+  (TrackRequest::opener) eröffnet auf seiner Atmosphäre -- nach dem Ambient-Intro seines Stils oder, auf eigenem Strom
+  ("OPEN"), mit mindestens 0,6 nach der Wahl der Kandidaten vorangestellt (die Suche bevorzugt kürzere Intros, sonst
+  1 von 12) --, jeder spätere mit seinem DJ-Intro. [M, testOpening] 30 Tracks und 12 Mixe: die Kick tritt immer mit
+  der Closed Hat ein; erste Tracks ohne Kick 6 von 12, spätere mit 17 von 17. Gerendert (12 Mixe zu 12 min, Seeds
+  101-112, die ersten 75 s mit Stems): Takt 1-8 ohne Kick auf Pad, Atmosphäre und dem angedeuteten Arp 7, Kick mit Hats
+  und Pad 5, die Kick allein 0 (vorher gehört in allen 12).
+- `parh_render --seconds S`: nur der Anfang. ctest 37/37.
 
 - **Phase 0, das Gerüst.** Modulkopie mit Herkunftsnotiz im Dateikopf: aus Totality (4d3c0d2) Vec, Dsp, Adaa, Halfband,
   Oversample, Clock, WavWriter, Loudness, Midi, Cue, der Parameterspeicher, Score, Deck, Engine, Kick, SubBass, der

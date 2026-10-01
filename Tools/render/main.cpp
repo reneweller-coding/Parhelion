@@ -7,7 +7,9 @@
  *   parh_render [--seed N] [--style S] [--bpm B] [--minutes M] [--set "key=value; ..."] [--reroll unit]
  *               [--save-set f.parhset] [--load-set f.parhset] [--study] [--dj minutes]
  *               [--out track.wav] [--midi track.mid] [--stems dir] [--loops dir] [--plan-json f.json]
- *               [--rate 48000] [--block 512] [--bench] [--quality desktop|quest] [--plan] [--list] [--version]
+ *               [--seconds S] [--rate 48000] [--block 512] [--bench] [--quality desktop|quest] [--plan] [--list] [--version]
+ *
+ * --seconds renders only the first S seconds (how a track or a mix begins: 01.10.2026).
  *
  * A track is composed from its seed (compose/Composer.h); --study renders the fixed study of Phase 1 instead; --dj (or
  * set.minutes) a DJ set of that many minutes (compose/Set.h), every track levelled before it is placed. Beside the WAV
@@ -52,7 +54,7 @@ void usage()
     std::printf("parh_render [--seed N] [--style Uplifting|Progressive|Dream House|Acid|Deep] [--bpm B] [--minutes M]\n"
                 "            [--set \"key=value; ...\"] [--reroll unit] [--save-set f.parhset] [--load-set f.parhset] [--study]\n"
                 "            [--dj minutes] [--out track.wav] [--midi track.mid] [--stems dir] [--loops dir] [--plan-json f.json]\n"
-                "            [--rate 48000]\n"
+                "            [--seconds S]  (its first S seconds only)  [--rate 48000]\n"
                 "            [--block 512] [--bench]\n"
                 "            [--quality desktop|quest] [--plan] [--list] [--dump-params f.json] [--version]\n");
     std::printf("units for --reroll:");
@@ -144,7 +146,7 @@ int main(int argc, char** argv)
     bool bench = false, quest = false, planOnly = false, list = false, study = false, seedGiven = false;
     std::string dump;
     std::string set, out, midi, stems, style, saveSetPath, loadSetPath, loopsDir, planJson;
-    double djArg = 0.0;
+    double djArg = 0.0, seconds = 0.0;
     Curation curation;
     for (int i = 1; i < argc; ++i) {
         const char* a = argv[i];
@@ -160,6 +162,7 @@ int main(int argc, char** argv)
         else if (!std::strcmp(a, "--load-set")) loadSetPath = next();
         else if (!std::strcmp(a, "--study")) study = true;
         else if (!std::strcmp(a, "--dj")) djArg = std::atof(next());
+        else if (!std::strcmp(a, "--seconds")) seconds = std::atof(next());
         else if (!std::strcmp(a, "--loops")) loopsDir = next();
         else if (!std::strcmp(a, "--plan-json")) planJson = next();
         else if (!std::strcmp(a, "--bpm")) bpm = static_cast<float>(std::atof(next()));
@@ -395,7 +398,8 @@ int main(int argc, char** argv)
     for (const Section& s : score.sections) sectionStart.push_back(static_cast<int64_t>(std::llround(score.tempo.secondsAt(s.beat) * rate)));
 
     std::vector<float> L(static_cast<size_t>(block)), R(static_cast<size_t>(block));
-    const int64_t total = static_cast<int64_t>(engine->lengthSeconds() * rate) + static_cast<int64_t>(2.0 * rate);
+    int64_t total = static_cast<int64_t>(engine->lengthSeconds() * rate) + static_cast<int64_t>(2.0 * rate);
+    if (seconds > 0.0) total = std::min(total, static_cast<int64_t>(seconds * rate));   // --seconds: the beginning only
     int64_t done = 0;
     size_t sec = 0;
     const auto t2 = std::chrono::steady_clock::now();

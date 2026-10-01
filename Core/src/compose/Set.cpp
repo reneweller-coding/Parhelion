@@ -202,6 +202,7 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
         req.bars = std::max(96, static_cast<int>(std::lround(trackMinutes * bpm / 4.0 / 32.0)) * 32);
         req.energy = e;
         req.mixable = true;
+        req.opener = i == 0;   // (nothing is mixed into the first: it may open on its atmosphere)
         req.prefs = prefs;
         SetTrack st;
         st.energy = e;

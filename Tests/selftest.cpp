@@ -1752,6 +1752,59 @@ void testQuestSounds()
 }
 
 /**
+ * The opening (01.10.2026; the user: his mix "begann ... wieder mit einer Solo-Kick"): the kick never alone -- where it
+ * enters, the closed hat plays with it (the references: where the kick plays in the first eight bars, the hats play with
+ * it; the kick alone in 1 of 30) --, in tracks of every style and in mixes; a mix's first track may open without the
+ * kick (on its atmosphere, nothing is mixed into it), every later one opens with it (its DJ intro).
+ */
+void testOpening()
+{
+    section("the opening: never the kick alone");
+    auto p = std::make_unique<ParamStore>();
+    // The first block of a deck's score (from @p from) with the kick on: does the closed hat play there too?
+    auto kickWithHats = [](const Score& s, double from, double to) {
+        for (const LayerBlock& b : s.layers) {
+            if (b.beat < from - 1e-6 || b.beat >= to) continue;
+            if (b.at(Layer::Kick) == LayerState::On) return b.at(Layer::ClosedHat) != LayerState::Off;
+        }
+        return true;
+    };
+    int tracks = 0, withHats = 0;
+    for (const char* style : { "Uplifting", "Progressive", "Dream House", "Acid", "Deep" }) {
+        p->parseText(std::string("compose.style=") + style);
+        for (uint64_t seed = 1; seed <= 6; ++seed) {
+            const Score s = composeTrack(*p, seed);
+            ++tracks;
+            withHats += kickWithHats(s, 0.0, s.lengthBeats);
+        }
+    }
+    check(withHats == tracks, "a track's kick enters with the closed hat", fmt("%d of %d tracks", withHats, tracks));
+    p->resetDefaults();
+    int mixes = 0, mixHats = 0, openers = 0, kickless = 0, later = 0, laterKick = 0;
+    for (uint64_t seed = 101; seed <= 112; ++seed) {
+        SetInfo si;
+        const SetScore set = composeSet(*p, seed, 12.0, nullptr, &si);
+        ++mixes;
+        bool ok = true;
+        for (size_t i = 0; i < si.tracks.size(); ++i) {
+            const SetTrack& tr = si.tracks[i];
+            const Score& deck = set.decks[static_cast<size_t>(tr.deck)];
+            ok = ok && kickWithHats(deck, tr.start, tr.end);
+            // Its first block: the kick there or not.
+            bool kickFirst = false;
+            for (const LayerBlock& b : deck.layers)
+                if (std::fabs(b.beat - tr.start) < 1e-6) kickFirst = b.at(Layer::Kick) == LayerState::On;
+            if (i == 0) { ++openers; kickless += !kickFirst; }
+            else { ++later; laterKick += kickFirst; }
+        }
+        mixHats += ok;
+    }
+    check(mixHats == mixes, "a mix's tracks: the kick enters with the closed hat", fmt("%d of %d mixes", mixHats, mixes));
+    check(kickless >= 1 && laterKick == later, "a mix's first track may open on its atmosphere, every later one opens with its kick",
+          fmt("first tracks without the kick %d of %d, later tracks with it %d of %d", kickless, openers, laterKick, later));
+}
+
+/**
  * The performer's "Breakdown now" and "Drop now" (Phase 6, planTrackRewritten): from an 8-bar line the plan turns to a
  * breakdown (its build, a drop) or to a drop at once -- the vacuum in the bar before it --, the whole a multiple of 32
  * bars; and every note before the line is what it was (the drums, the bass, the pad, the pluck, the arp: the voices
@@ -2141,6 +2194,7 @@ const TestSection kSections[] = {
     { "testHandover", testHandover },
     { "testSubGenres", testSubGenres },
     { "testSet", testSet },
+    { "testOpening", testOpening },
 };
 
 } // namespace

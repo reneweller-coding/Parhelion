@@ -98,6 +98,7 @@ uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls = 0);
  *                 ambient intro or outro, never beatless -- so a blend can lie over them
  */
 Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable = false);
+// (A mixable track that opens a mix -- TrackRequest::opener -- may have the ambient intro a track alone may have.)
 
 /** @brief A performer's "now": from bar @p bar (an 8-bar line) a breakdown with its build and drop, or a drop at once. */
 struct Rewrite {
@@ -119,7 +120,8 @@ Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& st
  *        rewrites the plan the ones before it left, from its own line on, so the plan up to the last line is the plan
  *        that was played up to it. The lines rise; one that does not is left out.
  */
-Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, const std::vector<Rewrite>& rewrites);
+Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, const std::vector<Rewrite>& rewrites,
+                        bool opener = false);
 
 /** @brief Plans a track from a track's seed without rerolls (as composeTrack does). */
 Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed, bool mixable = false);

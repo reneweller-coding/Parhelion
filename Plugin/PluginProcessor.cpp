@@ -242,6 +242,17 @@ void ParhelionProcessor::reroll(const juce::String& unit)
     compose();
 }
 
+bool ParhelionProcessor::mixChosen() const { return store().get(store().id(Module::Set, 0, set::Minutes)) > 0.0f; }
+
+void ParhelionProcessor::chooseMix(bool mix)
+{
+    const int id = store().id(Module::Set, 0, set::Minutes);
+    const bool was = mixChosen();
+    if (was && !mix) mixMinutes_ = store().get(id);
+    if (was != mix) setFromUi(id, mix ? std::max(10.0f, mixMinutes_) : 0.0f);
+    if (was != mix || playingMix() != mix) compose();
+}
+
 juce::String ParhelionProcessor::curationText() const
 {
     std::lock_guard<std::mutex> g(lock_);
@@ -834,10 +845,10 @@ juce::String ParhelionProcessor::status() const
     juce::String t;
     const double secs = current_.set.decks[0].tempo.secondsAt(current_.set.lengthBeats);
     t << "seed " << juce::String(static_cast<juce::int64>(seed_)) << "   ";
-    if (current_.isSet) t << "set of " << static_cast<int>(current_.tracks.size()) << " tracks, " << kDramaturgyNames[static_cast<int>(current_.setInfo.dramaturgy)];
+    if (current_.isSet) t << "DJ mix of " << static_cast<int>(current_.tracks.size()) << " tracks, " << kDramaturgyNames[static_cast<int>(current_.setInfo.dramaturgy)];
     else if (!current_.tracks.empty()) {
         const TrackInfo& i = current_.tracks[0].info;
-        t << juce::String(i.style) << " " << kFormTemplateNames[static_cast<int>(i.form)] << ", " << juce::String(i.bpm, 1) << " BPM, " << kKeyNames[i.key] << " "
+        t << "single track, " << juce::String(i.style) << " " << kFormTemplateNames[static_cast<int>(i.form)] << ", " << juce::String(i.bpm, 1) << " BPM, " << kKeyNames[i.key] << " "
           << kScaleNames[i.scale] << " (" << juce::String(i.camelot) << ")";
     }
     t << ", " << juce::String(secs / 60.0, 1) << " min";
@@ -919,6 +930,7 @@ void ParhelionProcessor::getStateInformation(juce::MemoryBlock& destData)
     for (int c = 0; c < 128; ++c)
         if (const int id = ccMap_[static_cast<size_t>(c)].load(); id >= 0) cc << c << "=" << juce::String(store().key(id)) << ";";
     xml.setAttribute("controllers", cc);
+    xml.setAttribute("mixMinutes", static_cast<double>(mixMinutes_));
     copyXmlToBinary(xml, destData);
 }
 
@@ -928,6 +940,7 @@ void ParhelionProcessor::setStateInformation(const void* data, int sizeInBytes)
     if (xml == nullptr || !xml->hasTagName("Parhelion")) return;
     store().resetDefaults();
     store().parseText(xml->getStringAttribute("params").toStdString());
+    if (xml->hasAttribute("mixMinutes")) mixMinutes_ = static_cast<float>(xml->getDoubleAttribute("mixMinutes", 60.0));
     if (xml->hasAttribute("controllers")) {
         for (auto& c : ccMap_) c = -1;
         for (const auto& item : juce::StringArray::fromTokens(xml->getStringAttribute("controllers"), ";", "")) {

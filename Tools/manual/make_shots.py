@@ -4,7 +4,8 @@
 
 Each tab is its own run of the standalone in the screenshot mode: the seed 4242, the playhead at beat 760 (bar 191, in the main drop),
 and PARH_SHOT_FULL, which grows the window until nothing of the page in front scrolls, so every knob is in the picture.
-The runs are muted (PARH_SHOT forces it). Besides: docs/screenshots/set.png, the Arrange tab of a 40-minute set, and
+The runs are muted (PARH_SHOT forces it). Besides: docs/screenshots/set.png, the Arrange tab of a 40-minute set,
+docs/screenshots/zoom.png, the Arrange tab zoomed in on a main drop (PARH_SHOT_ZOOM), and
 docs/screenshot.png, the Arrange tab at the window's usual size, the picture on the project's front page. After
 Totality's make_shots.py (itself after Ephemeris').
 """
@@ -39,6 +40,7 @@ def main():
     for tab in range(len(TABS)):
         shot(exe, tab, os.path.join(out, "tab_%02d.png" % tab), True)
     shot(exe, 1, os.path.join(out, "set.png"), False, {"PARH_SET": "40", "PARH_SEED": "5", "PARH_SHOT_AT": "1400"})
+    shot(exe, 1, os.path.join(out, "zoom.png"), False, {"PARH_SHOT_ZOOM": "720:848"})   # (the main drop, zoomed: 01.10.2026)
     shot(exe, 1, os.path.join(ROOT, "docs", "screenshot.png"), False)
 
 

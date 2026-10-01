@@ -1,5 +1,22 @@
 # Parhelion release notes
 
+## 1.0.1 (01.10.2026)
+
+**A track or a DJ mix.** The top bar chooses between a single Track and a DJ mix with two buttons and one Length beside
+them (a track 2 to 14 minutes, a mix 10 minutes to 12 hours); a click composes it, Compose reads "Compose track" or
+"Compose mix" and is lit while what plays is the other; the status line begins with "single track" or "DJ mix of N
+tracks". The mix's length is kept while a track is chosen.
+
+**Zoom.** The arrangement (on top and on the Arrange page) zooms with the mouse wheel around the pointer, down to four
+bars; a drag or Shift + wheel moves along, a double click shows everything. A ruler counts a track's bars (with the
+time on the Arrange page) and a mix's minutes; zoomed in, the notes themselves stand in the layer matrix's lanes; a
+zoomed view pages on with the playhead; the strip on top marks the Arrange page's window.
+
+**The beginning.** The kick is never alone any more: the closed hat enters with it in every intro (the references: the
+kick alone in 1 of 30 openings). A mix's first track -- nothing is mixed into it -- opens on its atmosphere at least as
+often as not, the kick after it; every later track opens with its DJ intro. `parh_render --seconds S` renders only the
+beginning.
+
 ## 1.0.0 (30.09.2026)
 
 The first release: a generator of trance -- tracks and DJ sets composed from a seed and synthesised in real time -- as a

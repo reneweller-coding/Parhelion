@@ -58,14 +58,17 @@ int pick(Rng& r, std::initializer_list<int> options)
 }
 
 /** @brief The sections of a template, lengths drawn (Planner.h). */
-std::vector<Spec> drawSpecs(const StyleProfile& prof, FormTemplate form, Rng& r, bool mixable)
+std::vector<Spec> drawSpecs(const StyleProfile& prof, FormTemplate form, Rng& r, bool mixable, bool opener = false)
 {
     std::vector<Spec> s;
     int intro = prof.introBars * (r.uniform() < prof.introLong ? 2 : 1);
     // (The draws in the same order as ever, taken or not: a track alone stays the track it was.)
     if (r.uniform() < prof.ambientIntro) {
         const int ambientBars = std::max(8, prof.ambientIntroBars + 8 * (r.below(3) - 1));
-        if (!mixable) s.push_back({ Role::AmbientIntro, ambientBars });
+        // A mix's first track too (01.10.2026, the user: his mix "begann ... wieder mit einer Solo-Kick"): nothing is mixed
+        // into its beginning. The references open without the kick in 15 of 30 (Progressive 5 of 6, Dream House 5 of 6,
+        // Deep 3 of 5, Acid 2 of 6, Uplifting 1 of 7; the kick alone in 1).
+        if (!mixable || opener) s.push_back({ Role::AmbientIntro, ambientBars });
     }
     if (mixable) intro = std::max(intro, 32);
     s.push_back({ Role::Intro, intro });
@@ -259,11 +262,13 @@ std::array<LayerState, kNumLayers> blockStates(Role role, int k, int n, const Ca
         set(a, Layer::Fx, S::On);
         if (c.arp && n >= 2 && k >= n / 2) set(a, Layer::Arp, S::Filtered);
         // Dok. 6: kick alone, hats, bass, open hat, percussion, the filtered pluck; spread over the intro's blocks (the
-        // percussion now and then before the open hat: PLAN 6.3's "Streuung").
+        // percussion now and then before the open hat: PLAN 6.3's "Streuung"). The kick never alone (01.10.2026, measured
+        // on the references' first eight bars: where the kick plays, the hats play with it, 2 to 13 dB under the drop's;
+        // the kick alone in 1 of 30): the closed hat from the first bar.
         Layer order[] = { Layer::Kick, Layer::ClosedHat, bassLayer, Layer::OpenHat, Layer::Perc, Layer::Pluck };
         if (v.introSwap && c.perc) std::swap(order[3], order[4]);
         const int steps = 6;
-        const int upto = n <= 1 ? 2 : std::min(steps, 1 + (k * (steps - 1) + (n - 2)) / std::max(1, n - 1));
+        const int upto = n <= 1 ? 2 : std::max(2, std::min(steps, 1 + (k * (steps - 1) + (n - 2)) / std::max(1, n - 1)));
         for (int i = 0; i < upto; ++i) {
             const Layer l = order[i];
             if (l == Layer::Kick && c.beatless) continue;
@@ -553,7 +558,8 @@ Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& st
     return planTrackRewritten(prof, bars, stream, mixable, one);
 }
 
-Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, const std::vector<Rewrite>& rewrites)
+Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, const std::vector<Rewrite>& rewrites,
+                        bool opener)
 {
     const uint64_t formSeed = stream("form");
     Rng r;
@@ -586,7 +592,7 @@ Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& st
     for (int c = 0; c < 8; ++c) {
         Rng cr;
         cr.seed(mixSeed(formSeed, 0x43414E44ull + static_cast<uint64_t>(c)));   // "CAND"
-        std::vector<Spec> specs = drawSpecs(prof, form, cr, mixable);
+        std::vector<Spec> specs = drawSpecs(prof, form, cr, mixable, opener);
         fitTo32(specs, mixable ? 32 : 16);
         Plan p = buildPlan(prof, form, specs, cast, stream);
         const float share = breakdownShare(p);
@@ -597,12 +603,24 @@ Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& st
                            + 4.0 * std::max(0.0, static_cast<double>(introBars) / std::max(1, p.bars) - 0.3);
         if (score < bestScore) { bestScore = score; best = std::move(p); bestC = c; }
     }
-    if (!rewrites.empty()) {
+    // A mix's first track opens on its atmosphere at least as often as not (01.10.2026: the beginning of the whole mix;
+    // the candidates' search favours the shorter intros, so it is decided here, on a stream of its own).
+    bool openOnAtmosphere = false;
+    if (opener) {
+        Rng orr;
+        orr.seed(mixSeed(formSeed, 0x4F50454Eull));   // "OPEN"
+        openOnAtmosphere = orr.uniform() < std::max(prof.ambientIntro, 0.6f);
+    }
+    const bool hasAmbient = !best.sections.empty() && best.sections.front().kind == SectionKind::Intro && best.sections.size() > 1
+                         && best.sections[1].kind == SectionKind::Intro;
+    if (!rewrites.empty() || (openOnAtmosphere && !hasAmbient)) {
         // The chosen candidate's specs again (the same draws), cut and continued at each line in turn (fitTo32 evens
         // the length out in the outro, after every line).
         Rng cr;
         cr.seed(mixSeed(formSeed, 0x43414E44ull + static_cast<uint64_t>(bestC)));
-        std::vector<Spec> specs = drawSpecs(prof, form, cr, mixable);
+        std::vector<Spec> specs = drawSpecs(prof, form, cr, mixable, opener);
+        if (openOnAtmosphere && (specs.empty() || specs.front().role != Role::AmbientIntro))
+            specs.insert(specs.begin(), Spec{ Role::AmbientIntro, std::max(16, prof.ambientIntroBars / 8 * 8) });
         fitTo32(specs, mixable ? 32 : 16);
         int last = -1;
         for (const Rewrite& w : rewrites) {

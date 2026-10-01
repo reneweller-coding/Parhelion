@@ -111,6 +111,14 @@ public:
     /** @brief The bar of the last performNow while it waits to be heard, -1 none. */
     int pendingNow() const { return nowBar_.load(); }
     bool isComposing() const { return composing_.load(); }   ///< whether the composer thread is at work
+    /** @brief Whether the knobs ask for a DJ mix (set.minutes above 0) rather than a single track. */
+    bool mixChosen() const;
+    /**
+     * @brief A single track or a DJ mix (message thread, 01.10.2026 -- after Totality's Phase 21): set.minutes to 0, or
+     *        back to the mix's last length (60 min at first); then composes, if what plays is not that already.
+     */
+    void chooseMix(bool mix);
+    bool playingMix() const { std::lock_guard<std::mutex> g(lock_); return current_.isSet; }   ///< whether what plays is a DJ mix
     uint64_t seed() const { std::lock_guard<std::mutex> g(lock_); return seed_; }   ///< the seed of what plays
     juce::String curationText() const;               ///< the rerolls, for the panel
     /** @brief The track under @p beat (its index in what plays), -1 if none. In a set, the one that owns the low end. */
@@ -262,6 +270,7 @@ private:
     double sampleRate_ = 48000.0;
     int blockSize_ = 512;
     juce::String lastExport_;
+    float mixMinutes_ = 60.0f;                       ///< the mix's length while a single track is chosen (chooseMix; the state)
     std::unique_ptr<std::thread> exporter_;
     std::vector<float> record_;                      ///< interleaved, allocated in prepareToPlay in the test mode only
     size_t recordTarget_ = 0;

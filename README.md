@@ -7,7 +7,7 @@ its detuned neighbours, which is what the JP-8000's supersaw is.
 
 ![Parhelion](docs/screenshot.png)
 
-**State (30.09.2026): version 1.0.0, Phases 0 to 8** ([release notes](docs/RELEASE_NOTES.md)). The frame (copied modules with their origin in every header), the parameter
+**State (01.10.2026): version 1.0.1, Phases 0 to 8** ([release notes](docs/RELEASE_NOTES.md)). The frame (copied modules with their origin in every header), the parameter
 system, the score with sections, the layer matrix and the ghost kick, the deck with kick, sub, mid-bass, 303, a
 twelve-lane kit, six polyphonic voices (Phosphene's JP-8000 supersaw, VA, FM and wavetable, the circuit filters, the
 trance gate with its classic sixteenth masks), the pump on every bus, three rooms (room, plate, hall), the master.
@@ -36,9 +36,10 @@ report). Every melodic voice has a modulation block of its own: a modulation env
 an eight-slot matrix, fed by velocity, key, a random value, the wheel, the pressure and the score's energy, onto the
 targets its model has -- the bow's pressure, speed and place, the choir's vowel and formants, the brass's breath and
 blare, the hammer's and the mallet's hardness, the pitch, the level, the pan. The plugin -- VST3 and standalone, passing
-pluginval at strictness 10 -- has a page per group of synths, each voice with its preset bar (the sixteen groups, the
-user's own presets, and the preset the composer chose for the track that plays), its modulation block, the arrangement
-with its layer matrix and energy curve, a performer's page (mutes, master filter, echo throw, mod wheel, "Breakdown
+pluginval at strictness 10 -- composes a single track or a DJ mix (two buttons and one length on top), has a page per
+group of synths, each voice with its preset bar (the sixteen groups, the user's own presets, and the preset the composer
+chose for the track that plays), its modulation block, the arrangement with its layer matrix and energy curve (the
+mouse wheel zooms down to four bars, where the notes themselves show), a performer's page (mutes, master filter, echo throw, mod wheel, "Breakdown
 now" and "Drop now", which rewrite the playing track from its next 8-bar line), the mixer, the export and the styles
 against their references. On the Meta Quest (Quest/README.md) the whole generator runs natively and is played with the
 hands, "Breakdown now" and "Drop now" as a held pinch, handed over to a second engine on a beat without a gap, under the

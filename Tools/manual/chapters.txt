@@ -35,16 +35,20 @@ light. In trance the drop is the sun; everything before it is the halo.
 
 == Quick start | | - ==
 
-The standalone plays by itself: press Play. Compose writes a new track with the knobs as they stand, New seed draws a
-fresh one. The status line tells what plays: its style and form, its tempo, its key with the Camelot label a DJ mixes
+The standalone plays by itself: press Play. Beside the key, choose what Parhelion writes: a single Track or a DJ mix,
+and its Length beside them (a track 2 to 14 minutes, a mix 10 minutes to 12 hours). A click on either composes it at
+once; Compose (it reads "Compose track" or "Compose mix") writes another with the knobs as they stand, and is lit
+while what plays is the other kind; New seed draws a fresh one. The status line begins with what plays -- "single
+track" or "DJ mix of 6 tracks" -- and tells its style and form, its tempo, its key with the Camelot label a DJ mixes
 by, and its length. While a track begins to play, Parhelion measures it in the background: each voice is set against
 the kick in a window of its own, every breakdown against the drop by the distance the style's references keep, every
 build a little under the drop, and the drop to the style's loudness. The status says "levelling" until the
 corrections have glided in.
 
-For a set, move Set min above zero: Parhelion then writes a set of that many minutes -- a dramaturgy of energy and
-tempo, tracks in neighbouring keys on the Camelot wheel, the incoming track's intro under the outgoing track's outro,
-the bass swapped on the mixer's isolator, the next track's hook teased on the third deck.
+A DJ mix (a set: the Set page names it so) is a dramaturgy of energy and tempo, tracks in neighbouring keys on the
+Camelot wheel, the incoming track's intro under the outgoing track's outro, the bass swapped on the mixer's isolator,
+the next track's hook teased on the third deck. Its first track may open on its atmosphere, as a track alone does --
+nothing is mixed into it --; every other track opens with its DJ intro, the kick and the hats from the first bar.
 
 In a DAW, Parhelion is an instrument plugin that follows the host's transport: it plays when the host plays, jumps
 when the host jumps, and plays at the host's tempo (a set's own tempo drift is the standalone's and the export's). Its
@@ -54,7 +58,7 @@ its true peak under -1 dBTP.
 A reroll draws one part of the track again and leaves the rest as it was: the form, the layer matrix, the energy, the
 harmony, the motif, the lead, the bass, the 303, the arp, the pluck, the piano, the orchestra, the drums, the effects,
 the sounds. In a set the rerolls act on the track under the playhead, and "reroll the whole track" or "reroll the
-set's plan" draw more at once (the Arrange page).
+mix's plan" draw more at once (the Arrange page).
 
 == The track and the set | compose set djfx | 0 ==
 
@@ -149,8 +153,20 @@ preset's.
 The arrangement across the whole length: in a track its sections by name, and under them a lane per layer -- kick,
 sub, bass, 303, the hats, the clap, the ride, the percussion, the crash, pluck, arp, pad, lead, counter, stab, effects
 --, bright where the layer plays open, dim where it plays filtered. Over them the energy curve the composer wrote. In
-a set the tracks lie on decks A and B, their bass swaps marked, and the teases on deck C. A click jumps there. The
-line above names the style, the form, the tempo, the key, the progression, the bass figure, the main drop and, where
+a mix the tracks lie on decks A and B, their bass swaps marked, and the teases on deck C. Under it a ruler: a track's
+bars and their time, a mix's minutes. A click jumps there.
+
+The mouse wheel zooms in around the pointer, down to four bars; drag, or turn the wheel with Shift held (or sideways),
+to move along; a double click shows the whole length again. Zoomed in, the notes themselves stand in the lanes -- every
+kick, every hat, the chords of the pad, the lead's line --, a bar under the ruler shows where the window lies, and the
+strip on top of the panel marks it too; when the playhead runs out of the window, the window pages on with it (not when
+you moved it away). The same works on the strip on top.
+
+[image screenshots/set.png: A DJ mix of forty minutes: its tracks on decks A and B, the ruler in minutes]
+
+[image screenshots/zoom.png: Zoomed in on a main drop: the notes in the lanes, the window marked on the strip on top]
+
+The line above names the style, the form, the tempo, the key, the progression, the bass figure, the main drop and, where
 there is one, the orchestra and the key change; the line below the preset of every synth.
 
 The row of rerolls acts on the track under the playhead; each part is drawn from a stream of its own, so a reroll of

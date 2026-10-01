@@ -63,7 +63,7 @@ Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req, 
 
     std::vector<Rewrite> rewrites = req.earlier;
     if (req.rewriteBar >= 0) rewrites.push_back({ req.rewriteBar, req.rewriteKind });
-    const Plan plan = planTrackRewritten(prof, askBars, stream, req.mixable, rewrites);
+    const Plan plan = planTrackRewritten(prof, askBars, stream, req.mixable, rewrites, req.opener);
     const Harmony harm = composeHarmony(plan, prof, key, scale, stream("harmony"));
 
     Score sc;
