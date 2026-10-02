@@ -63,7 +63,9 @@ jobs:
           mkdir -p "$out"
           cp "$app" "$cli" "$out/"
           cp -R "$vst" "$lv2" "$out/"
-          strip "$out/Parhelion" "$out/parh_render" "$out/Parhelion.vst3/Contents/x86_64-linux/Parhelion.so" "$out/Parhelion.lv2/Parhelion.so"
+          strip "$out/Parhelion" "$out/parh_render" "$out/Parhelion.vst3/Contents/x86_64-linux/Parhelion.so"
+          find "$out/Parhelion.lv2" -name "*.so" -exec strip {} +
+          ls "$out/Parhelion.lv2"
           cp LICENSE "$out/LICENSE.txt"
           if [ -f docs/manual/Parhelion-Manual.pdf ]; then cp docs/manual/Parhelion-Manual.pdf "$out/"; fi
           cat > "$out/README-Linux.txt" <<'EOF'
