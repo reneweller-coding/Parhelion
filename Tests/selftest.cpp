@@ -2263,6 +2263,40 @@ void testNoteTap()
     check(off.ons == 0, "the composer off: nothing tapped", fmt("%d notes", off.ons));
 }
 
+/** The keyboard's split (02.10.2026): a key that names its target plays that voice, whatever Keyboard Plays says --
+ *  with Keyboard Plays off a plain key is silent, a key naming Lead sounds; its release finds it. */
+void testKeySplit()
+{
+    section("keyboard split (a key names its voice)");
+    auto p = std::make_unique<ParamStore>();
+    const Score score = composeTrack(*p, 21);
+    auto run = [&](int target) {
+        auto e = std::make_unique<Engine>();
+        e->params().parseText("perform.composer=0");
+        e->setLive(true);
+        e->prepare(48000.0, 256);
+        e->load(score);
+        e->seek(128.0);
+        std::vector<float> L(256), R(256);
+        double held = 0.0, after = 0.0;
+        for (int b = 0; b < 48000 * 4 / 256; ++b) {
+            if (b == 50) e->queueLive(5, 72, 110, 0, true, target);
+            if (b == 200) e->queueLive(5, 72, 0, 0, false, target);
+            e->process(L.data(), R.data(), 256);
+            double sum = 0.0;
+            for (int i = 0; i < 256; ++i) sum += static_cast<double>(L[static_cast<size_t>(i)]) * L[static_cast<size_t>(i)];
+            if (b >= 60 && b < 200) held += sum;
+            if (b >= 650) after += sum;
+        }
+        return std::pair<double, double>(held, after);
+    };
+    const auto plain = run(-1);
+    const auto named = run(perform::keys::Lead);
+    check(plain.first < 1e-9, "Keyboard Plays off: a plain key is silent", fmt("%.3g", plain.first));
+    check(named.first > 1e-3, "a key naming its voice plays it", fmt("%.3g", named.first));
+    check(named.second < 0.05 * named.first, "and its release ends it", fmt("%.3g after, %.3g held", named.second, named.first));
+}
+
 /** @brief Every section, in the order they run. */
 const TestSection kSections[] = {
     { "testTempoMap", testTempoMap },
@@ -2299,6 +2333,7 @@ const TestSection kSections[] = {
     { "testOpening", testOpening },
     { "testKeyboard", testKeyboard },
     { "testNoteTap", testNoteTap },
+    { "testKeySplit", testKeySplit },
 };
 
 } // namespace

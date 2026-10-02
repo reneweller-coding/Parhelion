@@ -479,14 +479,14 @@ int Engine::keyboardTarget(int channel) const
     return channel >= 0 && channel < 14 ? kChannel[channel] : perform::keys::Off;
 }
 
-void Engine::queueLive(int offset, int pitch, int velocity, int channel, bool on)
+void Engine::queueLive(int offset, int pitch, int velocity, int channel, bool on, int target)
 {
     if (!live_ || pitch < 0 || pitch > 127 || liveCount_ >= kLiveQueue) return;
     LiveKey k;
     k.at = sample_ + std::max(0, offset);
     k.pitch = pitch;
     k.velocity = static_cast<float>(std::clamp(velocity, 1, 127)) / 127.0f;
-    k.target = on ? keyboardTarget(channel) : liveTarget_[pitch] - 1;
+    k.target = on ? (target > perform::keys::Off ? target : keyboardTarget(channel)) : liveTarget_[pitch] - 1;   // the split names one
     k.on = on;
     if (k.target <= perform::keys::Off) return;
     liveQueue_[liveCount_++] = k;

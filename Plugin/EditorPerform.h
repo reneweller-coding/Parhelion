@@ -64,6 +64,15 @@ private:
     std::unique_ptr<juce::ComboBoxParameterAttachment> keyPartAttach_;   ///< keyPart_ on its parameter
     std::unique_ptr<juce::ComboBoxParameterAttachment> keyModeAttach_;   ///< keyMode_ on its parameter
     std::unique_ptr<juce::ButtonParameterAttachment> composerAttach_;   ///< composer_ on its parameter
+    // The keyboard's options (02.10.2026): the lower keys' voice and the split, Scale Lock, the velocity curve.
+    std::unique_ptr<frame::Choice> keyLower_;   ///< perform.keyboard_lower: the voice under the split (Off: none)
+    std::unique_ptr<frame::Choice> keySplit_;   ///< perform.keyboard_split: the split key
+    std::unique_ptr<frame::Switch> keyScale_;   ///< perform.keyboard_scale: Scale Lock
+    std::unique_ptr<frame::Choice> keyVelocity_;   ///< perform.keyboard_velocity: the velocity curve
+    std::unique_ptr<juce::ComboBoxParameterAttachment> keyLowerAttach_;   ///< keyLower_ on its parameter
+    std::unique_ptr<juce::ComboBoxParameterAttachment> keySplitAttach_;   ///< keySplit_ on its parameter
+    std::unique_ptr<juce::ButtonParameterAttachment> keyScaleAttach_;     ///< keyScale_ on its parameter
+    std::unique_ptr<juce::ComboBoxParameterAttachment> keyVelocityAttach_;   ///< keyVelocity_ on its parameter
     juce::Rectangle<int> keyArea_;                 ///< the Keyboard group's box
 };
 

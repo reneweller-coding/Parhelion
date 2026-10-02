@@ -292,6 +292,7 @@ private:
     int keyboardSeen_ = 0;   ///< the keyboard target of the last block (audio thread): a change releases every key
     // MIDI out (02.10.2026): the composer's notes as the decks play them, on the channels of the MIDI export (Midi.h).
     parh::NoteTap noteTap_;   ///< what the decks played in the last process() call (audio thread)
+    frame::KeyMemory keyMemory_;   ///< where each held key went (the split, Scale Lock), so its release follows (02.10.2026)
     /** @brief A note-off due later, for a note whose part has none of its own (NoteTap::Note::offSample). */
     struct PendingOff {
         int64_t sample;    ///< when, on the engine's sample counter

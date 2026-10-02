@@ -971,8 +971,30 @@ void ParhelionProcessor::perform(const juce::MidiBuffer& midi)
         const juce::MidiMessage m = meta.getMessage();
         if (m.isAllNotesOff() || m.isAllSoundOff()) {
             engine_.liveAllOff();
+            keyMemory_.clear();
         } else if (keys && (m.isNoteOn() || m.isNoteOff())) {
-            engine_.queueLive(meta.samplePosition, m.getNoteNumber(), m.getVelocity(), m.getChannel() - 1, m.isNoteOn());
+            // The keyboard's options (02.10.2026): the keys under the split play the lower voice, Scale Lock moves a key
+            // to the nearest note of the track's key and scale (not on the kit, whose keys are its instruments), the
+            // velocity goes through its curve. Where a press went, its release goes too.
+            const int ch = m.getChannel() - 1, key = m.getNoteNumber();
+            if (m.isNoteOn()) {
+                const int lower = s.getInt(s.id(Module::Perform, 0, perform::KeyboardLower));
+                const int split = 36 + 12 * s.getInt(s.id(Module::Perform, 0, perform::KeyboardSplit));
+                const int target = lower != perform::keys::Off && key < split ? lower : -1;
+                int pitch = key;
+                if (s.getBool(s.id(Module::Perform, 0, perform::KeyboardScale))
+                    && (target >= 0 ? target : engine_.keyTargetFor(ch)) != perform::keys::Kit) {
+                    const Score& sc = engine_.deck(std::max(0, engine_.leadDeck())).score();
+                    pitch = frame::snapToScale(key, sc.keyRoot, frame::scaleMask(kScaleNames[std::clamp(sc.scale, 0, 5)]));
+                }
+                const int velocity = frame::shapeVelocity(m.getVelocity(), s.getInt(s.id(Module::Perform, 0, perform::KeyboardVelocity)));
+                keyMemory_.press(ch, key, target, pitch);
+                engine_.queueLive(meta.samplePosition, pitch, velocity, ch, true, target);
+            } else {
+                int target = -1, pitch = key;
+                keyMemory_.release(ch, key, target, pitch);
+                engine_.queueLive(meta.samplePosition, pitch, 0, ch, false, target);
+            }
         } else if (m.isNoteOn()) {
             // The keys from middle C: C kick, C# bass, D hats, D# perc, E lead, F synths, F# pads -- each press toggles.
             const int k = m.getNoteNumber() - 60;

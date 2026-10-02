@@ -342,6 +342,10 @@ enum : int { Filter, Throw, MuteKick, MuteBass, MuteHats, MutePerc, MuteLead, Mu
              KeyboardPart,   ///< what a MIDI keyboard plays (perform::keys, 01.10.2026); off: the keys toggle the mutes
              KeyboardMode,   ///< 0 Replace: the played voice's generated notes are left out; 1 Layer: it plays over them
              Composer,       ///< on: the composer's notes play; off: only what the keyboard plays
+             KeyboardLower,  ///< the keys below KeyboardSplit play this voice instead (perform::keys; Off: no split; 02.10.2026)
+             KeyboardSplit,  ///< the split key: C1 (36) .. C5 (84), 12 a step
+             KeyboardScale,  ///< Scale Lock: a played key goes to the nearest note of the track's key and scale (not the kit)
+             KeyboardVelocity,   ///< the velocity curve: as played, soft, hard, fixed (frame::shapeVelocity)
              Count };
 /**
  * @brief The keyboard's targets (perform.keyboard_part, 01.10.2026, Engine::queueLive): the kit -- C1 (36) the kick,

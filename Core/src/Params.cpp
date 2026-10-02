@@ -68,6 +68,8 @@ const char* const kMorphToNames[] = { "Off", "Uplifting", "Progressive", "Dream 
 const char* const kKeyboardPartNames[] = { "Off", "Kit", "Bass", "303", "Lead", "Counter", "Pluck", "Arp", "Pad", "Stab", "Piano",
                                            "Strings", "Choir", "Brass", "By channel" };   // perform::keys
 const char* const kKeyboardModeNames[] = { "Replace", "Layer" };   ///< perform.keyboard_mode
+const char* const kKeyboardSplitNames[] = { "C1", "C2", "C3", "C4", "C5" };   ///< perform.keyboard_split: 36 .. 84
+const char* const kKeyboardVelocityNames[] = { "As Played", "Soft", "Hard", "Fixed" };   ///< perform.keyboard_velocity
 const char* const kKickEngineNames[] = { "Sweep", "Resonator", "909" };   ///< kick.engine
 const char* const kKickTuneNames[] = { "Free", "Key", "Fifth", "Flat Seventh" };   ///< kick.tune (KickTune)
 const char* const kKickClipNames[] = { "Soft", "Hard" };   ///< kick.clip
@@ -635,6 +637,12 @@ const ParamDesc kPerformParams[perform::Count] = {
     { "keyboard_part", "Keyboard Plays", "", 0.0f, 14.0f, 0.0f, Curve::Choice, kKeyboardPartNames },
     { "keyboard_mode", "Keyboard Mode",  "", 0.0f, 1.0f, 0.0f, Curve::Choice, kKeyboardModeNames },
     { "composer",      "Composer",       "", 0.0f, 1.0f, 1.0f, Curve::Toggle },
+    // The keyboard's options (02.10.2026), all off by default: a split with a second voice under it, Scale Lock, the
+    // velocity curve. The lower keys choose among the voices (not by channel).
+    { "keyboard_lower",    "Lower Keys Play", "", 0.0f, 13.0f, 0.0f, Curve::Choice, kKeyboardPartNames },
+    { "keyboard_split",    "Split At",        "", 0.0f, 4.0f, 2.0f, Curve::Choice, kKeyboardSplitNames },
+    { "keyboard_scale",    "Scale Lock",      "", 0.0f, 1.0f, 0.0f, Curve::Toggle },
+    { "keyboard_velocity", "Velocity Curve",  "", 0.0f, 3.0f, 0.0f, Curve::Choice, kKeyboardVelocityNames },
 };
 
 /** The OSC cues (Cue.h). */

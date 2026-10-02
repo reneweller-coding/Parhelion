@@ -95,6 +95,21 @@ PerformPage::PerformPage(ParhelionProcessor& p) : proc_(p)
                               "effects go on as composed.");
         composerAttach_ = std::make_unique<juce::ButtonParameterAttachment>(*proc_.parameter(cid), *composer_);
         addAndMakeVisible(*composer_);
+        // The options (02.10.2026), all off by default.
+        choice(keyLower_, keyLowerAttach_, s.id(Module::Perform, 0, perform::KeyboardLower),
+               "A split: the keys below Split At play this voice, the keys from it the one above (Off: no split).");
+        choice(keySplit_, keySplitAttach_, s.id(Module::Perform, 0, perform::KeyboardSplit),
+               "The lowest key the upper voice plays, when Lower Keys Play names a voice.");
+        const int sid = s.id(Module::Perform, 0, perform::KeyboardScale);
+        keyScale_ = std::make_unique<frame::Switch>(nullptr, sid);
+        keyScale_->setButtonText("Scale Lock");
+        keyScale_->setTooltip("A played key goes to the nearest note of the track's key and scale (the kit's keys stay its "
+                              "instruments).");
+        keyScaleAttach_ = std::make_unique<juce::ButtonParameterAttachment>(*proc_.parameter(sid), *keyScale_);
+        addAndMakeVisible(*keyScale_);
+        choice(keyVelocity_, keyVelocityAttach_, s.id(Module::Perform, 0, perform::KeyboardVelocity),
+               "How a key's velocity reaches the voice: as played, soft (a light touch louder), hard (more effort for "
+               "the loud end) or fixed (always 100).");
     }
     bigSlider(wheel_, s.id(Module::Perform, 0, perform::Wheel), parhui::familyColour(parhui::Family::Source));
     wheel_.setTooltip("The mod wheel: a source of every voice's modulation matrix -- what it moves is the preset's (MIDI controller 1)");
@@ -199,7 +214,7 @@ void PerformPage::resized()
     }
     // Right of the decks: the keyboard, the headset under it.
     auto right = r.withTrimmedLeft(20);
-    keyArea_ = right.removeFromTop(150);
+    keyArea_ = right.removeFromTop(150 + 4 * 36);   // three lines and the four options (02.10.2026)
     {
         auto k = keyArea_.reduced(12, 8);
         k.removeFromTop(24);   // the title (paint)
@@ -211,6 +226,10 @@ void PerformPage::resized()
         keyLine(*keyPart_);
         keyLine(*keyMode_);
         keyLine(*composer_);
+        keyLine(*keyLower_);
+        keyLine(*keySplit_);
+        keyLine(*keyScale_);
+        keyLine(*keyVelocity_);
     }
     right.removeFromTop(12);
     headsetArea_ = headset_ ? right : juce::Rectangle<int>();
@@ -247,7 +266,9 @@ void PerformPage::paint(juce::Graphics& g)
         g.setColour(parhui::colour::dim);
         g.setFont(juce::FontOptions(13.0f));
         for (auto [c, name] : { std::pair<juce::Component*, const char*>{ keyPart_.get(), "Plays" }, { keyMode_.get(), "Mode" },
-                                { composer_.get(), "Composer" } })
+                                { composer_.get(), "Composer" }, { keyLower_.get(), "Lower Keys" },
+                                { keySplit_.get(), "Split At" }, { keyScale_.get(), "Scale" },
+                                { keyVelocity_.get(), "Velocity" } })
             g.drawText(name, keyArea_.getX() + 12, c->getY(), 96, c->getHeight(), juce::Justification::centredLeft);
     }
     if (headset_ && !headsetArea_.isEmpty())   // the headset (the frame): what the hands do, and how they stand now
