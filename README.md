@@ -7,7 +7,7 @@ breakdown with its tease, the build, the empty beat before the drop; a lead moti
 the tracks everyone knows; the JP-8000's supersaw, a physical piano and a synthesised orchestra; and the pump of the
 ghost kick on every bus. Everything is synthesised; nothing is played back from a recording.
 
-**VST3 plugin and standalone application** for Windows (x64) and macOS (Apple Silicon), a command-line renderer, and a native app for **Meta
+**VST3 plugin and standalone application** for Windows (x64), macOS (Apple Silicon) and Linux (x86-64), a command-line renderer, and a native app for **Meta
 Quest**. Licence: AGPL-3.0.
 
 <br clear="left" />
@@ -32,6 +32,10 @@ page of the panel as a picture and what each control does.
 **[macOS zip](https://github.com/reneweller-coding/Parhelion/releases/download/v1.2.0/Parhelion-1.2.0-macOS.zip)** for Apple Silicon (macOS 12 or newer): the standalone and
 the VST3, built on GitHub's runners and attached to the release within the hour after it; signed ad hoc,
 not notarized (README-macOS.txt inside says how to open it), and not yet tried on a real Mac.
+
+**[Linux archive](https://github.com/reneweller-coding/Parhelion/releases/download/v1.2.0/Parhelion-1.2.0-linux-x86_64.tar.gz)** for x86-64 (glibc 2.35 or newer: Ubuntu 22.04, Debian 12,
+Fedora 36 and later): the standalone, the VST3 and the renderer, built and tested on GitHub's Ubuntu runners
+and tried under WSL; README-Linux.txt inside says where everything goes.
 
 Requirements: Windows 10 or 11, a 64-bit processor with AVX2 (every x86-64 since 2013), and a VST3 host if you want
 the plugin; Meta Quest 2 or later for the app. The installer is not code-signed: Windows' SmartScreen may warn once.
