@@ -9,7 +9,7 @@
 #
 # Copied from Totality's root CMakeLists.txt at 4d3c0d2 (29.09.2026), which was built after Ephemeris's; the rules are theirs.
 cmake_minimum_required(VERSION 3.22)
-project(Parhelion VERSION 1.1.0 LANGUAGES C CXX)
+project(Parhelion VERSION 1.2.0 LANGUAGES C CXX)
 
 # The family's layout (01.10.2026): build/<preset>, bin/<preset>, dist/, work/ -- cmake/Family.cmake,
 # CMakePresets.json and build.ps1, the same in every repository of the family.

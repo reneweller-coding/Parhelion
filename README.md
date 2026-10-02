@@ -7,7 +7,7 @@ breakdown with its tease, the build, the empty beat before the drop; a lead moti
 the tracks everyone knows; the JP-8000's supersaw, a physical piano and a synthesised orchestra; and the pump of the
 ghost kick on every bus. Everything is synthesised; nothing is played back from a recording.
 
-**VST3 plugin and standalone application** for Windows (x64), a command-line renderer, and a native app for **Meta
+**VST3 plugin and standalone application** for Windows (x64) and macOS (Apple Silicon), a command-line renderer, and a native app for **Meta
 Quest**. Licence: AGPL-3.0.
 
 <br clear="left" />
@@ -19,18 +19,31 @@ its detuned neighbours, which is what the supersaw is.
 
 ## Download
 
-**[Parhelion-1.1.0-Setup.exe](https://github.com/reneweller-coding/Parhelion/releases/download/v1.1.0/Parhelion-1.1.0-Setup.exe)**
+**[Parhelion-1.2.0-Setup.exe](https://github.com/reneweller-coding/Parhelion/releases/download/v1.2.0/Parhelion-1.2.0-Setup.exe)**
 installs the standalone, the VST3, the offline renderer and the manual. Nothing else has to be installed: the runtime
 is linked in. There is a
-**[portable zip](https://github.com/reneweller-coding/Parhelion/releases/download/v1.1.0/Parhelion-1.1.0-portable.zip)**
+**[portable zip](https://github.com/reneweller-coding/Parhelion/releases/download/v1.2.0/Parhelion-1.2.0-portable.zip)**
 for anyone who would rather not run an installer, the
-**[Quest app](https://github.com/reneweller-coding/Parhelion/releases/download/v1.1.0/ParhelionQuest-1.1.0.apk)**
+**[Quest app](https://github.com/reneweller-coding/Parhelion/releases/download/v1.2.0/ParhelionQuest-1.2.0.apk)**
 (installed with `adb install -r`, developer mode; not yet run on a headset), and the
-**[manual](https://github.com/reneweller-coding/Parhelion/releases/download/v1.1.0/Parhelion-Manual.pdf)** -- every
+**[manual](https://github.com/reneweller-coding/Parhelion/releases/download/v1.2.0/Parhelion-Manual.pdf)** -- every
 page of the panel as a picture and what each control does.
+
+**[macOS zip](https://github.com/reneweller-coding/Parhelion/releases/download/v1.2.0/Parhelion-1.2.0-macOS.zip)** for Apple Silicon (macOS 12 or newer): the standalone and
+the VST3, built on GitHub's runners and attached to the release within the hour after it; signed ad hoc,
+not notarized (README-macOS.txt inside says how to open it), and not yet tried on a real Mac.
 
 Requirements: Windows 10 or 11, a 64-bit processor with AVX2 (every x86-64 since 2013), and a VST3 host if you want
 the plugin; Meta Quest 2 or later for the app. The installer is not code-signed: Windows' SmartScreen may warn once.
+
+## Demos
+
+[![Parhelion, the Uplifting demo, with pictures by KaleidoscopeEnhanced (click for the video)](docs/demo.jpg)](https://github.com/reneweller-coding/Parhelion/releases/download/demos/uplifting.mp4)
+
+A track per style, rendered by `parh_render` and nothing else: [Uplifting](https://github.com/reneweller-coding/Parhelion/releases/download/demos/uplifting.mp3), [Progressive](https://github.com/reneweller-coding/Parhelion/releases/download/demos/progressive.mp3), [Dream House](https://github.com/reneweller-coding/Parhelion/releases/download/demos/dream.mp3), [Acid](https://github.com/reneweller-coding/Parhelion/releases/download/demos/acid.mp3), [Deep](https://github.com/reneweller-coding/Parhelion/releases/download/demos/deep.mp3) (MP3). The video is the Uplifting demo with pictures by
+[KaleidoscopeEnhanced](https://github.com/reneweller-coding/KaleidoscopeEnhanced), its cuts placed by the
+track's own score cues (the bars, the sections, the drops). `Tools/demo/make_demos.py` renders them all again; they live on the release
+[demos](https://github.com/reneweller-coding/Parhelion/releases/tag/demos).
 
 ## How it is put together
 
@@ -102,6 +115,14 @@ parhelion in the sky at the size of a room.
 The plan, in German, with the reasons for everything: [docs/PLAN.md](docs/PLAN.md). The research it rests on:
 [docs/research](docs/research). The manual is built out of the program itself
 ([docs/manual](docs/manual/Parhelion-Manual.pdf)).
+
+## With a DAW and other apps
+
+In a DAW Parhelion sends what it plays as MIDI -- every part on a channel of its own, as in the MIDI export -- and has a
+stereo output per stem besides the main one, off until the host switches them on, so a part can be recorded as
+notes or mixed on a channel of its own. The standalone joins an **Ableton Link** session (Settings > Ableton
+Link): the session's tempo, its bars, its start and stop. A MIDI keyboard can be split between two voices,
+locked to the scale and given a velocity curve (the Keyboard group). The manual has the details (With a DAW and other apps).
 
 ## Build
 
@@ -185,6 +206,11 @@ matrix), the loudness of the whole and of every section, and the distance betwee
 loudest three seconds (the research document's 4 to 8 LU). The WAV carries a cue marker at every section;
 `--stems dir` writes a WAV per part, their sum the mix before the master; `--list` prints every parameter,
 `--set "key=value; ..."` changes them.
+
+## The family
+
+Parhelion is one of five instruments that share their build, their panel and the hands of a Meta Quest: [Noctuary](https://github.com/reneweller-coding/Noctuary) (ambient), [Phosphene](https://github.com/reneweller-coding/Phosphene) (psytrance), [Ephemeris](https://github.com/reneweller-coding/Ephemeris) (Berlin School), [Totality](https://github.com/reneweller-coding/Totality) (techno) and [Parhelion](https://github.com/reneweller-coding/Parhelion) (trance).
+All five, with their demos, on one page: **[reneweller-coding.github.io/VRAudio](https://reneweller-coding.github.io/VRAudio/)**.
 
 ## Licence
 
