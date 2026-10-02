@@ -11,7 +11,8 @@ juce_add_plugin(Parhelion
     COPY_PLUGIN_AFTER_BUILD     FALSE
     PLUGIN_MANUFACTURER_CODE    Rnwl
     PLUGIN_CODE                 Parh
-    FORMATS                     VST3 Standalone
+    FORMATS                     ${FAMILY_PLUGIN_FORMATS}   # VST3, Standalone; AU on macOS, LV2 on Linux (Family.cmake)
+    LV2URI                      "https://github.com/reneweller-coding/Parhelion"
     NEEDS_CURL                  TRUE
     VST3_CATEGORIES             Instrument Synth
     VERSION                     ${PROJECT_VERSION}
