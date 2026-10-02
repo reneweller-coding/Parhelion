@@ -100,7 +100,7 @@ void designBiquad(double b0, double b1, double b2, double a0, double a1, double 
 } // namespace
 
 ParhelionProcessor::ParhelionProcessor()
-    : juce::AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+    : juce::AudioProcessor(busLayout()),
       juce::Thread("Parhelion composer")
 {
     ParamStore& s = store();
@@ -584,6 +584,14 @@ void ParhelionProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         tapR_[static_cast<size_t>(d)] = tapBuf_.data() + static_cast<size_t>((2 * d + 1) * blockSize_);
     }
     engine_.setDeckTaps(tapL_.data(), tapR_.data());
+    // The stems' buffers for their outputs (02.10.2026); the engine writes them only while a stem's bus is on.
+    stemBuf_.assign(static_cast<size_t>(Engine::kStems * 2 * blockSize_), 0.0f);
+    for (int s = 0; s < Engine::kStems; ++s) {
+        stemL_[static_cast<size_t>(s)] = stemBuf_.data() + static_cast<size_t>(2 * s * blockSize_);
+        stemR_[static_cast<size_t>(s)] = stemBuf_.data() + static_cast<size_t>((2 * s + 1) * blockSize_);
+    }
+    engine_.setStems(nullptr, nullptr);
+    stemsOn_ = false;
     engine_.setNoteTap(&noteTap_);   // MIDI out (02.10.2026)
     // The K-weighting of BS.1770 at this rate (the pre-filter's shelf and the RLB high pass, as pyloudnorm designs them).
     {
@@ -616,9 +624,24 @@ void ParhelionProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     playedBpm_ = followsClock() ? hostBpm_.load() : 0.0;
 }
 
+juce::AudioProcessor::BusesProperties ParhelionProcessor::busLayout()
+{
+    BusesProperties b = BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true);
+    for (int s = 0; s < Engine::kStems; ++s) {
+        const juce::String name(Engine::stemName(s));
+        b = b.withOutput(name.substring(0, 1).toUpperCase() + name.substring(1), juce::AudioChannelSet::stereo(), false);
+    }
+    return b;
+}
+
 bool ParhelionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo()) return false;
+    for (int b = 1; b < layouts.outputBuses.size(); ++b) {   // a stem's bus: stereo, or off
+        const juce::AudioChannelSet& set = layouts.outputBuses.getReference(b);
+        if (!set.isDisabled() && set != juce::AudioChannelSet::stereo()) return false;
+    }
+    return true;
 }
 
 void ParhelionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -686,8 +709,26 @@ void ParhelionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     const int64_t start = engine_.samplePosition();
     if (start != midiExpect_) silenceMidi(midi);   // a jump: whatever sounded is released
     noteTap_.clear();
+    {   // The stems' outputs (02.10.2026): the engine writes the stems while the host has one of their buses on.
+        bool want = false;
+        for (int b = 1; b < getBusCount(false) && !want; ++b)
+            if (const auto* bus = getBus(false, b)) want = bus->isEnabled();
+        if (want != stemsOn_) {
+            engine_.setStems(want ? stemL_.data() : nullptr, want ? stemR_.data() : nullptr);
+            stemsOn_ = want;
+        }
+    }
     engine_.process(buffer.getWritePointer(0), buffer.getWritePointer(1), n);
     emitMidi(midi, start, n);
+    if (stemsOn_)
+        for (int b = 1; b < getBusCount(false) && b - 1 < Engine::kStems; ++b) {
+            const auto* bus = getBus(false, b);
+            if (bus == nullptr || !bus->isEnabled()) continue;
+            auto out = getBusBuffer(buffer, false, b);
+            if (out.getNumChannels() < 2) continue;
+            out.copyFrom(0, 0, stemL_[static_cast<size_t>(b - 1)], n);
+            out.copyFrom(1, 0, stemR_[static_cast<size_t>(b - 1)], n);
+        }
     if (link_.enabled() && !linkFollowing_.load(std::memory_order_relaxed) && n > 0)   // alone in the session: it takes our tempo
         link_.proposeTempo(60.0 * (engine_.beat() - before) * sampleRate_ / static_cast<double>(n), 0.0);
     midiExpect_ = engine_.samplePosition();
