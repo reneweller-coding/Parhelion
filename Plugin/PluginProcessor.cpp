@@ -437,7 +437,7 @@ SetScore ParhelionProcessor::forPlayback(const Playing& p) const
 {
     SetScore out = p.set;
     const double bpm = hostBpm_.load();
-    if (wrapperType != wrapperType_Standalone && bpm > 0.0)
+    if (followsClock() && bpm > 0.0)
         for (Score& s : out.decks) s.tempo.setConstant(bpm);
     return out;
 }
@@ -462,6 +462,11 @@ void ParhelionProcessor::loadEngine(const Playing& p)
 
 void ParhelionProcessor::timerCallback()
 {
+    // Ableton Link (02.10.2026): the standalone joins the session while the setting is on; a DAW's transport rules the
+    // plugin. The follow flag falls when the session goes.
+    link_.setEnabled(wrapperType == wrapperType_Standalone && (frame::Settings::of("Parhelion").link() || frame::LinkClock::forcedOn()));
+    link_.tick();
+    if (!link_.enabled()) linkFollowing_ = false;
     // The cue sender follows its two parameters (message thread: the socket is opened and closed here).
     {
         const ParamStore& s = store();
@@ -499,14 +504,17 @@ void ParhelionProcessor::timerCallback()
         // In a host the score plays at the host's tempo. A new tempo means new sample positions for every event, and
         // the engine allocates when it loads: so the score is loaded again here, and the engine goes on from its beat.
         const double bpm = hostBpm_.load();
-        if (wrapperType != wrapperType_Standalone && bpm > 0.0 && std::fabs(bpm - playedBpm_.load()) > 1.0e-3) {
+        // A Link session the standalone followed and now leads again (the others left, or Link went off): back to the
+        // composed tempo (02.10.2026).
+        const bool back = !followsClock() && playedBpm_.load() > 0.0;
+        if (back || (followsClock() && bpm > 0.0 && std::fabs(bpm - playedBpm_.load()) > 1.0e-3)) {
             Playing p;
             copyPlaying(p);
             suspendProcessing(true);
             const double beat = engine_.beat();
             loadEngine(p);
             engine_.seek(beat);
-            playedBpm_ = bpm;
+            playedBpm_ = back ? 0.0 : bpm;
             suspendProcessing(false);
         }
         if (again_ && !composing_) { again_ = false; compose(); }
@@ -522,7 +530,7 @@ void ParhelionProcessor::timerCallback()
     const bool resume = next->resume;
     const double at = engine_.beat();
     loadEngine(*next);
-    playedBpm_ = wrapperType != wrapperType_Standalone ? hostBpm_.load() : 0.0;
+    playedBpm_ = followsClock() ? hostBpm_.load() : 0.0;
     {
         std::lock_guard<std::mutex> g(lock_);
         current_ = std::move(*next);
@@ -605,7 +613,7 @@ void ParhelionProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     Playing p;
     copyPlaying(p);
     loadEngine(p);
-    playedBpm_ = wrapperType != wrapperType_Standalone ? hostBpm_.load() : 0.0;
+    playedBpm_ = followsClock() ? hostBpm_.load() : 0.0;
 }
 
 bool ParhelionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -635,6 +643,32 @@ void ParhelionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
                         if (std::fabs(*ppq - engine_.beat()) > (tempoPending ? 4.0 : 0.05)) engine_.seek(*ppq);
             }
         }
+    } else if (link_.enabled()) {
+        // Ableton Link (02.10.2026, LinkClock.h): with other apps in the session the standalone follows it as a DAW's
+        // playhead -- its tempo (the score reloaded at it on the message thread), its bar phase (the bars line up, the
+        // place in the track stays), its start and stop; alone in it, the standalone leads (the tempo goes out below).
+        const double latency = static_cast<double>(getLatencySamples() + n) / sampleRate_;
+        const frame::LinkClock::Now ln = link_.capture(latency, 4.0);
+        linkFollowing_ = ln.peers > 0;
+        if (ln.peers > 0) {
+            if (play != linkPlayed_) {
+                link_.setPlaying(play, latency, 4.0);   // Play or Stop pressed here: to the session
+            } else if (ln.playing != play) {
+                play = ln.playing;                      // pressed elsewhere: here too
+                playing_ = play;
+            }
+            hostBpm_ = ln.bpm;
+            const bool tempoPending = std::fabs(hostBpm_.load() - playedBpm_.load()) > 1.0e-3;
+            if (play && !tempoPending) {
+                double d = std::fmod(ln.beat - engine_.beat(), 4.0);
+                if (d > 2.0) d -= 4.0;
+                else if (d <= -2.0) d += 4.0;
+                if (std::fabs(d) > 0.05) engine_.seek(engine_.beat() + d);
+            }
+        }
+        linkPlayed_ = play;
+    } else {
+        linkFollowing_ = false;
     }
     const double seek = seekRequest_.exchange(-1.0);
     if (seek >= 0.0) engine_.seek(seek);
@@ -654,6 +688,8 @@ void ParhelionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     noteTap_.clear();
     engine_.process(buffer.getWritePointer(0), buffer.getWritePointer(1), n);
     emitMidi(midi, start, n);
+    if (link_.enabled() && !linkFollowing_.load(std::memory_order_relaxed) && n > 0)   // alone in the session: it takes our tempo
+        link_.proposeTempo(60.0 * (engine_.beat() - before) * sampleRate_ / static_cast<double>(n), 0.0);
     midiExpect_ = engine_.samplePosition();
     stripSamples_.fetch_add(n, std::memory_order_relaxed);
     position_ = engine_.beat();
@@ -739,6 +775,13 @@ void ParhelionProcessor::emitMidi(juce::MidiBuffer& midi, int64_t start, int n)
         if (nt.offSample >= 0 && pendingOffs_ < static_cast<int>(pendingOff_.size()))
             pendingOff_[static_cast<size_t>(pendingOffs_++)] = PendingOff{ std::max(nt.offSample, nt.sample + 1), static_cast<uint8_t>(channel), nt.pitch };
     }
+}
+
+juce::String ParhelionProcessor::linkStatus() const
+{
+    if (!link_.enabled()) return "off";
+    const int n = link_.peers();
+    return n == 0 ? "alone in the session: it takes this tempo" : juce::String(n) + (n == 1 ? " other app" : " other apps");
 }
 
 bool ParhelionProcessor::saveSet(const juce::File& file)
