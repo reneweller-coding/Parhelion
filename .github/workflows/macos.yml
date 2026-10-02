@@ -44,6 +44,7 @@ jobs:
           codesign --force --deep -s - "$out/Parhelion.app"
           codesign --force --deep -s - "$out/Parhelion.vst3"
           cp LICENSE "$out/LICENSE.txt"
+          if [ -f docs/manual/Parhelion-Manual.pdf ]; then cp docs/manual/Parhelion-Manual.pdf "$out/"; fi
           cat > "$out/README-macOS.txt" <<'EOF'
           Parhelion for macOS (Apple Silicon)
 
