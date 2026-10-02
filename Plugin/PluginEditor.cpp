@@ -1364,6 +1364,7 @@ void ParhelionEditor::showSettings()
     m.headsetStatus = [this] { return proc_.headset().statusText(); };
     if (proc_.wrapperType == juce::AudioProcessor::wrapperType_Standalone)   // Ableton Link, the standalone only (02.10.2026)
         m.linkStatus = [this] { return proc_.linkStatus(); };
+    m.jamStatus = [this] { return proc_.jamStatus(); };   // the family jam (02.10.2026), plugin and standalone
     m.about = [] { return juce::String("Trance -- uplifting, progressive, dream, acid, deep -- composed and synthesised.\ngithub.com/reneweller-coding/Parhelion"); };
     m.show(settings_);
 }

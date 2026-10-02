@@ -75,6 +75,16 @@ public:
     int64_t samplePosition() const { return sample_; }
     /** @brief Every deck writes the composer notes it plays into @p tap from now on (null: stops; MIDI out, 02.10.2026). */
     void setNoteTap(NoteTap* tap) { for (Deck& d : decks_) d.setNoteTap(tap); }
+    /**
+     * @brief The family jam (02.10.2026, the plugin's Jam.h), live only: the pitched parts @p transpose semitones away,
+     *        the leader's @p energy (0..1; negative: none) as a darker master filter while its knob rests, and with
+     *        @p rhythmOut the kick, the sub and the bass out for the leader's break.
+     */
+    void setJam(int transpose, float energy, bool rhythmOut)
+    {
+        for (Deck& d : decks_) d.setJam(transpose, rhythmOut);
+        jamEnergy_ = energy;
+    }
     /** @brief Current position in beats. */
     double beat() const { return tempo_.beatAt(seconds()); }
     /** @brief Length of the track or set in seconds. */
@@ -274,6 +284,8 @@ private:
     void playLive(const LiveKey& k);          ///< a queued key, now
     void releaseLive(int pitch);              ///< the key @p pitch, wherever it plays
     float perfFilter_ = 0.0f;   ///< perform.filter as read at the cell: -1 low pass .. 1 high pass
+    float jamEnergy_ = -1.0f;   ///< the family jam's energy (setJam); negative: no leader
+    float jamFilter_ = 0.0f;    ///< the master filter the jam's energy asks for, glided (updateCell)
     float perfThrow_ = 0.0f;   ///< perform.throw as read at the cell: the echo throw 0..1
     Svf perfFilt_[2];   ///< the master filter of the perform module, per channel
     std::vector<CueMark> cueMarks_;   ///< the cue marks of what is loaded

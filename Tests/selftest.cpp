@@ -2263,6 +2263,57 @@ void testNoteTap()
     check(off.ons == 0, "the composer off: nothing tapped", fmt("%d notes", off.ons));
 }
 
+/** The family jam (02.10.2026, the plugin's Jam.h): a follower's engine plays its pitched parts the jam's transposition
+ *  away, note for note, and the kit as written; in the leader's break the rhythm's foundation is out. */
+void testJam()
+{
+    section("family jam (a follower's engine)");
+    auto p = std::make_unique<ParamStore>();
+    const Score score = composeTrack(*p, 21);
+    struct Got {
+        std::vector<std::pair<int, int>> pitched;   ///< (part, pitch) of every pitched note-on, in order
+        std::vector<int> kit;                       ///< the kit's note-on pitches, in order
+        int out = 0;                                ///< note-ons of the parts a break takes out
+    };
+    auto isPitched = [](Part part) { return part == Part::Sub || part == Part::Bass || part == Part::Acid || part == Part::Lead || part == Part::Counter || part == Part::Pluck || part == Part::Arp || part == Part::Pad || part == Part::Stab || part == Part::Piano || part == Part::Strings || part == Part::Choir || part == Part::Brass || part == Part::Timpani; };
+    auto isOut = [](Part part) { return part == Part::Kick || part == Part::Sub || part == Part::Bass || part == Part::Acid; };
+    auto run = [&](int transpose, bool rhythmOut) {
+        auto e = std::make_unique<Engine>();
+        e->setLive(true);
+        e->prepare(48000.0, 256);
+        e->load(score);
+        e->seek(128.0);
+        e->setJam(transpose, 1.0f, rhythmOut);
+        auto tap = std::make_unique<NoteTap>();
+        e->setNoteTap(tap.get());
+        std::vector<float> L(256), R(256);
+        Got g;
+        for (int b = 0; b < 48000 * 8 / 256; ++b) {
+            tap->clear();
+            e->process(L.data(), R.data(), 256);
+            for (int i = 0; i < tap->count; ++i) {
+                const NoteTap::Note& nt = tap->notes[i];
+                if (nt.velocity == 0) continue;
+                const Part part = static_cast<Part>(nt.part);
+                if (isOut(part)) ++g.out;
+                if (isPitched(part)) g.pitched.emplace_back(nt.part, nt.pitch);
+                else g.kit.push_back(nt.pitch);
+            }
+        }
+        return g;
+    };
+    const Got plain = run(0, false), up = run(3, false), down = run(-5, false), brk = run(0, true);
+    bool shifted = !plain.pitched.empty() && up.pitched.size() == plain.pitched.size() && down.pitched.size() == plain.pitched.size();
+    for (size_t i = 0; shifted && i < plain.pitched.size(); ++i)
+        shifted = up.pitched[i].first == plain.pitched[i].first && up.pitched[i].second == std::min(127, plain.pitched[i].second + 3)
+               && down.pitched[i].second == std::max(0, plain.pitched[i].second - 5);
+    check(shifted, "the pitched parts play the jam's transposition, note for note (+3 and -5)",
+          fmt("%d pitched notes", static_cast<int>(plain.pitched.size())));
+    check(up.kit == plain.kit && !plain.kit.empty(), "the kit plays as written", fmt("%d hits", static_cast<int>(plain.kit.size())));
+    check(plain.out > 0 && brk.out == 0, "in the leader's break the rhythm's foundation is out",
+          fmt("%d notes as written, %d in the break", plain.out, brk.out));
+}
+
 /** The keyboard's split (02.10.2026): a key that names its target plays that voice, whatever Keyboard Plays says --
  *  with Keyboard Plays off a plain key is silent, a key naming Lead sounds; its release finds it. */
 void testKeySplit()
@@ -2334,6 +2385,7 @@ const TestSection kSections[] = {
     { "testKeyboard", testKeyboard },
     { "testNoteTap", testNoteTap },
     { "testKeySplit", testKeySplit },
+    { "testJam", testJam },
 };
 
 } // namespace

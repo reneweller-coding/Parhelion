@@ -59,6 +59,7 @@
 #include "parh/synth/Sfx.h"
 #include "parh/synth/SubBass.h"
 #include "parh/synth/Synth.h"
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <limits>
@@ -138,6 +139,12 @@ public:
     void liveAllOff();
     /** @brief From now on every composer note it plays is also written to @p tap (null: stops; NoteTap.h, MIDI out). */
     void setNoteTap(NoteTap* tap) { noteTap_ = tap; }
+    /**
+     * @brief The family jam (02.10.2026, the plugin's Jam.h): every pitched part's composed notes @p transpose semitones
+     *        from where they were written, from the next note on (a note ends with the shift it began with), and with
+     *        @p rhythmOut the rhythm's foundation out, as the leader's break has it.
+     */
+    void setJam(int transpose, bool rhythmOut) { jamTranspose_ = transpose; jamMutes_ = rhythmOut ? kJamRhythm : 0u; }
     /** @brief Where the engine keeps what it wrote on the knobs (Engine.h; NaN: never), read by played(). */
     void setShown(const float* shown) { shown_ = shown; }
     /** @brief The beat of the knob settings this deck plays from (Score::knobs), -1 before any. */
@@ -252,7 +259,14 @@ private:
     /** @} */
     uint32_t mutes_ = 0;   ///< the performer's muted groups (perform::MuteKick ..), bit k for group k
     /** @brief Whether a group is muted -- never for a played key (liveNote). */
-    bool muted(int param) const { return !liveEvent_ && ((mutes_ >> (param - perform::MuteKick)) & 1u) != 0; }
+    bool muted(int param) const { return !liveEvent_ && (((mutes_ | jamMutes_) >> (param - perform::MuteKick)) & 1u) != 0; }
+    /** @brief The perform mutes the family jam adds in the leader's break (setJam). */
+    static constexpr uint32_t kJamRhythm = (1u << (perform::MuteKick - perform::MuteKick)) | (1u << (perform::MuteBass - perform::MuteKick));
+    int jamTranspose_ = 0;           ///< the family jam's transposition of the pitched parts (setJam)
+    uint32_t jamMutes_ = 0;          ///< the perform mutes the family jam adds now (setJam)
+    std::array<std::array<int8_t, 128>, kNumParts> jamShift_{};   ///< the shift each held pitched note began with (dispatch)
+    /** @brief Plays @p e past the mutes and the keyboard (dispatch, after the family jam's transposition). */
+    void dispatchPlayed(const Ev& e);
     // The keyboard (01.10.2026, liveNote): read from the perform module in live play (updateCell).
     int keyTarget_ = 0;              ///< perform.keyboard_part (perform::keys)
     bool keyReplace_ = true;         ///< perform.keyboard_mode Replace: the played part's generated notes are left out

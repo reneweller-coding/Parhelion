@@ -19,7 +19,7 @@ juce_add_plugin(Parhelion
     PRODUCT_NAME                "Parhelion"
     ICON_BIG                    "${CMAKE_SOURCE_DIR}/Deploy/parhelion.png")
 target_sources(Parhelion PRIVATE PluginProcessor.cpp PluginEditor.cpp EditorTheme.cpp EditorPerform.cpp
-                             EditorStyle.cpp UpdateCheck.cpp Frame.cpp LinkClock.cpp)
+                             EditorStyle.cpp UpdateCheck.cpp Frame.cpp LinkClock.cpp Jam.cpp)
 # The frame's pieces (01.10.2026): the picture behind the panel and the manual's prose for the help (F1).
 juce_add_binary_data(ParhelionData
     HEADER_NAME ParhelionData.h

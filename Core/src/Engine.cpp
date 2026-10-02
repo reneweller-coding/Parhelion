@@ -233,6 +233,11 @@ void Engine::updateCell()
     // The performer (live only): the master filter, the echo throw.
     if (live_) {
         perfFilter_ = params_.get(params_.id(Module::Perform, 0, perform::Filter));
+        // The family jam (02.10.2026): the leader's energy as a low pass -- open at full energy, about 3.5 kHz at 0.3 --,
+        // gliding over half a second, and only while the knob rests (the performer's hand comes first).
+        const float jamTarget = jamEnergy_ >= 0.0f ? (std::clamp(jamEnergy_, 0.0f, 1.0f) - 1.0f) * 0.35f : 0.0f;
+        jamFilter_ += (jamTarget - jamFilter_) * (1.0f - std::exp(-static_cast<float>(kRaster) / (0.5f * fs)));
+        if (std::fabs(perfFilter_) < 0.01f && std::fabs(jamFilter_) >= 0.01f) perfFilter_ = jamFilter_;
         perfThrow_ = params_.get(params_.id(Module::Perform, 0, perform::Throw));
         if (std::fabs(perfFilter_) >= 0.01f) {
             const float f = perfFilter_ < 0.0f ? 20000.0f * std::exp2(10.0f * perfFilter_) : 20.0f * std::exp2(10.0f * perfFilter_);

@@ -563,6 +563,31 @@ void Deck::dispatch(const Ev& e)
 {
     const Part part = static_cast<Part>(e.part);
     if (e.on != 0 && !liveEvent_ && silenced(part)) return;   // the keyboard's or nobody's (01.10.2026)
+    // The family jam (02.10.2026): a pitched part's composed note moves by the jam's transposition; its end by the shift
+    // its start had, so a voice found by its pitch is found. The keys a player plays are their own.
+    if (!liveEvent_) {
+        switch (part) {
+        case Part::Sub: case Part::Bass: case Part::Acid: case Part::Lead: case Part::Counter: case Part::Pluck: case Part::Arp: case Part::Pad: case Part::Stab: case Part::Piano: case Part::Strings: case Part::Choir: case Part::Brass: case Part::Timpani: {
+            int8_t& was = jamShift_[static_cast<size_t>(e.part)][static_cast<size_t>(e.pitch & 127)];
+            const int shift = e.on != 0 ? jamTranspose_ : was;
+            if (e.on != 0) was = static_cast<int8_t>(jamTranspose_);
+            if (shift != 0) {
+                Ev t = e;
+                t.pitch = std::clamp(e.pitch + shift, 0, 127);
+                dispatchPlayed(t);
+                return;
+            }
+            break;
+        }
+        default: break;
+        }
+    }
+    dispatchPlayed(e);
+}
+
+void Deck::dispatchPlayed(const Ev& e)
+{
+    const Part part = static_cast<Part>(e.part);
     // MIDI out (02.10.2026): the composer's notes as they are played -- a muted group's note-ons are not, offs always.
     // A poly voice ends with its gate, the kick, the ghost kick and the kit 50 ms after the on.
     if (noteTap_ != nullptr && !liveEvent_ && (e.on == 0 || muteOf(part) < 0 || !muted(muteOf(part)))) {
