@@ -969,7 +969,9 @@ ExportPage::ExportPage(ParhelionProcessor& p) : proc_(p)
     save_.setTooltip("Save the set: seed, lengths, rerolls and every changed knob (Ctrl+S)");
     load_.setTooltip("Load a set and compose it (Ctrl+O)");
     wav_.setTooltip("Export what plays (Ctrl+E)");
-    for (auto* b : { &wav_, &stems_, &loops_, &all_, &save_, &load_ }) addAndMakeVisible(b);
+    for (auto* b : { &wav_, &stems_, &loops_, &all_ }) addAndMakeVisible(b);
+    addAndMakeVisible(save_);
+    addAndMakeVisible(load_);
     status_.setColour(juce::Label::textColourId, kInk);
     addAndMakeVisible(status_);
     cue_ = std::make_unique<ParamPage>(proc_, std::vector<std::pair<Module, int>>{ { Module::Cue, 0 } });
@@ -1010,8 +1012,8 @@ void ExportPage::resized()
     auto row = r.removeFromTop(30);
     for (auto* b : { &wav_, &stems_, &loops_, &all_ }) b->setBounds(row.removeFromLeft(170).reduced(3));
     row.removeFromLeft(24);
-    save_.setBounds(row.removeFromLeft(130).reduced(3));
-    load_.setBounds(row.removeFromLeft(130).reduced(3));
+    save_.setBounds(row.removeFromLeft(frame::kIconWidth).reduced(3));
+    load_.setBounds(row.removeFromLeft(frame::kIconWidth).reduced(3));
     r.removeFromTop(6);
     status_.setBounds(r.removeFromTop(22));
     r.removeFromTop(176);   // the text (paint)
@@ -1137,7 +1139,8 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
     compose_.setTooltip("Compose with the knobs as they stand, the seed and the rerolls");
     seed_.setTooltip("A new seed: another track (or mix) from the same settings");
     play_.setTooltip("Play and stop (Space)");
-    for (auto* b : { &compose_, &seed_, &play_ }) body_.addAndMakeVisible(b);
+    body_.addAndMakeVisible(compose_);
+    for (auto* b : { &seed_, &play_ }) body_.addAndMakeVisible(b);
     // Mute, as in Phosphene: silence at the output; PARH_MUTE (or the screenshot mode) holds it on.
     mute_.setClickingTogglesState(true);
     mute_.setToggleState(proc_.muted(), juce::dontSendNotification);
@@ -1404,7 +1407,7 @@ void ParhelionEditor::layoutBody()
     h.modes = { { &trackMode_, 64 }, { &mixMode_, 72 } };
     h.lengthLabel = &lengthLabel_;
     h.length = &length_;
-    h.actions = { { &compose_, 116 }, { &seed_, 88 } };
+    h.actions = { { &compose_, 116 }, { &seed_, frame::kIconWidth } };
     h.play = &play_;
     h.mute = &mute_;
     h.like = &like_;
@@ -1454,7 +1457,7 @@ void ParhelionEditor::timerCallback()
             layoutBody();
         }
     }
-    play_.setButtonText(proc_.isPlaying() ? "Stop" : "Play");
+    play_.show(proc_.isPlaying() ? frame::IconButton::Icon::Stop : frame::IconButton::Icon::Play, proc_.isPlaying() ? "Stop (Space)" : "Play (Space)");
     // The choice and its length as the parameters have them (the Set page and a host move them too); Compose names
     // what it makes, and is lit while what plays is the other.
     {
@@ -1474,7 +1477,9 @@ void ParhelionEditor::timerCallback()
     }
     const bool shown = proc_.muted() && shotPath_.isEmpty();
     mute_.setToggleState(shown, juce::dontSendNotification);
-    mute_.setButtonText(shown ? (proc_.muteForced() ? "Muted (env)" : "Muted") : "Mute");
+    mute_.show(shown ? frame::IconButton::Icon::SpeakerOff : frame::IconButton::Icon::Speaker,
+               shown ? (proc_.muteForced() ? "Muted by PARH_MUTE: an automated run makes no sound" : "Muted: click to hear the output again")
+                     : "Silence the output");
     compose_.setEnabled(!proc_.isComposing());
     // The test mode: the recording, when full, is written and the standalone quits.
     if (proc_.recordingDone()) {

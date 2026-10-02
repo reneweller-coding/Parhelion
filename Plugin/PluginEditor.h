@@ -260,8 +260,8 @@ private:
     juce::TextButton stems_{ "... with stems" };   ///< ... and the stems
     juce::TextButton loops_{ "... with DJ loops" };   ///< ... and the DJ loops
     juce::TextButton all_{ "... with both" };   ///< ... and both
-    juce::TextButton save_{ "Save .parhset" };   ///< saves the set (Ctrl+S)
-    juce::TextButton load_{ "Load .parhset" };   ///< loads a set (Ctrl+O)
+    frame::IconButton save_{ frame::IconButton::Icon::Save, "Save the set (Ctrl+S)" };   ///< saves the set (Ctrl+S): a disk
+    frame::IconButton load_{ frame::IconButton::Icon::Open, "Load a set (Ctrl+O)" };   ///< loads a set (Ctrl+O): a folder
     juce::Label status_;   ///< the export's progress and result
     std::unique_ptr<ParamPage> cue_;   ///< the OSC cues' settings
     std::unique_ptr<juce::FileChooser> chooser_;   ///< the file dialog while it is open
@@ -335,9 +335,9 @@ private:
     bool lengthOfMix_ = false;                         ///< the slider shows set.minutes (else compose.minutes)
     bool syncing_ = false;                             ///< the slider is set from its parameter, not by a hand
     juce::TextButton compose_{ "Compose track" };   ///< composes a track or a mix
-    juce::TextButton seed_{ "New seed" };   ///< a new seed, then composes
-    juce::TextButton play_{ "Play" };   ///< play and stop
-    juce::TextButton mute_{ "Mute" };   ///< mutes the output
+    frame::IconButton seed_{ frame::IconButton::Icon::Dice, "New seed" };   ///< a new seed, then composes: a die
+    frame::IconButton play_{ frame::IconButton::Icon::Play, "Play (Space)" };   ///< play and stop: a triangle, a square
+    frame::IconButton mute_{ frame::IconButton::Icon::Speaker, "Silence the output" };   ///< mutes the output: a speaker, crossed out when muted
     /** Phase 17: the ratings, as thumbs since the frame (01.10.2026). */
     frame::IconButton like_{ frame::IconButton::Icon::ThumbUp, "I like this track: its kind and its sounds come more often (with Favor Ratings)" };
     /** @brief the thumb down */
