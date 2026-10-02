@@ -214,12 +214,13 @@ void PerformPage::resized()
     }
     // Right of the decks: the keyboard, the headset under it.
     auto right = r.withTrimmedLeft(20);
-    keyArea_ = right.removeFromTop(150 + 4 * 36);   // three lines and the four options (02.10.2026)
+    keyArea_ = right.removeFromTop(std::min(right.getHeight(), 150 + 4 * 36));   // three lines and the four options (02.10.2026)
     {
         auto k = keyArea_.reduced(12, 8);
         k.removeFromTop(24);   // the title (paint)
+        const int line = std::min(36, k.getHeight() / 7);   // seven lines, closer where the page is short (Parhelion)
         auto keyLine = [&](juce::Component& c) {
-            auto row = k.removeFromTop(36);
+            auto row = k.removeFromTop(line);
             row.removeFromLeft(110);   // the name (paint)
             c.setBounds(row.removeFromLeft(std::min(220, row.getWidth())).reduced(0, 4));
         };
