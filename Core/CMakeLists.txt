@@ -57,6 +57,9 @@ if(WIN32)
     target_link_libraries(ParhelionCore PUBLIC ws2_32)   # the cue sender's UDP socket (Cue.h)
 endif()
 target_compile_features(ParhelionCore PUBLIC cxx_std_20)
+# Position-independent (02.10.2026): on Linux the VST3 is a shared object the core is linked into, and
+# GCC does not make a static library position-independent by itself (Windows and macOS need nothing).
+set_target_properties(ParhelionCore PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(MSVC)
     target_compile_options(ParhelionCore PRIVATE /W4 /permissive- /utf-8)
     target_compile_definitions(ParhelionCore PRIVATE _CRT_SECURE_NO_WARNINGS)
