@@ -13,6 +13,7 @@
 #include "parh/Handover.h"
 #include "parh/Loudness.h"
 #include "parh/Midi.h"
+#include "parh/NoteTap.h"
 #include "parh/Params.h"
 #include "parh/Score.h"
 #include "parh/Leveler.h"
@@ -2211,6 +2212,57 @@ void testKeyboard()
           fmt("%.6g against %.6g", offline, plainOffline));
 }
 
+/** MIDI out (02.10.2026, NoteTap.h): in live play every deck writes the composer notes it plays into the tap, each on its
+ *  sample inside the block, a poly voice with the sample its gate ends; a muted group's notes are not written, and with
+ *  the composer off nothing is. */
+void testNoteTap()
+{
+    section("MIDI out (note tap)");
+    auto p = std::make_unique<ParamStore>();
+    const Score score = composeTrack(*p, 21);
+    struct Count { int ons = 0, kicks = 0, polyOffs = 0, polyOns = 0; bool inBlock = true, offsAfter = true; };
+    auto run = [&](const char* knobs) {
+        auto e = std::make_unique<Engine>();
+        e->params().parseText(knobs);
+        e->setLive(true);
+        e->prepare(48000.0, 256);
+        e->load(score);
+        e->seek(128.0);
+        auto tap = std::make_unique<NoteTap>();
+        e->setNoteTap(tap.get());
+        std::vector<float> L(256), R(256);
+        Count c;
+        for (int b = 0; b < 48000 * 8 / 256; ++b) {
+            tap->clear();
+            const int64_t s0 = e->samplePosition();
+            e->process(L.data(), R.data(), 256);
+            for (int i = 0; i < tap->count; ++i) {
+                const NoteTap::Note& nt = tap->notes[i];
+                if (nt.sample < s0 || nt.sample >= s0 + 256) c.inBlock = false;
+                if (nt.velocity == 0) continue;
+                ++c.ons;
+                if (nt.part == static_cast<uint8_t>(Part::Kick)) ++c.kicks;
+                if (polyOf(static_cast<Part>(nt.part)) >= 0) {
+                    ++c.polyOns;
+                    if (nt.offSample > nt.sample) ++c.polyOffs;
+                }
+                if (nt.offSample >= 0 && nt.offSample <= nt.sample) c.offsAfter = false;
+            }
+        }
+        return c;
+    };
+    const Count all = run("");
+    const Count noKick = run("perform.mute_kick=1");
+    const Count off = run("perform.composer=0");
+    check(all.kicks >= 8 && all.ons > all.kicks, "the composer's notes are tapped, the kick among them",
+          fmt("%d notes, %d kicks, %d of the poly voices", all.ons, all.kicks, all.polyOns));
+    check(all.inBlock && noKick.inBlock, "every tapped note lies in the block it was played in");
+    check(all.offsAfter && all.polyOffs == all.polyOns, "a note without an off of its own carries one after it (a poly voice: its gate)",
+          fmt("%d of %d", all.polyOffs, all.polyOns));
+    check(noKick.kicks == 0 && noKick.ons > 0, "a muted group's notes are not tapped", fmt("%d kicks of %d", noKick.kicks, noKick.ons));
+    check(off.ons == 0, "the composer off: nothing tapped", fmt("%d notes", off.ons));
+}
+
 /** @brief Every section, in the order they run. */
 const TestSection kSections[] = {
     { "testTempoMap", testTempoMap },
@@ -2246,6 +2298,7 @@ const TestSection kSections[] = {
     { "testSet", testSet },
     { "testOpening", testOpening },
     { "testKeyboard", testKeyboard },
+    { "testNoteTap", testNoteTap },
 };
 
 } // namespace

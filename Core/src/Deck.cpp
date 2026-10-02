@@ -563,6 +563,13 @@ void Deck::dispatch(const Ev& e)
 {
     const Part part = static_cast<Part>(e.part);
     if (e.on != 0 && !liveEvent_ && silenced(part)) return;   // the keyboard's or nobody's (01.10.2026)
+    // MIDI out (02.10.2026): the composer's notes as they are played -- a muted group's note-ons are not, offs always.
+    // A poly voice ends with its gate, the kick, the ghost kick and the kit 50 ms after the on.
+    if (noteTap_ != nullptr && !liveEvent_ && (e.on == 0 || muteOf(part) < 0 || !muted(muteOf(part)))) {
+        const int64_t off = !isOneShot(part) ? -1
+                          : polyOf(part) >= 0 && e.gate > 0 ? e.sample + e.gate : e.sample + static_cast<int64_t>(sampleRate_ * 0.05);
+        noteTap_->add(e.sample, e.part, e.pitch, e.velocity, e.on != 0, off);
+    }
     switch (part) {
     case Part::Ghost:
         // The pump (PLAN 7.3): every duck starts on the ghost kick, whether a kick plays or not.
@@ -954,6 +961,28 @@ int Deck::targetOf(Part part)
     default:
         if (const int pi = polyOf(part); pi >= 0) return perform::keys::Lead + pi;
         return laneOf(part) >= 0 ? perform::keys::Kit : perform::keys::Off;
+    }
+}
+
+int Deck::muteOf(Part part) const
+{
+    switch (part) {
+    case Part::Kick: return perform::MuteKick;
+    case Part::Sub:
+    case Part::Bass:
+    case Part::Acid: return perform::MuteBass;
+    case Part::Strings:
+    case Part::Choir: return perform::MutePads;
+    case Part::Brass: return perform::MuteSynths;
+    case Part::Timpani: return perform::MutePerc;
+    case Part::Piano: return perform::MuteLead;
+    default: {
+        if (const int pi = polyOf(part); pi >= 0)
+            return pi <= static_cast<int>(PolyInstance::Counter) ? perform::MuteLead
+                 : pi <= static_cast<int>(PolyInstance::Arp) ? perform::MuteSynths : perform::MutePads;
+        const int lane = laneOf(part);
+        return lane < 0 ? -1 : laneIsHat_[lane] ? perform::MuteHats : perform::MutePerc;   // the ghost kick, the effects: none
+    }
     }
 }
 

@@ -257,7 +257,7 @@ public:
     bool hasEditor() const override { return true; }  ///< it has one
     const juce::String getName() const override { return JucePlugin_Name; }   ///< "Parhelion"
     bool acceptsMidi() const override { return true; }   ///< MIDI in: the performer's keys and controllers
-    bool producesMidi() const override { return false; }   ///< no MIDI out (the export writes files)
+    bool producesMidi() const override { return true; }   ///< MIDI out: the composer's notes as they play (02.10.2026)
     double getTailLengthSeconds() const override { return 8.0; }   ///< the rooms ring on
     int getNumPrograms() override { return 1; }       ///< one program
     int getCurrentProgram() override { return 0; }    ///< always the one
@@ -290,6 +290,22 @@ private:
     /** @brief The performer's MIDI: keys toggle the mutes, controllers move what they are bound to (audio thread). */
     void perform(const juce::MidiBuffer& midi);
     int keyboardSeen_ = 0;   ///< the keyboard target of the last block (audio thread): a change releases every key
+    // MIDI out (02.10.2026): the composer's notes as the decks play them, on the channels of the MIDI export (Midi.h).
+    parh::NoteTap noteTap_;   ///< what the decks played in the last process() call (audio thread)
+    /** @brief A note-off due later, for a note whose part has none of its own (NoteTap::Note::offSample). */
+    struct PendingOff {
+        int64_t sample;    ///< when, on the engine's sample counter
+        uint8_t channel;   ///< MIDI channel, 1..16
+        uint8_t pitch;     ///< MIDI note
+    };
+    std::array<PendingOff, 256> pendingOff_{};   ///< the note-offs not yet sent (audio thread)
+    int pendingOffs_ = 0;                        ///< how many of pendingOff_ are due
+    int64_t midiExpect_ = -1;                    ///< the sample the next block should start at; another is a jump
+    bool midiSounding_ = false;                  ///< a note-on went out since the last all-notes-off
+    /** @brief Writes the notes the decks played in the block from @p start (@p n samples) into @p midi, and the due offs. */
+    void emitMidi(juce::MidiBuffer& midi, int64_t start, int n);
+    /** @brief All notes off on every channel, at the block's start, when a note sounded (a stop, a jump). */
+    void silenceMidi(juce::MidiBuffer& midi);
     /** @brief Sets store id @p id to the real value @p value through its host parameter. */
     void setFromMidi(int id, float value);
 
