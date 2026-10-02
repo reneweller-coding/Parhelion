@@ -16,6 +16,7 @@
  * @note Copied from Totality `Core/include/tot/fx/Plate.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
  */
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
