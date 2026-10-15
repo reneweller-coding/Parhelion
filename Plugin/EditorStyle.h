@@ -26,8 +26,8 @@ public:
 private:
     /** @brief Follows the style chosen. */
     void timerCallback() override;
-    ParhelionProcessor& proc_;   ///< the processor
-    ScrollingPage knobs_;   ///< compose.style, morph_to, morph (the Compose module's page)
-    int knobsH_ = 150;      ///< its height: as tall as it needs, where the chart keeps its room
-    juce::String shown_;    ///< the profile's numbers as last drawn
+    ParhelionProcessor& m_proc;   ///< the processor
+    ScrollingPage m_knobs;   ///< compose.style, morph_to, morph (the Compose module's page)
+    int m_knobsH = 150;      ///< its height: as tall as it needs, where the chart keeps its room
+    juce::String m_shown;    ///< the profile's numbers as last drawn
 };

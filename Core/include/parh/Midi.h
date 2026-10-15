@@ -25,10 +25,10 @@
 
 namespace parh {
 
-constexpr int kMidiPpq = 960;   ///< ticks per quarter note in exported files
+constexpr int MidiPpq = 960;   ///< ticks per quarter note in exported files
 
 /** @brief MIDI channel (0-based) a part is written to. */
-int midiChannelOf(Part part);
+int midiChannelOf(PartE part);
 
 /** @brief Encodes a score as a Standard MIDI File (format 1). Notes need not be sorted. */
 std::vector<uint8_t> encodeMidi(const Score& score, const char* title = "Parhelion", const ParamStore* params = nullptr);

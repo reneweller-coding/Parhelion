@@ -52,49 +52,49 @@ namespace parh {
 
 /** @brief What a set asks of a track; every field left at its default is the composer's (or the knobs') to decide. */
 struct TrackRequest {
-    const StyleProfile* profile = nullptr;   ///< the profile (null: profileOf(the knobs))
-    float bpm = 0.0f;                        ///< 0: drawn (compose.auto) or compose.bpm
-    int key = -1;                            ///< -1: drawn (compose.auto) or compose.key
-    int scale = -1;                          ///< -1: drawn or compose.scale
-    int bars = 0;                            ///< 0: from compose.minutes (or the profile's lengths with compose.auto)
-    float energy = -1.0f;                    ///< the set's energy here, 0..1 (-1: a track alone)
-    bool mixable = false;                    ///< a set's track: DJ intro and outro of 32 bars at least (planTrack)
+    const StyleProfile* m_profile = nullptr;   ///< the profile (null: profileOf(the knobs))
+    float m_bpm = 0.0f;                        ///< 0: drawn (compose.auto) or compose.bpm
+    int m_key = -1;                            ///< -1: drawn (compose.auto) or compose.key
+    int m_scale = -1;                          ///< -1: drawn or compose.scale
+    int m_bars = 0;                            ///< 0: from compose.minutes (or the profile's lengths with compose.auto)
+    float m_energy = -1.0f;                    ///< the set's energy here, 0..1 (-1: a track alone)
+    bool m_mixable = false;                    ///< a set's track: DJ intro and outro of 32 bars at least (planTrack)
     /** The first track of a mix (01.10.2026): nothing is mixed into its beginning, so it may open without the kick -- the
      *  ambient intro by its style's chance, as a track alone does -- before its DJ intro. */
-    bool opener = false;
-    const Preferences* prefs = nullptr;      ///< the player's ratings (compose.use_ratings): the forms' and the sounds' weights
-    int rewriteBar = -1;                     ///< the performer's "now" (planTrackRewritten): from this bar (an 8-bar line), -1 none
-    SectionKind rewriteKind = SectionKind::Breakdown;   ///< a breakdown (with its build and drop) or a drop at once
-    std::vector<Rewrite> earlier;            ///< the "now"s before it on this track, in order (a second "now" keeps the first)
+    bool m_opener = false;
+    const Preferences* m_prefs = nullptr;      ///< the player's ratings (compose.use_ratings): the forms' and the sounds' weights
+    int m_rewriteBar = -1;                     ///< the performer's "now" (planTrackRewritten): from this bar (an 8-bar line), -1 none
+    SectionKindE m_rewriteKind = SectionKindE::BREAKDOWN;   ///< a breakdown (with its build and drop) or a drop at once
+    std::vector<Rewrite> m_earlier;            ///< the "now"s before it on this track, in order (a second "now" keeps the first)
 };
 
 /** @brief What a track tells the set, the cues and the displays. */
 struct TrackInfo {
-    std::string style;           ///< the profile's name
-    FormTemplate form = FormTemplate::Anthem;   ///< the track's form
-    float bpm = 138.0f;   ///< the tempo
-    int key = 9;   ///< the key's root, 0 = C
-    int scale = 0;   ///< the scale (compose.scale)
-    int bars = 0;   ///< length
-    int mainDropBar = -1;        ///< the main drop's first bar
-    int breakdownBar = -1;       ///< the main breakdown's first bar
-    int firstLeadBar = -1;       ///< where the lead is first heard
-    bool orchestra = false;      ///< the orchestra plays (Cinematic)
-    int introBars = 0;           ///< the intro's bars (the first groove's first bar)
-    int bassBar = 0;             ///< the first bar with the sub (a blend's bass swap lands the incoming track here)
-    int outroBar = 0;            ///< the last outro's first bar
-    std::vector<std::pair<int, int>> breakdowns;   ///< every breakdown and break, bars [from, to)
-    std::vector<int> drops;      ///< every drop's first bar
-    int keyChangeBar = -1;       ///< the Cinematic key change (-1: none)
-    std::string progression;     ///< "i-VI-III-VII"
-    std::string bass;            ///< the bass figure
-    std::string camelot;         ///< "8A"
-    bool beatless = false;   ///< no kick at all (Deep)
+    std::string m_style;           ///< the profile's name
+    FormTemplateE m_form = FormTemplateE::ANTHEM;   ///< the track's form
+    float m_bpm = 138.0f;   ///< the tempo
+    int m_key = 9;   ///< the key's root, 0 = C
+    int m_scale = 0;   ///< the scale (compose.scale)
+    int m_bars = 0;   ///< length
+    int m_mainDropBar = -1;        ///< the main drop's first bar
+    int m_breakdownBar = -1;       ///< the main breakdown's first bar
+    int m_firstLeadBar = -1;       ///< where the lead is first heard
+    bool m_orchestra = false;      ///< the orchestra plays (Cinematic)
+    int m_introBars = 0;           ///< the intro's bars (the first groove's first bar)
+    int m_bassBar = 0;             ///< the first bar with the sub (a blend's bass swap lands the incoming track here)
+    int m_outroBar = 0;            ///< the last outro's first bar
+    std::vector<std::pair<int, int>> m_breakdowns;   ///< every breakdown and break, bars [from, to)
+    std::vector<int> m_drops;      ///< every drop's first bar
+    int m_keyChangeBar = -1;       ///< the Cinematic key change (-1: none)
+    std::string m_progression;     ///< "i-VI-III-VII"
+    std::string m_bass;            ///< the bass figure
+    std::string m_camelot;         ///< "8A"
+    bool m_beatless = false;   ///< no kick at all (Deep)
 };
 
 /** @brief The names of a track's units (and `section<n>`, n from 1, for each of its sections). */
-constexpr int kUnitCount = 15;
-extern const char* const kUnitNames[kUnitCount];
+constexpr int UnitCount = 15;
+extern const char* const UnitNames[UnitCount];
 
 /**
  * @brief Writes one track, beat 0 its first bar.

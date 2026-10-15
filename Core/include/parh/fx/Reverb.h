@@ -3,7 +3,7 @@
  * @brief Eight-line feedback delay network reverb for the send buses (room and hall).
  *
  * Each channel passes its own pre-delay and a four-stage Schroeder all-pass diffusion into four of the
- * eight lines, and reads those same four back (Reverb.cpp, kLeft); a Householder reflection mixes all
+ * eight lines, and reads those same four back (Reverb.cpp, Left); a Householder reflection mixes all
  * eight. The four are not the first half or the second: the line set is ordered by length, so that
  * split handed one channel every short line and the other every long one and the two returns came out
  * with different colours (16.09.2026: 1.45 dB rms between the third octaves 500 Hz .. 8 kHz in the
@@ -105,52 +105,52 @@ public:
     static float barGate(double beat, double closeBeats, double holdBeats, double openBeats, float floorGain);
 
 private:
-    static constexpr int kLines = 8;   ///< delay lines in the network
-    static constexpr int kAllpasses = 4;   ///< stages of input diffusion per channel
-    double sr_ = 48000.0;   ///< sample rate in Hz
-    // The eight lines and their allpasses each in one buffer, line l at l * (mask_ + 1): the lanes of the vector path
+    static constexpr int Lines = 8;   ///< delay lines in the network
+    static constexpr int Allpasses = 4;   ///< stages of input diffusion per channel
+    double m_sr = 48000.0;   ///< sample rate in Hz
+    // The eight lines and their allpasses each in one buffer, line l at l * (m_mask + 1): the lanes of the vector path
     // read them with one gather (the optimisation pass, 29.09.2026).
-    std::vector<float> lines_;   ///< the eight delay lines in one buffer, line l at l * (mask_ + 1)
-    std::vector<float> scs_;   ///< their scattering all-passes, likewise
-    std::vector<float> ap_[kAllpasses];   ///< the left channel's input diffusion
-    std::vector<float> apR_[kAllpasses];   ///< the right channel's input diffusion
-    std::vector<float> pre_;   ///< the left pre-delay ring
-    std::vector<float> preR_;   ///< the right pre-delay ring
-    int mask_ = 0;   ///< ring size - 1 for the lines, diffusers and pre-delays
-    int w_ = 0;   ///< the write index, shared
+    std::vector<float> m_lines;   ///< the eight delay lines in one buffer, line l at l * (m_mask + 1)
+    std::vector<float> m_scs;   ///< their scattering all-passes, likewise
+    std::vector<float> m_ap[Allpasses];   ///< the left channel's input diffusion
+    std::vector<float> m_apR[Allpasses];   ///< the right channel's input diffusion
+    std::vector<float> m_pre;   ///< the left pre-delay ring
+    std::vector<float> m_preR;   ///< the right pre-delay ring
+    int m_mask = 0;   ///< ring size - 1 for the lines, diffusers and pre-delays
+    int m_w = 0;   ///< the write index, shared
     /** @brief Delay line @p l. */
-    float* line(int l) { return lines_.data() + static_cast<size_t>(l) * static_cast<size_t>(mask_ + 1); }
+    float* line(int l) { return m_lines.data() + static_cast<size_t>(l) * static_cast<size_t>(m_mask + 1); }
     /** @brief Line @p l's scattering all-pass. */
-    float* sc(int l) { return scs_.data() + static_cast<size_t>(l) * static_cast<size_t>(mask_ + 1); }
-    int apLen_[kAllpasses] = {};   ///< the input diffusers' lengths in samples (5.1 .. 13.7 ms)
-    int scLen_[kLines] = {};   ///< the scattering all-passes' lengths in samples (1.9 .. 7.1 ms, mutually prime)
-    float lenTarget_[kLines] = {};   ///< each line's length asked for, in samples
-    float lenCur_[kLines] = {};   ///< each line's length as it glides
-    float gain_[kLines] = {};   ///< each line's loop gain, from its length and the decay
-    float lp_[kLines] = {};   ///< the damping one-pole's state per line
-    double modPh_[kLines] = {};   ///< the phase of each line's length wobble, in cycles
-    float modRate_[kLines] = {};   ///< each wobble's rate in Hz, 0.11 .. 0.37
-    float preTarget_ = 0.0f;   ///< the pre-delay asked for, in samples
-    float preCur_ = 0.0f;   ///< the pre-delay as it glides
-    float damp_ = 0.4f;   ///< the damping, 0..1
-    float dcX_[2] = {};   ///< the input DC blocker's last input per channel
-    float dcY_[2] = {};   ///< its last output per channel
-    float dcR_ = 0.999f;   ///< its pole, 5 Hz at the rate
-    float hcCoef_ = 1.0f;   ///< the tail high cut's one-pole coefficient; 1 is off
-    float hcL_ = 0.0f;   ///< the high cut's state, left
-    float hcR_ = 0.0f;   ///< ... and right
-    float lcCoef_ = 0.0f;   ///< the tail low cut's one-pole coefficient
-    float lcL1_ = 0.0f;   ///< the low cut's first one-pole, left
-    float lcR1_ = 0.0f;   ///< its first one-pole, right
-    float lcL2_ = 0.0f;   ///< its second one-pole, left
-    float lcR2_ = 0.0f;   ///< its second one-pole, right
+    float* sc(int l) { return m_scs.data() + static_cast<size_t>(l) * static_cast<size_t>(m_mask + 1); }
+    int m_apLen[Allpasses] = {};   ///< the input diffusers' lengths in samples (5.1 .. 13.7 ms)
+    int m_scLen[Lines] = {};   ///< the scattering all-passes' lengths in samples (1.9 .. 7.1 ms, mutually prime)
+    float m_lenTarget[Lines] = {};   ///< each line's length asked for, in samples
+    float m_lenCur[Lines] = {};   ///< each line's length as it glides
+    float m_gain[Lines] = {};   ///< each line's loop gain, from its length and the decay
+    float m_lp[Lines] = {};   ///< the damping one-pole's state per line
+    double m_modPh[Lines] = {};   ///< the phase of each line's length wobble, in cycles
+    float m_modRate[Lines] = {};   ///< each wobble's rate in Hz, 0.11 .. 0.37
+    float m_preTarget = 0.0f;   ///< the pre-delay asked for, in samples
+    float m_preCur = 0.0f;   ///< the pre-delay as it glides
+    float m_damp = 0.4f;   ///< the damping, 0..1
+    float m_dcX[2] = {};   ///< the input DC blocker's last input per channel
+    float m_dcY[2] = {};   ///< its last output per channel
+    float m_dcR = 0.999f;   ///< its pole, 5 Hz at the rate
+    float m_hcCoef = 1.0f;   ///< the tail high cut's one-pole coefficient; 1 is off
+    float m_hcL = 0.0f;   ///< the high cut's state, left
+    float m_hcR = 0.0f;   ///< ... and right
+    float m_lcCoef = 0.0f;   ///< the tail low cut's one-pole coefficient
+    float m_lcL1 = 0.0f;   ///< the low cut's first one-pole, left
+    float m_lcR1 = 0.0f;   ///< its first one-pole, right
+    float m_lcL2 = 0.0f;   ///< its second one-pole, left
+    float m_lcR2 = 0.0f;   ///< its second one-pole, right
     // The gate's duck (20.09.2026, round "reverb"): a one-pole follower on the send's own peak, with a
     // threshold so a silent send stays fully open rather than sitting at some small fraction of depth.
-    float duckDepth_ = 0.0f;   ///< the duck's depth, 0..1
-    float duckThreshold_ = 0.01f;   ///< the send's level that counts as sounding, linear peak
-    float duckAttackC_ = 1.0f;   ///< the follower's attack coefficient
-    float duckReleaseC_ = 1.0f;   ///< the follower's release coefficient
-    float duckEnv_ = 0.0f;   ///< the follower's envelope
+    float m_duckDepth = 0.0f;   ///< the duck's depth, 0..1
+    float m_duckThreshold = 0.01f;   ///< the send's level that counts as sounding, linear peak
+    float m_duckAttackC = 1.0f;   ///< the follower's attack coefficient
+    float m_duckReleaseC = 1.0f;   ///< the follower's release coefficient
+    float m_duckEnv = 0.0f;   ///< the follower's envelope
 };
 
 } // namespace parh

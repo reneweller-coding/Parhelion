@@ -29,22 +29,22 @@ namespace parhui {
 
 /** @brief The palette. */
 namespace colour {
-const juce::Colour bg        { 0xff070b16 };   ///< the window: the night sky
-const juce::Colour panel     { 0xa00d1222 };   ///< a page (the halo shows faintly through it)
-const juce::Colour group     { 0xff131a2c };   ///< a group box
-const juce::Colour raised    { 0xff1c2439 };   ///< buttons, menus, the knobs' bodies
-const juce::Colour edge      { 0xff2a3452 };   ///< hairlines
-const juce::Colour ink       { 0xffe9eff8 };   ///< text: the ice crystals' light
-const juce::Colour dim       { 0xff8e98b0 };   ///< names, secondary text
-const juce::Colour faint     { 0xff434c68 };   ///< tracks, axes, the off state
-const juce::Colour accent    { 0xffcfe3f4 };   ///< the halo's silver: the title, the tab in front
-const juce::Colour sun       { 0xfff2cf7e };   ///< the low sun: the energy, the drops
-const juce::Colour onset     { 0xffd6553f };   ///< the onsets' red: the playhead, a mute
-const juce::Colour green     { 0xff7fd49a };   ///< a meter in range
-const juce::Colour red       { 0xffe06a5f };   ///< a meter over
+const juce::Colour Bg        { 0xff070b16 };   ///< the window: the night sky
+const juce::Colour Panel     { 0xa00d1222 };   ///< a page (the halo shows faintly through it)
+const juce::Colour Group     { 0xff131a2c };   ///< a group box
+const juce::Colour Raised    { 0xff1c2439 };   ///< buttons, menus, the knobs' bodies
+const juce::Colour Edge      { 0xff2a3452 };   ///< hairlines
+const juce::Colour Ink       { 0xffe9eff8 };   ///< text: the ice crystals' light
+const juce::Colour Dim       { 0xff8e98b0 };   ///< names, secondary text
+const juce::Colour Faint     { 0xff434c68 };   ///< tracks, axes, the off state
+const juce::Colour Accent    { 0xffcfe3f4 };   ///< the halo's silver: the title, the tab in front
+const juce::Colour Sun       { 0xfff2cf7e };   ///< the low sun: the energy, the drops
+const juce::Colour Onset     { 0xffd6553f };   ///< the onsets' red: the playhead, a mute
+const juce::Colour Green     { 0xff7fd49a };   ///< a meter in range
+const juce::Colour Red       { 0xffe06a5f };   ///< a meter over
 } // namespace colour
 
-using Family = frame::Family;   ///< The module families (the frame's).
+using Family = frame::FamilyE;   ///< The module families (the frame's).
 /** @brief The colour of a family. */
 juce::Colour familyColour(Family f);
 /** @brief The colour of deck @p d (A, B, C). */
@@ -57,11 +57,11 @@ const frame::Skin& skin();
  *        "~wave": a narrow menu).
  */
 struct GroupSpec {
-    const char* title;   ///< the group's title
-    Family family;   ///< its family: the colour
-    std::vector<const char*> keys;   ///< its parameters by key
+    const char* m_title;   ///< the group's title
+    Family m_family;   ///< its family: the colour
+    std::vector<const char*> m_keys;   ///< its parameters by key
 };
 /** @brief The panel of a module: its groups, in order (empty: one group of everything). */
-const std::vector<GroupSpec>& layoutOf(parh::Module m);
+const std::vector<GroupSpec>& layoutOf(parh::ModuleE m);
 
 } // namespace parhui

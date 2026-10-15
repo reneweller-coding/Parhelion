@@ -11,18 +11,18 @@ namespace parh {
 
 namespace {
 
-constexpr double kPiD = 3.14159265358979323846;   ///< pi
-constexpr double kRdLo = 0.3;   ///< Rd's low end: pressed
-constexpr double kRdHi = 2.7;   ///< Rd's high end: lax and breathy
+constexpr double PiD = 3.14159265358979323846;   ///< pi
+constexpr double RdLo = 0.3;   ///< Rd's low end: pressed
+constexpr double RdHi = 2.7;   ///< Rd's high end: lax and breathy
 
 /** @brief Formants: frequency (Hz), level (dB), bandwidth (Hz) of five, for a voice on a vowel. */
 struct Formants {
-    double f[5];    ///< the frequencies, Hz
-    double db[5];   ///< the levels, dB
-    double bw[5];   ///< the bandwidths, Hz
+    double m_f[5];    ///< the frequencies, Hz
+    double m_db[5];   ///< the levels, dB
+    double m_bw[5];   ///< the bandwidths, Hz
 };
 /// [voice: bass, tenor, alto, soprano][vowel: a, o, u]
-const Formants kFormants[4][3] = {
+const Formants FormantTable[4][3] = {
     { { { 600, 1040, 2250, 2450, 2750 }, { 0, -7, -9, -9, -20 }, { 60, 70, 110, 120, 130 } },
       { { 400, 750, 2400, 2600, 2900 }, { 0, -11, -21, -20, -40 }, { 40, 80, 100, 120, 120 } },
       { { 350, 600, 2400, 2675, 2950 }, { 0, -20, -32, -28, -36 }, { 40, 80, 100, 120, 120 } } },
@@ -53,24 +53,24 @@ Choir::LfShape Choir::solveLf(double rd)
     const double ra = (-1.0 + 4.8 * rd) / 100.0, rk = (22.4 + 11.8 * rd) / 100.0;
     const double rg = rk / (4.0 * (0.11 * rd / (0.5 + 1.2 * rk) - ra));
     LfShape s;
-    s.tp = 1.0 / (2.0 * rg);
-    s.te = s.tp * (1.0 + rk);
-    s.ta = std::max(ra, 1e-4);
-    if (s.te > 0.98) s.te = 0.98;
+    s.m_tp = 1.0 / (2.0 * rg);
+    s.m_te = s.m_tp * (1.0 + rk);
+    s.m_ta = std::max(ra, 1e-4);
+    if (s.m_te > 0.98) s.m_te = 0.98;
     // eps: eps ta = 1 - e^(-eps (1 - te)) (Newton from 1 / ta).
-    double eps = 1.0 / s.ta;
+    double eps = 1.0 / s.m_ta;
     for (int i = 0; i < 40; ++i) {
-        const double e = std::exp(-eps * (1.0 - s.te));
-        const double f = eps * s.ta - 1.0 + e, df = s.ta - (1.0 - s.te) * e;
+        const double e = std::exp(-eps * (1.0 - s.m_te));
+        const double f = eps * s.m_ta - 1.0 + e, df = s.m_ta - (1.0 - s.m_te) * e;
         eps -= f / df;
     }
-    s.eps = eps;
+    s.m_eps = eps;
     // alpha: the flow back to zero over the period (bisection on the areas), E0 so that E(te) = -Ee = -1.
-    const double w = kPiD / s.tp;
-    const double retArea = -(1.0 / (eps * s.ta)) * ((1.0 - std::exp(-eps * (1.0 - s.te))) / eps - (1.0 - s.te) * std::exp(-eps * (1.0 - s.te)));
+    const double w = PiD / s.m_tp;
+    const double retArea = -(1.0 / (eps * s.m_ta)) * ((1.0 - std::exp(-eps * (1.0 - s.m_te))) / eps - (1.0 - s.m_te) * std::exp(-eps * (1.0 - s.m_te)));
     auto total = [&](double a) {
-        const double e0 = -1.0 / (std::exp(a * s.te) * std::sin(w * s.te));
-        const double open = e0 * (std::exp(a * s.te) * (a * std::sin(w * s.te) - w * std::cos(w * s.te)) + w) / (a * a + w * w);
+        const double e0 = -1.0 / (std::exp(a * s.m_te) * std::sin(w * s.m_te));
+        const double open = e0 * (std::exp(a * s.m_te) * (a * std::sin(w * s.m_te) - w * std::cos(w * s.m_te)) + w) / (a * a + w * w);
         return open + retArea;
     };
     double lo = -50.0, hi = 50.0;
@@ -78,88 +78,88 @@ Choir::LfShape Choir::solveLf(double rd)
         const double mid = 0.5 * (lo + hi);
         if ((total(lo) < 0.0) == (total(mid) < 0.0)) lo = mid; else hi = mid;
     }
-    s.alpha = 0.5 * (lo + hi);
-    s.e0 = -1.0 / (std::exp(s.alpha * s.te) * std::sin(w * s.te));
+    s.m_alpha = 0.5 * (lo + hi);
+    s.m_e0 = -1.0 / (std::exp(s.m_alpha * s.m_te) * std::sin(w * s.m_te));
     return s;
 }
 
 void Choir::lfPeriod(double rd, int n, float* out) const
 {
-    const int i = std::clamp(static_cast<int>(std::lround((rd - kRdLo) / (kRdHi - kRdLo) * (kLfTable - 1))), 0, kLfTable - 1);
-    const LfShape& s = lf_[i];
-    const double w = kPiD / s.tp;
+    const int i = std::clamp(static_cast<int>(std::lround((rd - RdLo) / (RdHi - RdLo) * (LfTable - 1))), 0, LfTable - 1);
+    const LfShape& s = m_lf[i];
+    const double w = PiD / s.m_tp;
     for (int k = 0; k < n; ++k) {
         const double t = static_cast<double>(k) / n;
-        out[k] = static_cast<float>(t < s.te ? s.e0 * std::exp(s.alpha * t) * std::sin(w * t)
-                                             : -(1.0 / (s.eps * s.ta)) * (std::exp(-s.eps * (t - s.te)) - std::exp(-s.eps * (1.0 - s.te))));
+        out[k] = static_cast<float>(t < s.m_te ? s.m_e0 * std::exp(s.m_alpha * t) * std::sin(w * t)
+                                             : -(1.0 / (s.m_eps * s.m_ta)) * (std::exp(-s.m_eps * (t - s.m_te)) - std::exp(-s.m_eps * (1.0 - s.m_te))));
     }
 }
 
 void Choir::prepare(double sampleRate, uint64_t seed)
 {
-    sr_ = sampleRate;
-    seed_ = seed;
-    mod_.prepare(sampleRate, mixSeed(seed, 0x4D4F44ull));   // "MOD"
-    for (int i = 0; i < kLfTable; ++i) lf_[i] = solveLf(kRdLo + (kRdHi - kRdLo) * i / (kLfTable - 1.0));
-    for (Svf& f : lowCut_) f.setQ(lowCutHz_, 0.707f, static_cast<float>(sr_));
+    m_sr = sampleRate;
+    m_seed = seed;
+    m_mod.prepare(sampleRate, mixSeed(seed, 0x4D4F44ull));   // "MOD"
+    for (int i = 0; i < LfTable; ++i) m_lf[i] = solveLf(RdLo + (RdHi - RdLo) * i / (LfTable - 1.0));
+    for (Svf& f : m_lowCut) f.setQ(m_lowCutHz, 0.707f, static_cast<float>(m_sr));
     reset();
 }
 
 void Choir::update(const float* v)
 {
-    level_ = dbToGain(v[choir::Level]);
-    setSingers(static_cast<int>(std::lround(v[choir::Singers])));
-    const float vowel = v[choir::Vowel];
-    vibrato_ = v[choir::Vibrato];
-    breath_ = v[choir::Breath];
-    tension_ = v[choir::Tension];
-    attackMs_ = v[choir::Attack];
-    releaseMs_ = v[choir::Release];
-    width_ = v[choir::Width];
-    if (v[choir::LowCut] != lowCutHz_) {
-        lowCutHz_ = v[choir::LowCut];
-        for (Svf& f : lowCut_) f.setQ(lowCutHz_, 0.707f, static_cast<float>(sr_));
+    m_level = dbToGain(v[choir::LEVEL]);
+    setSingers(static_cast<int>(std::lround(v[choir::SINGERS])));
+    const float vowel = v[choir::VOWEL];
+    m_vibrato = v[choir::VIBRATO];
+    m_breath = v[choir::BREATH];
+    m_tension = v[choir::TENSION];
+    m_attackMs = v[choir::ATTACK];
+    m_releaseMs = v[choir::RELEASE];
+    m_width = v[choir::WIDTH];
+    if (v[choir::LOW_CUT] != m_lowCutHz) {
+        m_lowCutHz = v[choir::LOW_CUT];
+        for (Svf& f : m_lowCut) f.setQ(m_lowCutHz, 0.707f, static_cast<float>(m_sr));
     }
-    mod_.set(readModCore(v + choir::ModFirst, kChoirModDests, static_cast<int>(std::size(kChoirModDests))));
+    m_mod.set(readModCore(v + choir::MOD_FIRST, ChoirModDests, static_cast<int>(std::size(ChoirModDests))));
     // A note no slot moves takes the knobs as they are.
-    for (Note& n : note_) {
-        if (!mod_.targets(ModDest::Tension)) n.tension = tension_;
-        if (!mod_.targets(ModDest::Breath)) n.breath = breath_;
+    for (Note& n : m_note) {
+        if (!m_mod.targets(ModDestE::TENSION)) n.m_tension = m_tension;
+        if (!m_mod.targets(ModDestE::BREATH)) n.m_breath = m_breath;
     }
-    if (vowel != vowel_) {
-        vowel_ = vowel;
-        for (Note& n : note_) {
-            if (mod_.targets(ModDest::Vowel) || mod_.targets(ModDest::Formant)) continue;   // (the cell sets it)
-            n.vowel = vowel_;
-            if (n.on) setFormants(n);
+    if (vowel != m_vowel) {
+        m_vowel = vowel;
+        for (Note& n : m_note) {
+            if (m_mod.targets(ModDestE::VOWEL) || m_mod.targets(ModDestE::FORMANT)) continue;   // (the cell sets it)
+            n.m_vowel = m_vowel;
+            if (n.m_on) setFormants(n);
         }
     }
 }
 
 void Choir::modCell()
 {
-    for (int s = 0; s < kChoirNotes; ++s) if (note_[s].on) modNote(s);
+    for (int s = 0; s < ChoirNotes; ++s) if (m_note[s].m_on) modNote(s);
 }
 
 void Choir::modNote(int s)
 {
     {
-        Note& n = note_[s];
-        mod_.evaluate(s, pos_);
-        n.pitchSt = std::clamp(static_cast<double>(mod_.get(s, ModDest::Pitch)), -12.0, 12.0);
-        n.vib = std::clamp(1.0f + mod_.get(s, ModDest::VibDepth), 0.0f, 4.0f);
-        n.tension = std::clamp(tension_ + mod_.get(s, ModDest::Tension), 0.0f, 1.0f);
-        n.breath = std::clamp(breath_ + mod_.get(s, ModDest::Breath), 0.0f, 1.0f);
-        n.level = std::clamp(1.0f + mod_.get(s, ModDest::Level), 0.0f, 2.0f);
-        const float pan = std::clamp(mod_.get(s, ModDest::Pan), -1.0f, 1.0f);
-        n.panL = mod_.targets(ModDest::Pan) ? std::cos((pan + 1.0f) * kPi / 4.0f) * 1.41421356f : 1.0f;
-        n.panR = mod_.targets(ModDest::Pan) ? std::sin((pan + 1.0f) * kPi / 4.0f) * 1.41421356f : 1.0f;
+        Note& n = m_note[s];
+        m_mod.evaluate(s, m_pos);
+        n.m_pitchSt = std::clamp(static_cast<double>(m_mod.get(s, ModDestE::PITCH)), -12.0, 12.0);
+        n.m_vib = std::clamp(1.0f + m_mod.get(s, ModDestE::VIB_DEPTH), 0.0f, 4.0f);
+        n.m_tension = std::clamp(m_tension + m_mod.get(s, ModDestE::TENSION), 0.0f, 1.0f);
+        n.m_breath = std::clamp(m_breath + m_mod.get(s, ModDestE::BREATH), 0.0f, 1.0f);
+        n.m_level = std::clamp(1.0f + m_mod.get(s, ModDestE::LEVEL), 0.0f, 2.0f);
+        const float pan = std::clamp(m_mod.get(s, ModDestE::PAN), -1.0f, 1.0f);
+        n.m_panL = m_mod.targets(ModDestE::PAN) ? std::cos((pan + 1.0f) * Pi / 4.0f) * 1.41421356f : 1.0f;
+        n.m_panR = m_mod.targets(ModDestE::PAN) ? std::sin((pan + 1.0f) * Pi / 4.0f) * 1.41421356f : 1.0f;
         // The vowel and the tract's length: new formants where they have moved.
-        const float vowel = std::clamp(vowel_ + mod_.get(s, ModDest::Vowel), 0.0f, 1.0f);
-        const float fm = std::exp2(0.5f * std::clamp(mod_.get(s, ModDest::Formant), -1.0f, 1.0f));
-        if (std::fabs(vowel - n.vowel) > 1e-3f || std::fabs(fm - n.formantMul) > 1e-3f) {
-            n.vowel = vowel;
-            n.formantMul = fm;
+        const float vowel = std::clamp(m_vowel + m_mod.get(s, ModDestE::VOWEL), 0.0f, 1.0f);
+        const float fm = std::exp2(0.5f * std::clamp(m_mod.get(s, ModDestE::FORMANT), -1.0f, 1.0f));
+        if (std::fabs(vowel - n.m_vowel) > 1e-3f || std::fabs(fm - n.m_formantMul) > 1e-3f) {
+            n.m_vowel = vowel;
+            n.m_formantMul = fm;
             setFormants(n);
         }
     }
@@ -167,38 +167,38 @@ void Choir::modNote(int s)
 
 void Choir::reset()
 {
-    for (Singer& g : singer_) g = Singer{};
-    for (Note& n : note_) {
-        n.on = false;
-        for (auto& bank : n.formant) for (Svf& f : bank) f.ic1 = f.ic2 = 0.0f;
+    for (Singer& g : m_singer) g = Singer{};
+    for (Note& n : m_note) {
+        n.m_on = false;
+        for (auto& bank : n.m_formant) for (Svf& f : bank) f.m_ic1 = f.m_ic2 = 0.0f;
     }
-    for (Svf& f : lowCut_) f.ic1 = f.ic2 = 0.0f;
-    pos_ = 0;
-    mod_.reset();
+    for (Svf& f : m_lowCut) f.m_ic1 = f.m_ic2 = 0.0f;
+    m_pos = 0;
+    m_mod.reset();
 }
 
 int Choir::activeSingers() const
 {
     int n = 0;
-    for (const Singer& g : singer_) n += g.on;
+    for (const Singer& g : m_singer) n += g.m_on;
     return n;
 }
 
 void Choir::setFormants(Note& n)
 {
     // The vowel glides a -> o -> u; frequencies geometric, levels in dB, bandwidths linear.
-    const double x = std::clamp(static_cast<double>(n.vowel), 0.0, 1.0) * 2.0;
+    const double x = std::clamp(static_cast<double>(n.m_vowel), 0.0, 1.0) * 2.0;
     const int a = std::min(static_cast<int>(x), 1);
     const double u = x - a;
-    const Formants& p = kFormants[n.voice][a];
-    const Formants& q = kFormants[n.voice][a + 1];
+    const Formants& p = FormantTable[n.m_voice][a];
+    const Formants& q = FormantTable[n.m_voice][a + 1];
     for (int k = 0; k < 5; ++k) {
-        const double f = p.f[k] * std::pow(q.f[k] / p.f[k], u), bw = p.bw[k] + u * (q.bw[k] - p.bw[k]), db = p.db[k] + u * (q.db[k] - p.db[k]);
-        n.gain[k] = dbToGain(static_cast<float>(db));
+        const double f = p.m_f[k] * std::pow(q.m_f[k] / p.m_f[k], u), bw = p.m_bw[k] + u * (q.m_bw[k] - p.m_bw[k]), db = p.m_db[k] + u * (q.m_db[k] - p.m_db[k]);
+        n.m_gain[k] = dbToGain(static_cast<float>(db));
         for (int g = 0; g < 2; ++g) {
             // The two tracts: 3 % shorter and 3 % longer.
-            const double fg = std::min(f * static_cast<double>(n.formantMul) * (g == 0 ? 1.03 : 0.97), 0.45 * sr_);
-            n.formant[g][k].setQ(static_cast<float>(fg), static_cast<float>(fg / bw), static_cast<float>(sr_));
+            const double fg = std::min(f * static_cast<double>(n.m_formantMul) * (g == 0 ? 1.03 : 0.97), 0.45 * m_sr);
+            n.m_formant[g][k].setQ(static_cast<float>(fg), static_cast<float>(fg / bw), static_cast<float>(m_sr));
         }
     }
 }
@@ -206,56 +206,56 @@ void Choir::setFormants(Note& n)
 void Choir::noteOn(int pitch, float velocity, bool, double)
 {
     int slot = -1;
-    for (int s = 0; s < kChoirNotes && slot < 0; ++s) if (!note_[s].on) slot = s;
+    for (int s = 0; s < ChoirNotes && slot < 0; ++s) if (!m_note[s].m_on) slot = s;
     if (slot < 0) {
         double oldest = -1.0;
-        for (int s = 0; s < kChoirNotes; ++s) if (note_[s].t > oldest) { oldest = note_[s].t; slot = s; }
+        for (int s = 0; s < ChoirNotes; ++s) if (m_note[s].m_t > oldest) { oldest = m_note[s].m_t; slot = s; }
     }
-    Note& n = note_[slot];
-    n.on = true;
-    n.held = true;
-    n.pitch = pitch;
-    n.voice = voiceOf(pitch);
-    n.velocity = velocity;
-    n.t = 0.0;
-    n.released = -1.0;
-    n.env = 0.0f;
-    n.quiet = 0;
-    n.vowel = vowel_;
-    n.formantMul = 1.0f;
-    n.tension = tension_;
-    n.breath = breath_;
-    n.vib = 1.0f;
-    n.level = n.panL = n.panR = 1.0f;
-    n.pitchSt = 0.0;
-    mod_.noteOn(slot, pos_, pitch, velocity);
-    if (mod_.on()) modNote(slot);   // (the note's first values before its first period)
-    for (auto& bank : n.formant) for (Svf& f : bank) f.ic1 = f.ic2 = 0.0f;
+    Note& n = m_note[slot];
+    n.m_on = true;
+    n.m_held = true;
+    n.m_pitch = pitch;
+    n.m_voice = voiceOf(pitch);
+    n.m_velocity = velocity;
+    n.m_t = 0.0;
+    n.m_released = -1.0;
+    n.m_env = 0.0f;
+    n.m_quiet = 0;
+    n.m_vowel = m_vowel;
+    n.m_formantMul = 1.0f;
+    n.m_tension = m_tension;
+    n.m_breath = m_breath;
+    n.m_vib = 1.0f;
+    n.m_level = n.m_panL = n.m_panR = 1.0f;
+    n.m_pitchSt = 0.0;
+    m_mod.noteOn(slot, m_pos, pitch, velocity);
+    if (m_mod.on()) modNote(slot);   // (the note's first values before its first period)
+    for (auto& bank : n.m_formant) for (Svf& f : bank) f.m_ic1 = f.m_ic2 = 0.0f;
     setFormants(n);
-    for (int k = 0; k < kChoirSingers; ++k) {
-        Singer& g = singer_[slot * kChoirSingers + k];
+    for (int k = 0; k < ChoirSingers; ++k) {
+        Singer& g = m_singer[slot * ChoirSingers + k];
         g = Singer{};
-        if (k >= singers_) continue;
-        g.on = true;
-        g.note = slot;
-        g.group = k & 1;
-        g.rng.seed(mixSeed(seed_, (static_cast<uint64_t>(counter_++) << 4) + static_cast<uint64_t>(k)));
-        g.cents = 5.0 * g.rng.gaussian() * 0.6;
-        g.start = 0.06 * g.rng.uniform();
-        g.vibHz = 4.8 + g.rng.uniform();
-        g.vibCents = (15.0 + 20.0 * g.rng.uniform()) * vibrato_;
-        g.vibPhase = 2.0 * kPiD * g.rng.uniform();
-        g.wanderTo = 6.0 * g.rng.bipolar();
-        g.amp = 0.8 + 0.4 * g.rng.uniform();
+        if (k >= m_singers) continue;
+        g.m_on = true;
+        g.m_note = slot;
+        g.m_group = k & 1;
+        g.m_rng.seed(mixSeed(m_seed, (static_cast<uint64_t>(m_counter++) << 4) + static_cast<uint64_t>(k)));
+        g.m_cents = 5.0 * g.m_rng.gaussian() * 0.6;
+        g.m_start = 0.06 * g.m_rng.uniform();
+        g.m_vibHz = 4.8 + g.m_rng.uniform();
+        g.m_vibCents = (15.0 + 20.0 * g.m_rng.uniform()) * m_vibrato;
+        g.m_vibPhase = 2.0 * PiD * g.m_rng.uniform();
+        g.m_wanderTo = 6.0 * g.m_rng.bipolar();
+        g.m_amp = 0.8 + 0.4 * g.m_rng.uniform();
         startPeriod(g, n, 0.0);
     }
 }
 
 void Choir::noteOff(int pitch)
 {
-    for (int s = 0; s < kChoirNotes; ++s) {
-        Note& n = note_[s];
-        if (n.on && n.held && n.pitch == pitch) { n.held = false; n.released = 0.0; mod_.noteOff(s); }
+    for (int s = 0; s < ChoirNotes; ++s) {
+        Note& n = m_note[s];
+        if (n.m_on && n.m_held && n.m_pitch == pitch) { n.m_held = false; n.m_released = 0.0; m_mod.noteOff(s); }
     }
 }
 
@@ -263,106 +263,106 @@ void Choir::startPeriod(Singer& g, const Note& n, double tInto)
 {
     // The pitch of this period: the note, the singer's intonation, vibrato (after a third of a second) and wander,
     // jitter on the length and shimmer on the amplitude.
-    const double ramp = std::clamp((g.age - 0.3) / 0.4, 0.0, 1.0);
-    const double cents = g.cents + g.wander + ramp * (g.vibCents * n.vib) * std::sin(g.vibPhase) + 100.0 * n.pitchSt;
-    const double f0 = midiToHz(n.pitch) * std::pow(2.0, cents / 1200.0);
-    g.T0 = (1.0 / f0) * (1.0 + 0.004 * g.rng.gaussian());
-    g.wander += 0.05 * (g.wanderTo - g.wander);
-    if (g.rng.uniform() < 0.01) g.wanderTo = 6.0 * g.rng.bipolar();
+    const double ramp = std::clamp((g.m_age - 0.3) / 0.4, 0.0, 1.0);
+    const double cents = g.m_cents + g.m_wander + ramp * (g.m_vibCents * n.m_vib) * std::sin(g.m_vibPhase) + 100.0 * n.m_pitchSt;
+    const double f0 = midiToHz(n.m_pitch) * std::pow(2.0, cents / 1200.0);
+    g.m_T0 = (1.0 / f0) * (1.0 + 0.004 * g.m_rng.gaussian());
+    g.m_wander += 0.05 * (g.m_wanderTo - g.m_wander);
+    if (g.m_rng.uniform() < 0.01) g.m_wanderTo = 6.0 * g.m_rng.bipolar();
     // The shape at this period's Rd (a little per singer), scaled to the period.
-    const double rd = std::clamp(2.7 - 1.9 * static_cast<double>(n.tension) + 0.1 * g.rng.bipolar(), kRdLo, kRdHi);
-    const double x = (rd - kRdLo) / (kRdHi - kRdLo) * (kLfTable - 1);
-    const int i = std::min(static_cast<int>(x), kLfTable - 2);
+    const double rd = std::clamp(2.7 - 1.9 * static_cast<double>(n.m_tension) + 0.1 * g.m_rng.bipolar(), RdLo, RdHi);
+    const double x = (rd - RdLo) / (RdHi - RdLo) * (LfTable - 1);
+    const int i = std::min(static_cast<int>(x), LfTable - 2);
     const double u = x - i;
-    const LfShape& a = lf_[i];
-    const LfShape& b = lf_[i + 1];
-    g.s.tp = (a.tp + u * (b.tp - a.tp)) * g.T0;
-    g.s.te = (a.te + u * (b.te - a.te)) * g.T0;
-    g.s.ta = (a.ta + u * (b.ta - a.ta)) * g.T0;
-    g.s.alpha = (a.alpha + u * (b.alpha - a.alpha)) / g.T0;
-    g.s.eps = (a.eps + u * (b.eps - a.eps)) / g.T0;
-    g.s.e0 = a.e0 + u * (b.e0 - a.e0);
-    g.w = kPiD / g.s.tp;
-    const double dt = 1.0 / sr_;
-    g.t = tInto;
+    const LfShape& a = m_lf[i];
+    const LfShape& b = m_lf[i + 1];
+    g.m_s.m_tp = (a.m_tp + u * (b.m_tp - a.m_tp)) * g.m_T0;
+    g.m_s.m_te = (a.m_te + u * (b.m_te - a.m_te)) * g.m_T0;
+    g.m_s.m_ta = (a.m_ta + u * (b.m_ta - a.m_ta)) * g.m_T0;
+    g.m_s.m_alpha = (a.m_alpha + u * (b.m_alpha - a.m_alpha)) / g.m_T0;
+    g.m_s.m_eps = (a.m_eps + u * (b.m_eps - a.m_eps)) / g.m_T0;
+    g.m_s.m_e0 = a.m_e0 + u * (b.m_e0 - a.m_e0);
+    g.m_w = PiD / g.m_s.m_tp;
+    const double dt = 1.0 / m_sr;
+    g.m_t = tInto;
     // The open phase's phasor at tInto and its step.
-    const double ea = std::exp(g.s.alpha * tInto);
-    g.zr = ea * std::cos(g.w * tInto);
-    g.zi = ea * std::sin(g.w * tInto);
-    const double es = std::exp(g.s.alpha * dt);
-    g.sr = es * std::cos(g.w * dt);
-    g.si = es * std::sin(g.w * dt);
-    g.retStep = std::exp(-g.s.eps * dt);
-    g.retEnd = std::exp(-g.s.eps * (g.T0 - g.s.te));
-    g.returning = false;
-    g.amp = std::max(0.2, g.amp * (1.0 + 0.03 * g.rng.gaussian()) * 0.9 + 0.1);
+    const double ea = std::exp(g.m_s.m_alpha * tInto);
+    g.m_zr = ea * std::cos(g.m_w * tInto);
+    g.m_zi = ea * std::sin(g.m_w * tInto);
+    const double es = std::exp(g.m_s.m_alpha * dt);
+    g.m_sr = es * std::cos(g.m_w * dt);
+    g.m_si = es * std::sin(g.m_w * dt);
+    g.m_retStep = std::exp(-g.m_s.m_eps * dt);
+    g.m_retEnd = std::exp(-g.m_s.m_eps * (g.m_T0 - g.m_s.m_te));
+    g.m_returning = false;
+    g.m_amp = std::max(0.2, g.m_amp * (1.0 + 0.03 * g.m_rng.gaussian()) * 0.9 + 0.1);
 }
 
 void Choir::process(float* L, float* R, int n)
 {
-    const double dt = 1.0 / sr_;
-    const float wl = 0.5f * (1.0f + width_), wr = 0.5f * (1.0f - width_);
-    const bool modded = mod_.on();
+    const double dt = 1.0 / m_sr;
+    const float wl = 0.5f * (1.0f + m_width), wr = 0.5f * (1.0f - m_width);
+    const bool modded = m_mod.on();
     for (int i = 0; i < n; ++i) {
-        if (modded && pos_ % kMaxBlock == 0) modCell();
-        ++pos_;
+        if (modded && m_pos % MaxBlock == 0) modCell();
+        ++m_pos;
         float outL = 0.0f, outR = 0.0f;
-        for (int s = 0; s < kChoirNotes; ++s) {
-            Note& nt = note_[s];
-            if (!nt.on) continue;
+        for (int s = 0; s < ChoirNotes; ++s) {
+            Note& nt = m_note[s];
+            if (!nt.m_on) continue;
             // The note's envelope: a swell in, a fall after the release.
-            const double att = static_cast<double>(attackMs_) * 1e-3, rel = static_cast<double>(releaseMs_) * 1e-3;
-            double env = nt.t < att ? 0.5 - 0.5 * std::cos(kPiD * nt.t / att) : 1.0;
-            if (!nt.held) { env *= std::max(0.0, 1.0 - nt.released / rel); nt.released += dt; }
-            nt.t += dt;
-            nt.env = static_cast<float>(env);
+            const double att = static_cast<double>(m_attackMs) * 1e-3, rel = static_cast<double>(m_releaseMs) * 1e-3;
+            double env = nt.m_t < att ? 0.5 - 0.5 * std::cos(PiD * nt.m_t / att) : 1.0;
+            if (!nt.m_held) { env *= std::max(0.0, 1.0 - nt.m_released / rel); nt.m_released += dt; }
+            nt.m_t += dt;
+            nt.m_env = static_cast<float>(env);
             float src[2] = { 0.0f, 0.0f };
-            for (int k = 0; k < kChoirSingers; ++k) {
-                Singer& g = singer_[s * kChoirSingers + k];
-                if (!g.on) continue;
-                g.age += dt;
-                g.vibPhase += 2.0 * kPiD * g.vibHz * dt;
-                if (g.age < g.start) continue;
+            for (int k = 0; k < ChoirSingers; ++k) {
+                Singer& g = m_singer[s * ChoirSingers + k];
+                if (!g.m_on) continue;
+                g.m_age += dt;
+                g.m_vibPhase += 2.0 * PiD * g.m_vibHz * dt;
+                if (g.m_age < g.m_start) continue;
                 double e;
-                if (g.t < g.s.te) {
-                    e = g.s.e0 * g.zi;
-                    const double zr = g.zr * g.sr - g.zi * g.si;
-                    g.zi = g.zr * g.si + g.zi * g.sr;
-                    g.zr = zr;
+                if (g.m_t < g.m_s.m_te) {
+                    e = g.m_s.m_e0 * g.m_zi;
+                    const double zr = g.m_zr * g.m_sr - g.m_zi * g.m_si;
+                    g.m_zi = g.m_zr * g.m_si + g.m_zi * g.m_sr;
+                    g.m_zr = zr;
                 } else {
-                    if (!g.returning) { g.returning = true; g.ret = std::exp(-g.s.eps * (g.t - g.s.te)); }
-                    e = -(1.0 / (g.s.eps * g.s.ta)) * (g.ret - g.retEnd);
-                    g.ret *= g.retStep;
+                    if (!g.m_returning) { g.m_returning = true; g.m_ret = std::exp(-g.m_s.m_eps * (g.m_t - g.m_s.m_te)); }
+                    e = -(1.0 / (g.m_s.m_eps * g.m_s.m_ta)) * (g.m_ret - g.m_retEnd);
+                    g.m_ret *= g.m_retStep;
                 }
                 // Aspiration: noise, strongest while the glottis is open.
-                const double open = g.t < g.s.te ? 1.0 : 0.3;
-                e += static_cast<double>(nt.breath) * 0.35 * open * g.rng.bipolar();
-                src[g.group] += static_cast<float>(e * g.amp);
-                g.t += dt;
-                if (g.t >= g.T0) startPeriod(g, nt, g.t - g.T0);
+                const double open = g.m_t < g.m_s.m_te ? 1.0 : 0.3;
+                e += static_cast<double>(nt.m_breath) * 0.35 * open * g.m_rng.bipolar();
+                src[g.m_group] += static_cast<float>(e * g.m_amp);
+                g.m_t += dt;
+                if (g.m_t >= g.m_T0) startPeriod(g, nt, g.m_t - g.m_T0);
             }
             // The two tracts.
-            const float amp = static_cast<float>(env) * (0.4f + 0.6f * nt.velocity) * nt.level;
+            const float amp = static_cast<float>(env) * (0.4f + 0.6f * nt.m_velocity) * nt.m_level;
             for (int grp = 0; grp < 2; ++grp) {
                 float y = 0.0f;
                 for (int f = 0; f < 5; ++f) {
                     float lp, bp, hp;
-                    nt.formant[grp][f].tick(src[grp], lp, bp, hp);
-                    y += nt.gain[f] * bp * nt.formant[grp][f].k;
+                    nt.m_formant[grp][f].tick(src[grp], lp, bp, hp);
+                    y += nt.m_gain[f] * bp * nt.m_formant[grp][f].m_k;
                 }
                 y *= amp;
-                outL += y * (grp == 0 ? wl : wr) * nt.panL;
-                outR += y * (grp == 0 ? wr : wl) * nt.panR;
+                outL += y * (grp == 0 ? wl : wr) * nt.m_panL;
+                outR += y * (grp == 0 ? wr : wl) * nt.m_panR;
             }
-            if (!nt.held && nt.released > rel + 0.3) {
-                nt.on = false;
-                for (int k = 0; k < kChoirSingers; ++k) singer_[s * kChoirSingers + k].on = false;
+            if (!nt.m_held && nt.m_released > rel + 0.3) {
+                nt.m_on = false;
+                for (int k = 0; k < ChoirSingers; ++k) m_singer[s * ChoirSingers + k].m_on = false;
             }
         }
         float lp, bp, hp;
-        lowCut_[0].tick(outL * level_ * 1.5f, lp, bp, hp);
+        m_lowCut[0].tick(outL * m_level * 1.5f, lp, bp, hp);
         L[i] = hp;
-        lowCut_[1].tick(outR * level_ * 1.5f, lp, bp, hp);
+        m_lowCut[1].tick(outR * m_level * 1.5f, lp, bp, hp);
         R[i] = hp;
     }
 }

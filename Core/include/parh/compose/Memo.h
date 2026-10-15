@@ -17,14 +17,14 @@
 
 namespace parh {
 
-constexpr int kMemoMinNotes = 5;   ///< a window counts with at least this many notes
-constexpr int kMemoMinPitches = 3;   ///< ... and this many distinct pitches
+constexpr int MemoMinNotes = 5;   ///< a window counts with at least this many notes
+constexpr int MemoMinPitches = 3;   ///< ... and this many distinct pitches
 
-extern const int kMemoBloomBits;
-extern const int kMemoBloomK;
-extern const uint64_t kMemoBloom[];
+extern const int MemoBloomBits;
+extern const int MemoBloomK;
+extern const uint64_t MemoBloom[];
 /** @brief The hash of the probe window {(0, 0), (4, +2), (8, +1), (12, -3), (16, +5)} as the tool computed it. */
-extern const uint64_t kMemoProbeHash;
+extern const uint64_t MemoProbeHash;
 
 /**
  * @brief The hash of the window of two bars from sixteenth @p start of @p top (a pitch per sixteenth, -1: no onset).

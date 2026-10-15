@@ -29,7 +29,7 @@ namespace parh {
 /** @brief The cloud. */
 class GrainCloud {
 public:
-    static constexpr int kMaxGrains = 24;   ///< grains at once; an onset beyond them is dropped
+    static constexpr int MaxGrains = 24;   ///< grains at once; an onset beyond them is dropped
     /** @brief Allocates the history and seeds the stream (not for the audio thread). */
     void prepare(double sampleRate, uint64_t seed);
     /** @brief Silence, the stream from its seed again. */
@@ -44,32 +44,32 @@ public:
 private:
     /** @brief One grain: where it reads, how fast, how long, where it sits. */
     struct Grain {
-        double pos = 0.0;     ///< read position in the history, frames
-        double rate = 1.0;    ///< frames per sample
-        int length = 0;       ///< samples
-        int age = 0;          ///< samples played
-        float gl = 0.0f;   ///< the pan's gain, left
-        float gr = 0.0f;   ///< the pan's gain, right
-        bool live = false;   ///< it sounds
+        double m_pos = 0.0;     ///< read position in the history, frames
+        double m_rate = 1.0;    ///< frames per sample
+        int m_length = 0;       ///< samples
+        int m_age = 0;          ///< samples played
+        float m_gl = 0.0f;   ///< the pan's gain, left
+        float m_gr = 0.0f;   ///< the pan's gain, right
+        bool m_live = false;   ///< it sounds
     };
     /** @brief Starts a grain at a random place in the history (Spray), pitch and side. */
     void spawn();
 
-    double sr_ = 48000.0;   ///< the sample rate, Hz
-    uint64_t seed_ = 1;   ///< the stream's seed
-    Rng rng_;   ///< the random stream
-    std::vector<float> histL_;   ///< the history the grains read, left
-    std::vector<float> histR_;   ///< ... right
-    int mask_ = 0;   ///< its size - 1
-    int write_ = 0;   ///< where the next sample goes
-    Grain g_[kMaxGrains];   ///< the grains
-    int live_ = 0;   ///< how many grains sound
-    float rate_ = 0.0f;        ///< onsets per sample
-    float sizeS_ = 0.2f;   ///< a grain's length, s
-    float pitch_ = 0.3f;   ///< the grains' pitch spread, semitones
-    float spray_ = 1.5f;   ///< how far back in the history they read, s
-    float level_ = 0.0f;   ///< the level, linear
-    bool on_ = false;   ///< the cloud plays (level above zero)
+    double m_sr = 48000.0;   ///< the sample rate, Hz
+    uint64_t m_seed = 1;   ///< the stream's seed
+    Rng m_rng;   ///< the random stream
+    std::vector<float> m_histL;   ///< the history the grains read, left
+    std::vector<float> m_histR;   ///< ... right
+    int m_mask = 0;   ///< its size - 1
+    int m_write = 0;   ///< where the next sample goes
+    Grain m_g[MaxGrains];   ///< the grains
+    int m_live = 0;   ///< how many grains sound
+    float m_rate = 0.0f;        ///< onsets per sample
+    float m_sizeS = 0.2f;   ///< a grain's length, s
+    float m_pitch = 0.3f;   ///< the grains' pitch spread, semitones
+    float m_spray = 1.5f;   ///< how far back in the history they read, s
+    float m_level = 0.0f;   ///< the level, linear
+    bool m_on = false;   ///< the cloud plays (level above zero)
 };
 
 } // namespace parh

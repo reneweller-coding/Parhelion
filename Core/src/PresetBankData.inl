@@ -4,7 +4,7 @@
 const std::vector<Bank>& banks()
 {
     static const std::vector<Bank> k = {
-    { "kick", Module::Kick, 0, { "Muffled", "Padded", "Round", "Solid", "Punchy", "Tight", "Crisp", "Cutting" }, {
+    { "kick", ModuleE::KICK, 0, { "Muffled", "Padded", "Round", "Solid", "Punchy", "Tight", "Crisp", "Cutting" }, {
         { "Anthem 909", { "Beacon", "Summit", "Horizon", "Skyline", "Crest", "Pinnacle", "Rampart", "Citadel" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "engine", 2.0f, 2.0f, 'C', nullptr }, { "pitch_end", 48.0f, 56.0f, 'R', nullptr }, { "pitch_start", 240.0f, 380.0f, 'R', nullptr }, { "pitch_decay", 14.0f, 22.0f, 'B', nullptr }, { "amp_decay", 320.0f, 460.0f, 'B', nullptr }, { "drive", 0.25f, 0.45f, 'R', nullptr }, { "tone", 2500.0f, 12000.0f, 'A', nullptr }, { "click_level", 0.2f, 0.5f, 'A', nullptr }, { "click_tone", 2000.0f, 7000.0f, 'A', nullptr }, { "punch", 0.4f, 0.65f, 'R', nullptr }, { "top_level", -18.0f, -10.0f, 'R', nullptr } },
           {  } },
@@ -54,7 +54,7 @@ const std::vector<Bank>& banks()
           { { "engine", 1.0f, 1.0f, 'C', nullptr }, { "pitch_end", 40.0f, 50.0f, 'R', nullptr }, { "pitch_start", 160.0f, 300.0f, 'R', nullptr }, { "pitch_decay", 22.0f, 34.0f, 'B', nullptr }, { "amp_decay", 500.0f, 800.0f, 'B', nullptr }, { "drive", 0.3f, 0.5f, 'R', nullptr }, { "tone", 2500.0f, 12000.0f, 'A', nullptr }, { "click_level", 0.1f, 0.3f, 'A', nullptr }, { "click_tone", 2000.0f, 7000.0f, 'A', nullptr }, { "top_level", -20.0f, -12.0f, 'R', nullptr } },
           {  } }
     } },
-    { "sub", Module::Sub, 0, { "Buried", "Dark", "Deep", "Warm", "Full", "Firm", "Present", "Bright" }, {
+    { "sub", ModuleE::SUB, 0, { "Buried", "Dark", "Deep", "Warm", "Full", "Firm", "Present", "Bright" }, {
         { "Pure Offbeat", { "Pulse", "Beat", "Throb", "Surge", "Heave", "Push", "Bounce", "Lift" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "attack", 0.5f, 2.0f, 'R', nullptr }, { "decay", 50.0f, 110.0f, 'B', nullptr }, { "sustain", 0.0f, 0.1f, 'R', nullptr }, { "release", 30.0f, 60.0f, 'B', nullptr }, { "low_pass", 80.0f, 160.0f, 'A', nullptr }, { "drive", 0.0f, 0.15f, 'A', nullptr }, { "octave", 0.0f, 0.0f, 'C', nullptr } },
           {  } },
@@ -104,7 +104,7 @@ const std::vector<Bank>& banks()
           { { "attack", 4.0f, 20.0f, 'R', nullptr }, { "decay", 300.0f, 900.0f, 'B', nullptr }, { "sustain", 0.6f, 0.9f, 'R', nullptr }, { "release", 200.0f, 600.0f, 'B', nullptr }, { "low_pass", 50.0f, 100.0f, 'A', nullptr }, { "drive", 0.1f, 0.3f, 'A', nullptr }, { "octave", -1.0f, 0.0f, 'C', nullptr } },
           {  } }
     } },
-    { "perc", Module::Perc, 0, { "Dusty", "Muted", "Soft", "Warm", "Clean", "Crisp", "Sharp", "Sparkling" }, {
+    { "perc", ModuleE::PERC, 0, { "Dusty", "Muted", "Soft", "Warm", "Clean", "Crisp", "Sharp", "Sparkling" }, {
         { "Tight Hats", { "Tick", "Tock", "Chip", "Flick", "Spark", "Glint", "Blip", "Dot" }, { 0.6f, 0.6f, 0.6f, 0.6f, 0.6f }, 3u,
           { { "engine", 1.0f, 1.0f, 'C', nullptr }, { "pitch", 6000.0f, 10000.0f, 'R', nullptr }, { "decay", 20.0f, 60.0f, 'B', nullptr }, { "cutoff", 7000.0f, 16000.0f, 'A', nullptr }, { "filter", 2.0f, 2.0f, 'C', nullptr }, { "noise", 0.2f, 0.5f, 'R', nullptr }, { "noise_decay", 15.0f, 50.0f, 'B', nullptr }, { "resonance", 0.1f, 0.3f, 'R', nullptr } },
           {  } },
@@ -154,7 +154,7 @@ const std::vector<Bank>& banks()
           { { "engine", 0.0f, 0.0f, 'C', nullptr }, { "pitch", 2000.0f, 8000.0f, 'R', nullptr }, { "decay", 300.0f, 1500.0f, 'B', nullptr }, { "cutoff", 2000.0f, 16000.0f, 'A', nullptr }, { "filter", 1.0f, 1.0f, 'C', nullptr }, { "noise", 1.0f, 1.0f, 'C', nullptr }, { "noise_decay", 300.0f, 1500.0f, 'B', nullptr }, { "resonance", 0.2f, 0.6f, 'R', nullptr } },
           {  } }
     } },
-    { "bass", Module::Bass, 0, { "Sub", "Dark", "Round", "Warm", "Punchy", "Tight", "Bright", "Biting" }, {
+    { "bass", ModuleE::BASS, 0, { "Sub", "Dark", "Round", "Warm", "Punchy", "Tight", "Bright", "Biting" }, {
         { "Offbeat Saw", { "Arrow", "Dart", "Bolt", "Quarrel", "Javelin", "Lance", "Spear", "Pike" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "wave", 0.0f, 0.15f, 'R', nullptr }, { "cutoff", 250.0f, 900.0f, 'A', nullptr }, { "resonance", 0.1f, 0.3f, 'R', nullptr }, { "env_amount", 1.5f, 3.0f, 'B', nullptr }, { "decay", 60.0f, 160.0f, 'B', nullptr }, { "filter", 0.0f, 0.0f, 'R', "list:2,0,1" }, { "drive", 0.1f, 0.35f, 'R', nullptr }, { "amp_attack", 0.5f, 2.0f, 'R', nullptr }, { "amp_decay", 80.0f, 300.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.4f, 'R', nullptr }, { "amp_release", 20.0f, 80.0f, 'R', nullptr } },
           { { 0.5f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 3.0f, 3.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.25f, 'R', nullptr } } }, { 0.3f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 3.0f, 3.0f, 'C', nullptr }, { "mx#_amount", 0.03f, 0.08f, 'R', nullptr }, { "lfo@_shape", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_sync", 1.0f, 1.0f, 'C', nullptr } } } } },
@@ -204,7 +204,7 @@ const std::vector<Bank>& banks()
           { { "wave", 0.0f, 0.5f, 'R', nullptr }, { "cutoff", 200.0f, 700.0f, 'A', nullptr }, { "resonance", 0.1f, 0.3f, 'R', nullptr }, { "env_amount", 1.0f, 2.5f, 'B', nullptr }, { "decay", 100.0f, 300.0f, 'B', nullptr }, { "filter", 0.0f, 0.0f, 'R', "list:0,2" }, { "drive", 0.1f, 0.35f, 'R', nullptr }, { "amp_attack", 1.0f, 4.0f, 'R', nullptr }, { "amp_decay", 200.0f, 500.0f, 'B', nullptr }, { "amp_sustain", 0.4f, 0.7f, 'R', nullptr }, { "amp_release", 80.0f, 200.0f, 'R', nullptr } },
           { { 0.6f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 3.0f, 3.0f, 'C', nullptr }, { "mx#_amount", 0.15f, 0.35f, 'R', nullptr } } }, { 0.4f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 7.0f, 7.0f, 'C', nullptr }, { "mx#_amount", -0.2f, -0.1f, 'R', nullptr }, { "lfo@_shape", 4.0f, 4.0f, 'C', nullptr }, { "lfo@_sync", 7.0f, 7.0f, 'C', nullptr } } } } }
     } },
-    { "acid", Module::Acid, 0, { "Murky", "Dark", "Rubbery", "Liquid", "Squelchy", "Acidic", "Screaming", "Searing" }, {
+    { "acid", ModuleE::ACID, 0, { "Murky", "Dark", "Rubbery", "Liquid", "Squelchy", "Acidic", "Screaming", "Searing" }, {
         { "Classic 303", { "Silver Box", "Bassline", "Transistor", "Sequencer", "Step", "Pattern", "Slide", "Accent" }, { 0.1f, 0.3f, 0.1f, 1.0f, 0.2f }, 0u,
           { { "wave", 0.0f, 0.0f, 'R', nullptr }, { "cutoff", 200.0f, 1200.0f, 'A', nullptr }, { "resonance", 0.55f, 0.8f, 'R', nullptr }, { "env_amount", 2.5f, 4.5f, 'B', nullptr }, { "decay", 80.0f, 300.0f, 'B', nullptr }, { "filter", 0.0f, 0.0f, 'R', "list:5" }, { "drive", 0.1f, 0.35f, 'R', nullptr }, { "amp_attack", 0.5f, 2.0f, 'R', nullptr }, { "amp_decay", 80.0f, 300.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.4f, 'R', nullptr }, { "amp_release", 20.0f, 80.0f, 'R', nullptr }, { "accent", 0.3f, 0.6f, 'B', nullptr } },
           { { 0.5f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 3.0f, 3.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.25f, 'R', nullptr } } } } },
@@ -254,7 +254,7 @@ const std::vector<Bank>& banks()
           { { "wave", 0.0f, 0.3f, 'R', nullptr }, { "cutoff", 200.0f, 900.0f, 'A', nullptr }, { "resonance", 0.55f, 0.85f, 'R', nullptr }, { "env_amount", 2.0f, 4.0f, 'B', nullptr }, { "decay", 80.0f, 300.0f, 'B', nullptr }, { "filter", 0.0f, 0.0f, 'R', "list:5" }, { "drive", 0.1f, 0.35f, 'R', nullptr }, { "amp_attack", 0.5f, 2.0f, 'R', nullptr }, { "amp_decay", 80.0f, 300.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.4f, 'R', nullptr }, { "amp_release", 20.0f, 80.0f, 'R', nullptr } },
           { { 0.9f, { { "mx#_src", 10.0f, 10.0f, 'C', nullptr }, { "mx#_dst", 3.0f, 3.0f, 'C', nullptr }, { "mx#_amount", 0.3f, 0.6f, 'R', nullptr } } }, { 0.6f, { { "mx#_src", 11.0f, 11.0f, 'C', nullptr }, { "mx#_dst", 4.0f, 4.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.25f, 'R', nullptr } } } } }
     } },
-    { "lead", Module::Poly, 0, { "Veiled", "Smoky", "Warm", "Golden", "Glowing", "Radiant", "Brilliant", "Blazing" }, {
+    { "lead", ModuleE::POLY, 0, { "Veiled", "Smoky", "Warm", "Golden", "Glowing", "Radiant", "Brilliant", "Blazing" }, {
         { "Anthem Supersaw", { "Sunrise", "Dawn", "Daybreak", "Aurora", "Firmament", "Zenith", "Solstice", "Equinox" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.45f, 0.85f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 2500.0f, 16000.0f, 'A', nullptr }, { "resonance", 0.05f, 0.3f, 'R', nullptr }, { "env_amount", 0.5f, 2.5f, 'R', nullptr }, { "filter_decay", 150.0f, 900.0f, 'B', nullptr }, { "amp_attack", 1.0f, 12.0f, 'R', nullptr }, { "amp_decay", 300.0f, 1200.0f, 'R', nullptr }, { "amp_sustain", 0.7f, 1.0f, 'R', nullptr }, { "amp_release", 120.0f, 500.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:0,3,2" } },
           { { 0.6f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.04f, 0.12f, 'R', nullptr }, { "lfo@_shape", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_sync", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_rate", 0.05f, 0.3f, 'R', nullptr } } }, { 0.4f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.25f, 'R', nullptr } } }, { 0.5f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 11.0f, 11.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr } } } } },
@@ -304,7 +304,7 @@ const std::vector<Bank>& banks()
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.35f, 0.7f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 2000.0f, 12000.0f, 'A', nullptr }, { "resonance", 0.05f, 0.3f, 'R', nullptr }, { "env_amount", 0.5f, 2.5f, 'R', nullptr }, { "filter_decay", 150.0f, 900.0f, 'B', nullptr }, { "amp_attack", 1.0f, 12.0f, 'R', nullptr }, { "amp_decay", 300.0f, 1200.0f, 'R', nullptr }, { "amp_sustain", 0.7f, 1.0f, 'R', nullptr }, { "amp_release", 120.0f, 500.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:0,2" } },
           { { 0.7f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 1.0f, 1.0f, 'C', nullptr }, { "mx#_amount", 0.04f, 0.07f, 'R', nullptr }, { "lfo@_shape", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_sync", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_rate", 4.8f, 5.8f, 'R', nullptr }, { "lfo@_fade", 0.6f, 1.5f, 'R', nullptr } } }, { 0.7f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr } } }, { 0.5f, { { "mx#_src", 10.0f, 10.0f, 'C', nullptr }, { "mx#_dst", 1.0f, 1.0f, 'C', nullptr }, { "mx#_amount", 0.05f, 0.08f, 'R', nullptr } } } } }
     } },
-    { "counter", Module::Poly, 1, { "Hushed", "Dim", "Mellow", "Soft", "Clear", "Keen", "Bright", "Piercing" }, {
+    { "counter", ModuleE::POLY, 1, { "Hushed", "Dim", "Mellow", "Soft", "Clear", "Keen", "Bright", "Piercing" }, {
         { "Dry Saw Answer", { "Reply", "Answer", "Echo Voice", "Response", "Rejoinder", "Retort", "Riposte", "Return" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.2f, 0.5f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 1500.0f, 9000.0f, 'A', nullptr }, { "resonance", 0.05f, 0.3f, 'R', nullptr }, { "env_amount", 1.5f, 3.5f, 'R', nullptr }, { "filter_decay", 60.0f, 300.0f, 'B', nullptr }, { "amp_attack", 0.3f, 3.0f, 'R', nullptr }, { "amp_decay", 80.0f, 400.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.25f, 'R', nullptr }, { "amp_release", 40.0f, 200.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:0,2,1" } },
           { { 0.5f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.15f, 0.3f, 'R', nullptr } } } } },
@@ -354,7 +354,7 @@ const std::vector<Bank>& banks()
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.3f, 0.6f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 1500.0f, 9000.0f, 'A', nullptr }, { "resonance", 0.05f, 0.3f, 'R', nullptr }, { "env_amount", 0.5f, 2.5f, 'R', nullptr }, { "filter_decay", 150.0f, 900.0f, 'B', nullptr }, { "amp_attack", 1.0f, 12.0f, 'R', nullptr }, { "amp_decay", 300.0f, 1200.0f, 'R', nullptr }, { "amp_sustain", 0.7f, 1.0f, 'R', nullptr }, { "amp_release", 120.0f, 500.0f, 'B', nullptr } },
           { { 0.6f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 1.0f, 1.0f, 'C', nullptr }, { "mx#_amount", 0.04f, 0.06f, 'R', nullptr }, { "lfo@_shape", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_sync", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_rate", 5.0f, 6.0f, 'R', nullptr }, { "lfo@_fade", 0.5f, 1.2f, 'R', nullptr } } }, { 0.5f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.25f, 'R', nullptr } } } } }
     } },
-    { "pluck", Module::Poly, 2, { "Muted", "Dusky", "Woody", "Warm", "Snappy", "Crisp", "Glassy", "Sparkling" }, {
+    { "pluck", ModuleE::POLY, 2, { "Muted", "Dusky", "Woody", "Warm", "Snappy", "Crisp", "Glassy", "Sparkling" }, {
         { "Trance Pluck", { "Starlight", "Starbeam", "Stardust", "Starfall", "Starfield", "Starburst", "Starglow", "Starshine" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.3f, 0.6f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 800.0f, 6000.0f, 'A', nullptr }, { "resonance", 0.2f, 0.5f, 'R', nullptr }, { "env_amount", 2.0f, 4.5f, 'R', nullptr }, { "filter_decay", 40.0f, 200.0f, 'B', nullptr }, { "amp_attack", 0.3f, 3.0f, 'R', nullptr }, { "amp_decay", 80.0f, 400.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.25f, 'R', nullptr }, { "amp_release", 40.0f, 200.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:2,1,0" } },
           { { 0.5f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.2f, 0.4f, 'R', nullptr } } }, { 0.3f, { { "mx#_src", 9.0f, 9.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.05f, 0.15f, 'R', nullptr } } } } },
@@ -404,7 +404,7 @@ const std::vector<Bank>& banks()
           { { "osc", 1.0f, 1.0f, 'C', nullptr }, { "wave", 0.0f, 0.3f, 'R', nullptr }, { "cutoff", 1200.0f, 8000.0f, 'A', nullptr }, { "resonance", 0.1f, 0.4f, 'R', nullptr }, { "env_amount", 2.0f, 4.0f, 'R', nullptr }, { "filter_decay", 60.0f, 250.0f, 'B', nullptr }, { "amp_attack", 0.3f, 3.0f, 'R', nullptr }, { "amp_decay", 80.0f, 400.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.25f, 'R', nullptr }, { "amp_release", 40.0f, 200.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:2,4" } },
           { { 0.6f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.15f, 0.3f, 'R', nullptr } } }, { 0.4f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.2f, 'R', nullptr } } } } }
     } },
-    { "arp", Module::Poly, 3, { "Shadowed", "Dim", "Soft", "Warm", "Lively", "Sparkly", "Shimmering", "Dazzling" }, {
+    { "arp", ModuleE::POLY, 3, { "Shadowed", "Dim", "Soft", "Warm", "Lively", "Sparkly", "Shimmering", "Dazzling" }, {
         { "Classic Sequence", { "Cycle", "Loop", "Circuit Arp", "Orbit", "Revolution", "Rotation", "Round", "Lap" }, { 0.6f, 0.6f, 0.6f, 0.6f, 0.6f }, 0u,
           { { "osc", 1.0f, 1.0f, 'C', nullptr }, { "wave", 0.0f, 0.4f, 'R', nullptr }, { "cutoff", 700.0f, 5000.0f, 'A', nullptr }, { "resonance", 0.25f, 0.55f, 'R', nullptr }, { "env_amount", 1.5f, 4.0f, 'R', nullptr }, { "filter_decay", 60.0f, 300.0f, 'B', nullptr }, { "amp_attack", 0.3f, 3.0f, 'R', nullptr }, { "amp_decay", 80.0f, 400.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.25f, 'R', nullptr }, { "amp_release", 40.0f, 200.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:1,2,6,0" } },
           { { 0.8f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.08f, 0.2f, 'R', nullptr }, { "lfo@_shape", 1.0f, 1.0f, 'C', nullptr }, { "lfo@_sync", 2.0f, 2.0f, 'C', nullptr } } }, { 0.4f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr } } } } },
@@ -454,7 +454,7 @@ const std::vector<Bank>& banks()
           { { "osc", 1.0f, 1.0f, 'C', nullptr }, { "wave", 0.0f, 0.3f, 'R', nullptr }, { "cutoff", 800.0f, 5000.0f, 'A', nullptr }, { "resonance", 0.15f, 0.35f, 'R', nullptr }, { "env_amount", 1.0f, 3.0f, 'R', nullptr }, { "filter_decay", 80.0f, 400.0f, 'B', nullptr }, { "amp_attack", 0.3f, 3.0f, 'R', nullptr }, { "amp_decay", 80.0f, 400.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.25f, 'R', nullptr }, { "amp_release", 40.0f, 200.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:2,1" } },
           { { 0.8f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.15f, 0.35f, 'R', nullptr } } }, { 0.4f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.05f, 0.12f, 'R', nullptr }, { "lfo@_shape", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_sync", 1.0f, 1.0f, 'C', nullptr } } } } }
     } },
-    { "pad", Module::Poly, 4, { "Deep", "Dark", "Hazy", "Warm", "Lush", "Silken", "Luminous", "Celestial" }, {
+    { "pad", ModuleE::POLY, 4, { "Deep", "Dark", "Hazy", "Warm", "Lush", "Silken", "Luminous", "Celestial" }, {
         { "Supersaw Pad", { "Heaven", "Paradise", "Elysium", "Eden", "Arcadia", "Nirvana", "Utopia", "Shangri-La" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.5f, 0.9f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 1500.0f, 12000.0f, 'A', nullptr }, { "resonance", 0.05f, 0.2f, 'R', nullptr }, { "env_amount", 0.5f, 2.5f, 'R', nullptr }, { "filter_decay", 150.0f, 900.0f, 'B', nullptr }, { "amp_attack", 150.0f, 1500.0f, 'B', nullptr }, { "amp_decay", 800.0f, 3000.0f, 'R', nullptr }, { "amp_sustain", 0.7f, 1.0f, 'R', nullptr }, { "amp_release", 600.0f, 3000.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:0,3,2" } },
           { { 0.8f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.05f, 0.15f, 'R', nullptr }, { "lfo@_shape", 1.0f, 1.0f, 'C', nullptr }, { "lfo@_sync", 1.0f, 1.0f, 'C', nullptr } } }, { 0.5f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 10.0f, 10.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr }, { "lfo@_shape", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_sync", 2.0f, 2.0f, 'C', nullptr } } }, { 0.5f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr } } } } },
@@ -504,7 +504,7 @@ const std::vector<Bank>& banks()
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.5f, 0.8f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 1000.0f, 9000.0f, 'A', nullptr }, { "resonance", 0.05f, 0.3f, 'R', nullptr }, { "env_amount", 0.5f, 2.5f, 'R', nullptr }, { "filter_decay", 150.0f, 900.0f, 'B', nullptr }, { "amp_attack", 150.0f, 1500.0f, 'B', nullptr }, { "amp_decay", 800.0f, 3000.0f, 'R', nullptr }, { "amp_sustain", 0.7f, 1.0f, 'R', nullptr }, { "amp_release", 600.0f, 3000.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:0,2" } },
           { { 1.0f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.15f, 0.35f, 'R', nullptr } } }, { 0.6f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.05f, 0.12f, 'R', nullptr }, { "lfo@_shape", 1.0f, 1.0f, 'C', nullptr }, { "lfo@_sync", 1.0f, 1.0f, 'C', nullptr } } }, { 0.4f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 10.0f, 10.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr }, { "lfo@_shape", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_sync", 2.0f, 2.0f, 'C', nullptr } } } } }
     } },
-    { "stab", Module::Poly, 5, { "Thick", "Dark", "Round", "Warm", "Punchy", "Snappy", "Bright", "Blinding" }, {
+    { "stab", ModuleE::POLY, 5, { "Thick", "Dark", "Round", "Warm", "Punchy", "Snappy", "Bright", "Blinding" }, {
         { "Chord Stab", { "Hit", "Chord Hit", "Blow Stab", "Impact Stab", "Shot", "Burst Stab", "Jab Stab", "Strike Stab" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.4f, 0.75f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 1500.0f, 10000.0f, 'A', nullptr }, { "resonance", 0.05f, 0.3f, 'R', nullptr }, { "env_amount", 1.5f, 3.5f, 'R', nullptr }, { "filter_decay", 60.0f, 300.0f, 'B', nullptr }, { "amp_attack", 0.3f, 3.0f, 'R', nullptr }, { "amp_decay", 80.0f, 400.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.25f, 'R', nullptr }, { "amp_release", 40.0f, 200.0f, 'B', nullptr }, { "filter_model", 0.0f, 0.0f, 'R', "list:0,3,2" } },
           { { 0.5f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr } } } } },
@@ -554,7 +554,7 @@ const std::vector<Bank>& banks()
           { { "osc", 0.0f, 0.0f, 'C', nullptr }, { "detune", 0.5f, 0.8f, 'B', nullptr }, { "mix", 0.6f, 0.9f, 'R', nullptr }, { "cutoff", 1000.0f, 8000.0f, 'A', nullptr }, { "resonance", 0.05f, 0.3f, 'R', nullptr }, { "env_amount", 0.5f, 2.5f, 'R', nullptr }, { "filter_decay", 150.0f, 900.0f, 'B', nullptr }, { "amp_attack", 0.3f, 3.0f, 'R', nullptr }, { "amp_decay", 80.0f, 400.0f, 'B', nullptr }, { "amp_sustain", 0.0f, 0.25f, 'R', nullptr }, { "amp_release", 40.0f, 200.0f, 'B', nullptr }, { "osc2", 1.0f, 1.0f, 'C', nullptr }, { "osc2_interval", 1.0f, 1.0f, 'C', nullptr }, { "osc2_mix", 0.3f, 0.5f, 'R', nullptr } },
           { { 0.8f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 6.0f, 6.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr } } } } }
     } },
-    { "piano", Module::Piano, 0, { "Muted", "Mellow", "Soft", "Warm", "Rounded", "Clear", "Bright", "Brilliant" }, {
+    { "piano", ModuleE::PIANO, 0, { "Muted", "Mellow", "Soft", "Warm", "Rounded", "Clear", "Bright", "Brilliant" }, {
         { "Concert Grand", { "Steinway Hall", "Bösendorfer Hall", "Carnegie", "Musikverein", "Concertgebouw", "Wigmore", "Albert Hall", "Philharmonie" }, { 0.8f, 0.5f, 0.8f, 0.1f, 0.5f }, 0u,
           { { "instrument", 0.0f, 0.0f, 'R', "list:0" }, { "hardness", 0.7f, 1.8f, 'A', nullptr }, { "strike", -0.3f, 0.3f, 'R', nullptr }, { "unison", 0.5f, 1.5f, 'B', nullptr }, { "inharm", 0.8f, 1.2f, 'R', nullptr }, { "impedance", 0.8f, 1.2f, 'R', nullptr }, { "stretch", 0.8f, 1.2f, 'R', nullptr }, { "condition", 0.1f, 0.5f, 'B', nullptr } },
           { { 0.6f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 2.0f, 2.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.3f, 'R', nullptr } } } } },
@@ -604,7 +604,7 @@ const std::vector<Bank>& banks()
           { { "instrument", 0.0f, 0.0f, 'R', "list:0" }, { "hardness", 0.6f, 1.8f, 'A', nullptr }, { "strike", -0.3f, 0.3f, 'R', nullptr }, { "unison", 0.5f, 1.5f, 'B', nullptr }, { "inharm", 0.8f, 1.2f, 'R', nullptr }, { "impedance", 0.8f, 1.2f, 'R', nullptr }, { "stretch", 0.8f, 1.2f, 'R', nullptr }, { "condition", 0.1f, 0.5f, 'B', nullptr } },
           { { 0.7f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 2.0f, 2.0f, 'C', nullptr }, { "mx#_amount", 0.15f, 0.3f, 'R', nullptr } } }, { 0.5f, { { "mx#_src", 12.0f, 12.0f, 'C', nullptr }, { "mx#_dst", 2.0f, 2.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.2f, 'R', nullptr } } }, { 0.4f, { { "mx#_src", 10.0f, 10.0f, 'C', nullptr }, { "mx#_dst", 1.0f, 1.0f, 'C', nullptr }, { "mx#_amount", 0.03f, 0.05f, 'R', nullptr } } } } }
     } },
-    { "strings", Module::Strings, 0, { "Distant", "Sombre", "Tender", "Warm", "Rich", "Singing", "Radiant", "Soaring" }, {
+    { "strings", ModuleE::STRINGS, 0, { "Distant", "Sombre", "Tender", "Warm", "Rich", "Singing", "Radiant", "Soaring" }, {
         { "Legato Section", { "Adagio", "Largo", "Lento", "Andante", "Sostenuto", "Legato", "Cantabile", "Espressivo" }, { 1.0f, 0.3f, 0.6f, 0.05f, 0.4f }, 0u,
           { { "players", 5.0f, 6.0f, 'R', nullptr }, { "vibrato", 0.8f, 1.3f, 'B', nullptr }, { "pressure", 0.8f, 1.3f, 'A', nullptr }, { "position", -0.2f, 0.2f, 'A', nullptr }, { "speed", 0.8f, 1.2f, 'R', nullptr }, { "attack", 80.0f, 250.0f, 'B', nullptr }, { "release", 150.0f, 400.0f, 'R', nullptr } },
           { { 0.6f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 2.0f, 2.0f, 'C', nullptr }, { "mx#_amount", 0.1f, 0.25f, 'R', nullptr }, { "lfo@_shape", 6.0f, 6.0f, 'C', nullptr }, { "lfo@_sync", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_rate", 0.1f, 0.3f, 'R', nullptr } } } } },
@@ -654,7 +654,7 @@ const std::vector<Bank>& banks()
           { { "players", 4.0f, 6.0f, 'R', nullptr }, { "vibrato", 0.5f, 1.0f, 'B', nullptr }, { "pressure", 0.5f, 1.0f, 'A', nullptr }, { "position", -0.5f, 0.2f, 'A', nullptr }, { "speed", 0.7f, 1.0f, 'R', nullptr }, { "attack", 300.0f, 800.0f, 'B', nullptr }, { "release", 400.0f, 1200.0f, 'R', nullptr } },
           { { 1.0f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 8.0f, 8.0f, 'C', nullptr }, { "mx#_amount", 0.3f, 0.6f, 'R', nullptr }, { "lfo@_shape", 6.0f, 6.0f, 'C', nullptr }, { "lfo@_sync", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_rate", 0.03f, 0.1f, 'R', nullptr } } }, { 0.6f, { { "mx#_src", 9.0f, 9.0f, 'C', nullptr }, { "mx#_dst", 4.0f, 4.0f, 'C', nullptr }, { "mx#_amount", 0.2f, 0.4f, 'R', nullptr } } }, { 0.5f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 1.0f, 1.0f, 'C', nullptr }, { "mx#_amount", 0.02f, 0.03f, 'R', nullptr }, { "lfo@_shape", 6.0f, 6.0f, 'C', nullptr }, { "lfo@_sync", 0.0f, 0.0f, 'C', nullptr }, { "lfo@_rate", 0.05f, 0.15f, 'R', nullptr } } } } }
     } },
-    { "choir", Module::Choir, 0, { "Hollow", "Dusky", "Gentle", "Warm", "Full", "Clear", "Shining", "Heavenly" }, {
+    { "choir", ModuleE::CHOIR, 0, { "Hollow", "Dusky", "Gentle", "Warm", "Full", "Clear", "Shining", "Heavenly" }, {
         { "Aah Ensemble", { "Aria", "Anthem Choir", "Chorale", "Cantata", "Oratorio", "Motet", "Madrigal", "Requiem" }, { 1.0f, 0.3f, 0.6f, 0.05f, 0.4f }, 0u,
           { { "singers", 5.0f, 6.0f, 'R', nullptr }, { "vowel", 0.0f, 0.15f, 'B', nullptr }, { "vibrato", 0.8f, 1.2f, 'R', nullptr }, { "breath", 0.15f, 0.3f, 'R', nullptr }, { "tension", 0.3f, 0.6f, 'A', nullptr }, { "attack", 150.0f, 400.0f, 'R', nullptr }, { "release", 300.0f, 700.0f, 'R', nullptr } },
           {  } },
@@ -704,7 +704,7 @@ const std::vector<Bank>& banks()
           { { "singers", 5.0f, 6.0f, 'R', nullptr }, { "vowel", 0.0f, 0.5f, 'B', nullptr }, { "vibrato", 0.8f, 1.2f, 'R', nullptr }, { "breath", 0.2f, 0.35f, 'R', nullptr }, { "tension", 0.3f, 0.6f, 'A', nullptr }, { "attack", 300.0f, 800.0f, 'R', nullptr }, { "release", 600.0f, 1500.0f, 'R', nullptr } },
           { { 0.8f, { { "mx#_src", -1.0f, -1.0f, 'C', nullptr }, { "mx#_dst", 2.0f, 2.0f, 'C', nullptr }, { "mx#_amount", 0.15f, 0.3f, 'R', nullptr }, { "lfo@_shape", 1.0f, 1.0f, 'C', nullptr }, { "lfo@_sync", 1.0f, 1.0f, 'C', nullptr } } }, { 0.6f, { { "menv_attack", 1000.0f, 3000.0f, 'R', nullptr }, { "menv_decay", 2000.0f, 6000.0f, 'B', nullptr }, { "menv_sustain", 0.6f, 0.6f, 'C', nullptr }, { "mx#_src", 5.0f, 5.0f, 'C', nullptr }, { "mx#_dst", 3.0f, 3.0f, 'C', nullptr }, { "mx#_amount", 0.2f, 0.4f, 'R', nullptr } } } } }
     } },
-    { "brass", Module::Brass, 0, { "Muffled", "Dark", "Mellow", "Round", "Bold", "Brassy", "Blaring", "Triumphant" }, {
+    { "brass", ModuleE::BRASS, 0, { "Muffled", "Dark", "Mellow", "Round", "Bold", "Brassy", "Blaring", "Triumphant" }, {
         { "Braam Blast", { "Braam", "Foghorn", "Siren Brass", "Klaxon Brass", "Warhorn", "Ram's Horn", "Shofar", "Alphorn" }, { 1.0f, 0.3f, 0.6f, 0.05f, 0.4f }, 0u,
           { { "players", 3.0f, 4.0f, 'R', nullptr }, { "pressure", 1.2f, 1.9f, 'A', nullptr }, { "brassiness", 0.5f, 0.9f, 'A', nullptr }, { "attack", 20.0f, 80.0f, 'B', nullptr }, { "release", 200.0f, 500.0f, 'R', nullptr }, { "vibrato", 0.0f, 3.0f, 'R', nullptr } },
           {  } },
@@ -754,7 +754,7 @@ const std::vector<Bank>& banks()
           { { "players", 2.0f, 4.0f, 'R', nullptr }, { "pressure", 0.9f, 1.4f, 'A', nullptr }, { "brassiness", 0.2f, 0.5f, 'A', nullptr }, { "attack", 60.0f, 200.0f, 'B', nullptr }, { "release", 300.0f, 700.0f, 'R', nullptr }, { "vibrato", 0.0f, 3.0f, 'R', nullptr } },
           {  } }
     } },
-    { "timpani", Module::Timpani, 0, { "Muffled", "Deep", "Soft", "Warm", "Resonant", "Firm", "Crisp", "Thundering" }, {
+    { "timpani", ModuleE::TIMPANI, 0, { "Muffled", "Deep", "Soft", "Warm", "Resonant", "Firm", "Crisp", "Thundering" }, {
         { "Orchestral", { "Kettle", "Pauke", "Timbale", "Nakers", "Tympanum", "Copper Drum", "Bowl Drum", "Pedal Drum" }, { 1.0f, 0.3f, 0.6f, 0.05f, 0.4f }, 0u,
           { { "hardness", 0.7f, 1.5f, 'A', nullptr }, { "decay", 0.8f, 1.2f, 'B', nullptr }, { "strike", 0.6f, 0.75f, 'R', nullptr } },
           {  } },
@@ -804,7 +804,7 @@ const std::vector<Bank>& banks()
           { { "hardness", 1.5f, 3.0f, 'A', nullptr }, { "decay", 0.6f, 1.0f, 'B', nullptr }, { "strike", 0.4f, 0.6f, 'R', nullptr } },
           { { 0.6f, { { "mx#_src", 7.0f, 7.0f, 'C', nullptr }, { "mx#_dst", 2.0f, 2.0f, 'C', nullptr }, { "mx#_amount", 0.15f, 0.3f, 'R', nullptr } } } } }
     } },
-    { "sfx", Module::Sfx, 0, { "Shadowy", "Dark", "Hazy", "Smooth", "Wide", "Bright", "Glittering", "Blazing" }, {
+    { "sfx", ModuleE::SFX, 0, { "Shadowy", "Dark", "Hazy", "Smooth", "Wide", "Bright", "Glittering", "Blazing" }, {
         { "White Risers", { "Liftoff", "Launch", "Ascent FX", "Takeoff", "Blastoff", "Uplift FX", "Elevator", "Escalator" }, { 1.0f, 0.3f, 0.3f, 0.1f, 0.1f }, 0u,
           { { "noise", 0.7f, 1.0f, 'R', nullptr }, { "resonance", 0.2f, 0.5f, 'R', nullptr }, { "brightness", 0.3f, 1.0f, 'A', nullptr }, { "impact_decay", 800.0f, 2000.0f, 'B', nullptr }, { "vowel", 0.0f, 0.3f, 'R', nullptr }, { "swell_decay", 800.0f, 2500.0f, 'B', nullptr }, { "width", 0.6f, 1.0f, 'R', nullptr }, { "sub_level", -20.0f, -12.0f, 'R', nullptr }, { "preset_riser", 1.0f, 64.0f, 'R', nullptr } },
           {  } },
@@ -854,7 +854,7 @@ const std::vector<Bank>& banks()
           { { "noise", 0.5f, 0.9f, 'R', nullptr }, { "resonance", 0.3f, 0.6f, 'R', nullptr }, { "brightness", 0.6f, 1.0f, 'A', nullptr }, { "impact_decay", 800.0f, 2000.0f, 'B', nullptr }, { "vowel", 0.0f, 0.4f, 'R', nullptr }, { "swell_decay", 800.0f, 2500.0f, 'B', nullptr }, { "width", 0.7f, 1.0f, 'R', nullptr }, { "sub_level", -24.0f, -16.0f, 'R', nullptr }, { "preset_riser", 1.0f, 256.0f, 'R', nullptr }, { "preset_sweep", 1.0f, 256.0f, 'R', nullptr } },
           {  } }
     } },
-    { "cloud", Module::Cloud, 0, { "Faint", "Dim", "Misty", "Soft", "Drifting", "Glinting", "Shimmering", "Radiant" }, {
+    { "cloud", ModuleE::CLOUD, 0, { "Faint", "Dim", "Misty", "Soft", "Drifting", "Glinting", "Shimmering", "Radiant" }, {
         { "Fine Dust", { "Dust", "Powder", "Talc", "Pollen Dust", "Soot", "Ash", "Spore", "Flour" }, { 0.2f, 0.5f, 0.5f, 0.1f, 1.0f }, 0u,
           { { "density", 20.0f, 50.0f, 'A', nullptr }, { "size", 30.0f, 90.0f, 'B', nullptr }, { "pitch", 0.1f, 0.3f, 'R', nullptr }, { "spray", 1.0f, 3.0f, 'R', nullptr } },
           {  } },

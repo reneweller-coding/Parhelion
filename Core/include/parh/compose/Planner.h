@@ -47,44 +47,44 @@ namespace parh {
 
 /** @brief The inner parts of a breakdown (bars, absolute). */
 struct BreakdownParts {
-    int start = 0;    ///< the breakdown's first bar
-    int tease = 0;    ///< where the motif's fragment enters
-    int peak = 0;     ///< where the whole melody plays
-    int end = 0;      ///< the build's first bar (the breakdown's end)
+    int m_start = 0;    ///< the breakdown's first bar
+    int m_tease = 0;    ///< where the motif's fragment enters
+    int m_peak = 0;     ///< where the whole melody plays
+    int m_end = 0;      ///< the build's first bar (the breakdown's end)
 };
 
 /** @brief The silence before a drop (rule 5): from beat @ref from of bar @ref bar to the drop, the kick alone on the bar's
  *         last beat where @ref kickOn4. */
 struct Vacuum {
-    int bar = 0;            ///< the bar before the drop
-    double from = 3.0;      ///< the beat in the bar where the silence begins (3: the last beat, 2: the last two, 0: the bar)
-    bool kickOn4 = false;   ///< the kick still on the last beat (and only the kick)
+    int m_bar = 0;            ///< the bar before the drop
+    double m_from = 3.0;      ///< the beat in the bar where the silence begins (3: the last beat, 2: the last two, 0: the bar)
+    bool m_kickOn4 = false;   ///< the kick still on the last beat (and only the kick)
 };
 
 /** @brief What the planner decided. */
 struct Plan {
-    FormTemplate form = FormTemplate::Anthem;   ///< the track's form
-    int bars = 0;                          ///< the track's length
-    std::vector<Section> sections;         ///< in order (beats)
-    std::vector<LayerBlock> blocks;        ///< one per 8 bars (beats)
-    std::vector<BreakdownParts> breakdowns;   ///< every breakdown's parts
-    int mainDrop = -1;                     ///< index into sections of the main drop
-    int mainBreakdown = -1;                ///< index of the main breakdown (-1: none)
-    int firstLeadBar = -1;                 ///< where the lead is first heard
-    bool beatless = false;                 ///< no kick at all (Deep)
-    int bassPattern = 0;                   ///< BassPattern (Acid where the 303 carries the bass)
-    std::vector<int> miniBreaks;           ///< bars in which the kick rests (Dok. 6: "Kick raus fuer 1 Takt")
-    std::vector<Vacuum> vacuums;           ///< the silence before every drop (rule 5)
+    FormTemplateE m_form = FormTemplateE::ANTHEM;   ///< the track's form
+    int m_bars = 0;                          ///< the track's length
+    std::vector<Section> m_sections;         ///< in order (beats)
+    std::vector<LayerBlock> m_blocks;        ///< one per 8 bars (beats)
+    std::vector<BreakdownParts> m_breakdowns;   ///< every breakdown's parts
+    int m_mainDrop = -1;                     ///< index into sections of the main drop
+    int m_mainBreakdown = -1;                ///< index of the main breakdown (-1: none)
+    int m_firstLeadBar = -1;                 ///< where the lead is first heard
+    bool m_beatless = false;                 ///< no kick at all (Deep)
+    int m_bassPattern = 0;                   ///< BassPattern (Acid where the 303 carries the bass)
+    std::vector<int> m_miniBreaks;           ///< bars in which the kick rests (Dok. 6: "Kick raus fuer 1 Takt")
+    std::vector<Vacuum> m_vacuums;           ///< the silence before every drop (rule 5)
     /** @brief The section of bar @p bar (index), -1 past the end. */
     int sectionAt(int bar) const;
     /** @brief The state of @p l in bar @p bar. */
-    LayerState at(int bar, Layer l) const;
+    LayerStateE at(int bar, LayerE l) const;
     /** @brief The energy (0..10) at bar @p bar, interpolated inside its section. */
     float energyAt(int bar) const;
 };
 
 /** @brief A unit's seed by its name ("form", "matrix", "section3"; Composer.h). */
-using UnitStream = std::function<uint64_t(const std::string&)>;
+using UnitStreamT = std::function<uint64_t(const std::string&)>;
 
 /** @brief The seed of unit @p name of a track's @p seed after @p rerolls rerolls (SetFile.h, Curation). */
 uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls = 0);
@@ -97,13 +97,13 @@ uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls = 0);
  * @param mixable  a DJ's track (a set, PLAN 6.8): an intro and an outro of 32 bars at least, both with the beat -- no
  *                 ambient intro or outro, never beatless -- so a blend can lie over them
  */
-Plan planTrack(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable = false);
+Plan planTrack(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable = false);
 // (A mixable track that opens a mix -- TrackRequest::opener -- may have the ambient intro a track alone may have.)
 
 /** @brief A performer's "now": from bar @p bar (an 8-bar line) a breakdown with its build and drop, or a drop at once. */
 struct Rewrite {
-    int bar = -1;   ///< the 8-bar line it begins on, -1 none
-    SectionKind kind = SectionKind::Breakdown;   ///< a breakdown (with its build and drop) or a drop at once
+    int m_bar = -1;   ///< the 8-bar line it begins on, -1 none
+    SectionKindE m_kind = SectionKindE::BREAKDOWN;   ///< a breakdown (with its build and drop) or a drop at once
 };
 
 /**
@@ -113,14 +113,14 @@ struct Rewrite {
  *        after it the second break. The units' streams are the plan's own, so everything before @p bar stays as it was --
  *        but a drop's approach: the harmony turns towards it over the eight bars before (VI-VII-i, PLAN 6.5).
  */
-Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, int bar, SectionKind kind);
+Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable, int bar, SectionKindE kind);
 
 /**
  * @brief The same for several "now"s one after the other (Phase 7, 30.09.2026: a second "now" keeps the first): each
  *        rewrites the plan the ones before it left, from its own line on, so the plan up to the last line is the plan
  *        that was played up to it. The lines rise; one that does not is left out.
  */
-Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStream& stream, bool mixable, const std::vector<Rewrite>& rewrites,
+Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable, const std::vector<Rewrite>& rewrites,
                         bool opener = false);
 
 /** @brief Plans a track from a track's seed without rerolls (as composeTrack does). */

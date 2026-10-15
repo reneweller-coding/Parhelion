@@ -18,13 +18,13 @@ bool saveSet(const char* path, const SetFile& set, const ParamStore& params)
     std::ofstream f(path, std::ios::binary);
     if (!f) return false;
     f << "# Parhelion set\n";
-    f << "seed=" << set.seed << "\n";
+    f << "seed=" << set.m_seed << "\n";
     char buf[64];
-    std::snprintf(buf, sizeof(buf), "%.9g", set.minutes);
+    std::snprintf(buf, sizeof(buf), "%.9g", set.m_minutes);
     f << "minutes=" << buf << "\n";
-    std::snprintf(buf, sizeof(buf), "%.9g", set.set);
+    std::snprintf(buf, sizeof(buf), "%.9g", set.m_set);
     f << "set=" << buf << "\n";
-    for (const auto& r : set.curation.rerolls)
+    for (const auto& r : set.m_curation.m_rerolls)
         if (r.second != 0) f << "reroll " << r.first << "=" << r.second << "\n";
     std::istringstream lines(params.toText(true));
     std::string line;
@@ -44,18 +44,18 @@ bool loadSet(const char* path, SetFile& set, ParamStore& params, std::string* er
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty() || line[0] == '#') continue;
         auto value = [&](size_t from) { return line.substr(from); };
-        if (line.rfind("seed=", 0) == 0) set.seed = std::strtoull(value(5).c_str(), nullptr, 10);
-        else if (line.rfind("minutes=", 0) == 0) set.minutes = std::atof(value(8).c_str());
-        else if (line.rfind("set=", 0) == 0) set.set = std::atof(value(4).c_str());
+        if (line.rfind("seed=", 0) == 0) set.m_seed = std::strtoull(value(5).c_str(), nullptr, 10);
+        else if (line.rfind("minutes=", 0) == 0) set.m_minutes = std::atof(value(8).c_str());
+        else if (line.rfind("set=", 0) == 0) set.m_set = std::atof(value(4).c_str());
         else if (line.rfind("reroll ", 0) == 0) {
             const size_t eq = line.find('=');
             if (eq == std::string::npos) { if (error) *error = "line " + std::to_string(n) + ": reroll without '='"; return false; }
-            set.curation.rerolls[line.substr(7, eq - 7)] = std::atoi(value(eq + 1).c_str());
+            set.m_curation.m_rerolls[line.substr(7, eq - 7)] = std::atoi(value(eq + 1).c_str());
         } else if (line.rfind("param ", 0) == 0) paramText += value(6) + "\n";
         else { if (error) *error = "line " + std::to_string(n) + ": not understood"; return false; }
     }
     params.resetDefaults();
-    set.params = paramText;
+    set.m_params = paramText;
     return params.parseText(paramText, error);
 }
 

@@ -19,22 +19,22 @@ namespace parh {
 
 /** @brief One rating of a track. */
 struct Rating {
-    int value = 1;                      ///< +1 liked, -1 not
-    int form = 0;                       ///< its FormTemplate
-    std::string style;                  ///< its profile's name
-    unsigned long long seed = 0;        ///< its seed
-    std::vector<std::string> groups;    ///< the groups of its presets ("Anthem Supersaw", "Dream Haze" ...)
+    int m_value = 1;                      ///< +1 liked, -1 not
+    int m_form = 0;                       ///< its FormTemplate
+    std::string m_style;                  ///< its profile's name
+    unsigned long long m_seed = 0;        ///< its seed
+    std::vector<std::string> m_groups;    ///< the groups of its presets ("Anthem Supersaw", "Dream Haze" ...)
 };
 
 /** @brief The weights the ratings give. */
 struct Preferences {
-    float form[5] = { 1, 1, 1, 1, 1 };               ///< a factor per FormTemplate (Anthem, Dream, Acid, Plateau, Drift)
-    std::map<std::string, float> groups;             ///< a factor per preset group (1 where absent)
+    float m_form[5] = { 1, 1, 1, 1, 1 };               ///< a factor per FormTemplate (Anthem, Dream, Acid, Plateau, Drift)
+    std::map<std::string, float> m_groups;             ///< a factor per preset group (1 where absent)
     /** @brief The factor of preset group @p name. */
     float group(const std::string& name) const
     {
-        const auto it = groups.find(name);
-        return it == groups.end() ? 1.0f : it->second;
+        const auto it = m_groups.find(name);
+        return it == m_groups.end() ? 1.0f : it->second;
     }
 };
 

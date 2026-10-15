@@ -43,40 +43,40 @@ public:
     /** @brief Releases the note. */
     void noteOff();
     /** @brief A kick starts: the duck. */
-    void kick(double late) { duck_.trigger(late); }
+    void kick(double late) { m_duck.trigger(late); }
     /** @brief Renders @p n samples (replacing @p out, mono). */
     void process(float* out, int n);
     /** @brief The frequency a note of @p pitch plays at, after the octave setting. */
     double noteHz(int pitch) const;
     /** @brief Whether sub.lock asks for the kick's phase. */
-    bool locked() const { return lock_; }
+    bool locked() const { return m_lock; }
     /**
      * @brief Phase in cycles the voice's chain adds at @p hz (half a sample of ADAA, the low pass): a locked note starts
      *        this much earlier in its cycle, so that what leaves the voice is in the kick's phase.
      */
     double chainPhase(double hz) const;
     /** @brief Whether anything sounds. */
-    bool active() const { return env_.isActive(); }
+    bool active() const { return m_env.isActive(); }
 
 private:
-    double sr_ = 48000.0;   ///< the sample rate, Hz
-    Envelope env_;           ///< the amplitude envelope
-    Ducker duck_;            ///< the kick's duck
-    TanhAdaa sat_;           ///< the drive
-    Svf lp_;                 ///< the low pass
-    double phase_ = 0.0;   ///< the phase, cycles
-    double inc_ = 0.0;   ///< the phase step per sample, cycles
-    float velocity_ = 1.0f;   ///< the note's velocity
-    float level_ = 0.5f;   ///< sub.level, linear
-    float drive_ = 1.0f;   ///< the drive
-    float driveNorm_ = 1.0f;   ///< the gain that keeps the level after it
-    float attackS_ = 0.003f;   ///< the envelope's attack, seconds
-    float decayS_ = 0.25f;   ///< its decay, seconds
-    float sustain_ = 0.7f;   ///< its sustain, 0..1
-    float releaseS_ = 0.09f;   ///< its release, seconds
-    float lpHz_ = 110.0f;    ///< the low pass's corner
-    int octave_ = 0;   ///< octaves the notes are moved by
-    bool lock_ = true;   ///< the phase is locked to the kick's (sub.lock)
+    double m_sr = 48000.0;   ///< the sample rate, Hz
+    Envelope m_env;           ///< the amplitude envelope
+    Ducker m_duck;            ///< the kick's duck
+    TanhAdaa m_sat;           ///< the drive
+    Svf m_lp;                 ///< the low pass
+    double m_phase = 0.0;   ///< the phase, cycles
+    double m_inc = 0.0;   ///< the phase step per sample, cycles
+    float m_velocity = 1.0f;   ///< the note's velocity
+    float m_level = 0.5f;   ///< sub.level, linear
+    float m_drive = 1.0f;   ///< the drive
+    float m_driveNorm = 1.0f;   ///< the gain that keeps the level after it
+    float m_attackS = 0.003f;   ///< the envelope's attack, seconds
+    float m_decayS = 0.25f;   ///< its decay, seconds
+    float m_sustain = 0.7f;   ///< its sustain, 0..1
+    float m_releaseS = 0.09f;   ///< its release, seconds
+    float m_lpHz = 110.0f;    ///< the low pass's corner
+    int m_octave = 0;   ///< octaves the notes are moved by
+    bool m_lock = true;   ///< the phase is locked to the kick's (sub.lock)
 };
 
 } // namespace parh

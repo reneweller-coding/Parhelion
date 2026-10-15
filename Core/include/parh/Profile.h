@@ -10,10 +10,10 @@
 namespace parh::prof {
 
 /** @brief The stages timed. */
-enum Slot : int { Cells, Events, Kick, Sub, Kit, Bass, Poly, Piano, Strings, Choir, Brass, Timpani, Sfx, Buses, Cloud, Rooms,
-                  TrackBus, Glue, Mixer, MasterTone, Clipper, Limiter, Count };
+enum SlotE : int { CELLS, EVENTS, KICK, SUB, KIT, BASS, POLY, PIANO, STRINGS, CHOIR, BRASS, TIMPANI, SFX, BUSES, CLOUD, ROOMS,
+                  TRACK_BUS, GLUE, MIXER, MASTER_TONE, CLIPPER, LIMITER, COUNT };
 /** @brief Their names. */
-inline const char* const kNames[Count] = { "cells (knobs)", "events", "kick", "sub", "kit (12 lanes)", "bass and 303", "poly (6 voices)", "piano", "strings",
+inline const char* const Names[COUNT] = { "cells (knobs)", "events", "kick", "sub", "kit (12 lanes)", "bass and 303", "poly (6 voices)", "piano", "strings",
                                            "choir", "brass", "timpani", "effects", "buses, gates, pump", "cloud", "rooms",
                                            "track bus", "glue and trim", "mixer", "master tone", "clipper (4x)", "limiter" };
 
@@ -23,13 +23,13 @@ inline const char* const kNames[Count] = { "cells (knobs)", "events", "kick", "s
 #include <chrono>
 namespace parh::prof {
 /** @brief Nanoseconds spent per slot. */
-inline double ns[Count] = {};
+inline double ns[COUNT] = {};
 /** @brief Adds the time from its construction to its end to a slot. */
 struct Scope {
-    int slot;
-    std::chrono::steady_clock::time_point t0;
-    explicit Scope(int s) : slot(s), t0(std::chrono::steady_clock::now()) {}
-    ~Scope() { ns[slot] += std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - t0).count(); }
+    int m_slot;
+    std::chrono::steady_clock::time_point m_t0;
+    explicit Scope(int s) : m_slot(s), m_t0(std::chrono::steady_clock::now()) {}
+    ~Scope() { ns[m_slot] += std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - m_t0).count(); }
 };
 } // namespace parh::prof
 #define PARH_PROF_CAT2(a, b) a##b

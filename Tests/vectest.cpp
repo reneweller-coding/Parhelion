@@ -28,7 +28,7 @@ using namespace parhtest;
 
 namespace {
 
-constexpr int W = kVecWidth;   ///< the lanes of the vector type compiled here
+constexpr int W = VecWidth;   ///< the lanes of the vector type compiled here
 
 /** @brief A float made from @p i that covers signs, magnitudes and the denormals. */
 float testValue(uint32_t i)
@@ -118,9 +118,9 @@ void testKit()
     sk.prepare(48000.0);
     for (PercKit* k : { &vk, &sk }) {
         k->setTempo(130.0);
-        for (int l = 0; l < kPercLanes; ++l) {
+        for (int l = 0; l < PercLanes; ++l) {
             float v[64];
-            params->readModule(Module::Perc, l, v);
+            params->readModule(ModuleE::PERC, l, v);
             k->update(l, v, 9, 0);
         }
     }
@@ -128,7 +128,7 @@ void testKit()
     float peak = 0.0f;
     for (int block = 0; block < 1500; ++block) {
         if (block % 3 == 0) {
-            const int lane = (block / 3) % kPercLanes;
+            const int lane = (block / 3) % PercLanes;
             const float vel = 0.4f + 0.05f * static_cast<float>(block % 12);
             const double late = static_cast<double>(block % 7) / 7.0;
             vk.trigger(lane, vel, block % 5 == 0 ? 2 : 0, late);
@@ -136,7 +136,7 @@ void testKit()
         }
         vk.processLanes(32);
         sk.processLanesWith<float>(32);
-        for (int i = 0; i < 32 * PercKit::kStride; ++i) {
+        for (int i = 0; i < 32 * PercKit::Stride; ++i) {
             if (!sameBits(vk.laneL()[i], sk.laneL()[i]) || !sameBits(vk.laneR()[i], sk.laneR()[i])) ++bad;
             peak = std::max(peak, std::fabs(sk.laneL()[i]));
             ++samples;
@@ -169,8 +169,8 @@ void testPoly()
                             "lead.wave=0.5 lead.drift=4 lead.disperse=%d lead.disperse_freq=900",
                             (block / 250) % 4, (block / 250) % 6, 0.1 + 0.07 * (block / 250 % 10), block / 250 % 7,
                             1 + (block / 250) % 8).c_str());
-            std::vector<float> v(static_cast<size_t>(poly::Count));
-            p.readModule(Module::Poly, 0, v.data());
+            std::vector<float> v(static_cast<size_t>(poly::COUNT));
+            p.readModule(ModuleE::POLY, 0, v.data());
             a->update(v.data(), 145.0);
             b->update(v.data(), 145.0);
         }
@@ -223,8 +223,8 @@ void testPolyModels()
                             "lead.mx5_src=4 lead.mx5_dst=1 lead.mx5_amount=0.1 lead.mx6_src=9 lead.mx6_dst=10 lead.mx6_amount=0.6 "
                             "lead.mx7_src=7 lead.mx7_dst=9 lead.mx7_amount=-0.4 lead.mx8_src=6 lead.mx8_dst=3 lead.mx8_amount=0.5",
                             m, 0.11 * (block / 500 % 9), 0.2 + 0.09 * (block / 500 % 9), (block / 500) % 4).c_str());
-            std::vector<float> v(static_cast<size_t>(poly::Count));
-            p.readModule(Module::Poly, 0, v.data());
+            std::vector<float> v(static_cast<size_t>(poly::COUNT));
+            p.readModule(ModuleE::POLY, 0, v.data());
             a->update(v.data(), 145.0);
             b->update(v.data(), 145.0);
         }
@@ -263,8 +263,8 @@ void testPiano()
     const DenormalGuard guard;
     auto a = std::make_unique<Piano>(), b = std::make_unique<Piano>();
     ParamStore ps;
-    std::vector<float> v(static_cast<size_t>(piano::Count));
-    ps.readModule(Module::Piano, 0, v.data());
+    std::vector<float> v(static_cast<size_t>(piano::COUNT));
+    ps.readModule(ModuleE::PIANO, 0, v.data());
     for (Piano* p : { a.get(), b.get() }) {
         p->prepare(48000.0);
         p->setSpec(PianoSpec{});
@@ -273,19 +273,19 @@ void testPiano()
     int bad = 0;
     double energy = 0.0;
     std::vector<float> aL(64), aR(64), bL(64), bR(64);
-    static const int kChords[4][3] = { { 45, 57, 64 }, { 41, 53, 60 }, { 36, 55, 64 }, { 43, 59, 74 } };
+    static const int Chords[4][3] = { { 45, 57, 64 }, { 41, 53, 60 }, { 36, 55, 64 }, { 43, 59, 74 } };
     for (int block = 0; block < 4000; ++block) {
         if (block % 400 == 0) {
-            v[piano::Pedal] = static_cast<float>((block / 400) % 3) * 0.5f;
+            v[piano::PEDAL] = static_cast<float>((block / 400) % 3) * 0.5f;
             a->update(v.data());
             b->update(v.data());
         }
         if (block % 250 == 0) {
-            const int* c = kChords[(block / 250) % 4];
+            const int* c = Chords[(block / 250) % 4];
             for (int k = 0; k < 3; ++k) { a->noteOn(c[k], 0.5f + 0.15f * k, 0.3); b->noteOn(c[k], 0.5f + 0.15f * k, 0.3); }
         }
         if (block % 250 == 120) {
-            const int* c = kChords[(block / 250) % 4];
+            const int* c = Chords[(block / 250) % 4];
             for (int k = 0; k < 3; ++k) { a->noteOff(c[k]); b->noteOff(c[k]); }
         }
         const int n = 5 + block % 40;
@@ -309,18 +309,18 @@ void testStrings()
     const DenormalGuard guard;
     auto a = std::make_unique<StringSection>(), b = std::make_unique<StringSection>();
     ParamStore ps;
-    std::vector<float> v(static_cast<size_t>(strings::Count));
-    ps.readModule(Module::Strings, 0, v.data());
+    std::vector<float> v(static_cast<size_t>(strings::COUNT));
+    ps.readModule(ModuleE::STRINGS, 0, v.data());
     for (StringSection* s : { a.get(), b.get() }) { s->prepare(48000.0, 11); s->update(v.data()); }
     int bad = 0;
     double energy = 0.0;
     std::vector<float> aL(64), aR(64), bL(64), bR(64);
-    static const int kNotes[5] = { 38, 50, 57, 64, 76 };
+    static const int Notes[5] = { 38, 50, 57, 64, 76 };
     for (int block = 0; block < 3000; ++block) {
         if (block % 300 == 0)
-            for (int k = 0; k < 5; ++k) { const bool st = (block / 300) % 2 == 1; a->noteOn(kNotes[k] + (block / 300) % 3, 0.7f, st, 0.0); b->noteOn(kNotes[k] + (block / 300) % 3, 0.7f, st, 0.0); }
+            for (int k = 0; k < 5; ++k) { const bool st = (block / 300) % 2 == 1; a->noteOn(Notes[k] + (block / 300) % 3, 0.7f, st, 0.0); b->noteOn(Notes[k] + (block / 300) % 3, 0.7f, st, 0.0); }
         if (block % 300 == 200)
-            for (int k = 0; k < 5; ++k) { a->noteOff(kNotes[k] + (block / 300) % 3); b->noteOff(kNotes[k] + (block / 300) % 3); }
+            for (int k = 0; k < 5; ++k) { a->noteOff(Notes[k] + (block / 300) % 3); b->noteOff(Notes[k] + (block / 300) % 3); }
         const int n = 5 + block % 40;
         a->processWith<float>(aL.data(), aR.data(), n);
         b->processWith<VecF>(bL.data(), bR.data(), n);
@@ -336,9 +336,9 @@ void testStrings()
 /** @brief Runs the tests; the exit code is the number of failures. */
 int main()
 {
-    std::printf("parh_vectest: path %s, %d lanes\n", kVecPathName, W);
+    std::printf("parh_vectest: path %s, %d lanes\n", VecPathName, W);
 #if defined(PARH_EXPECT_PATH)
-    check(std::strcmp(kVecPathName, PARH_EXPECT_PATH) == 0, "built for the expected path", fmt("expected %s, got %s", PARH_EXPECT_PATH, kVecPathName));
+    check(std::strcmp(VecPathName, PARH_EXPECT_PATH) == 0, "built for the expected path", fmt("expected %s, got %s", PARH_EXPECT_PATH, VecPathName));
 #endif
     testOps();
     testHalfband();

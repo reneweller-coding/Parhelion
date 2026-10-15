@@ -73,33 +73,33 @@ public:
     bool isBoolean() const override;                  ///< a Toggle is boolean
     juce::String getText(float normalisedValue, int maximumStringLength) const override;   ///< the value as the panel shows it
     float getValueForText(const juce::String& text) const override;   ///< parses a choice name, On/Off or a number
-    const juce::NormalisableRange<float>& getNormalisableRange() const override { return range_; }   ///< the store's own mapping
-    int paramId() const { return id_; }               ///< the id in the store
+    const juce::NormalisableRange<float>& getNormalisableRange() const override { return m_range; }   ///< the store's own mapping
+    int paramId() const { return m_id; }               ///< the id in the store
 
 private:
-    parh::ParamStore& store_;   ///< the store it reads and writes
-    int id_;   ///< the id in the store
-    juce::String name_;   ///< the display name
-    juce::NormalisableRange<float> range_;   ///< the store's mapping between the real and the normalised value
+    parh::ParamStore& m_store;   ///< the store it reads and writes
+    int m_id;   ///< the id in the store
+    juce::String m_name;   ///< the display name
+    juce::NormalisableRange<float> m_range;   ///< the store's mapping between the real and the normalised value
 };
 
 /** @brief A track where it lies in what plays (a track alone: at beat 0 on deck A). */
 struct TrackPlace {
-    double start = 0.0;   ///< set beat of the track's first bar
-    double swapIn = 0.0;   ///< set beat where it takes over the low end
-    double end = 0.0;   ///< set beat of its end
-    int deck = 0;   ///< the deck it plays on
-    parh::TrackInfo info;   ///< what the composer says of it
+    double m_start = 0.0;   ///< set beat of the track's first bar
+    double m_swapIn = 0.0;   ///< set beat where it takes over the low end
+    double m_end = 0.0;   ///< set beat of its end
+    int m_deck = 0;   ///< the deck it plays on
+    parh::TrackInfo m_info;   ///< what the composer says of it
 };
 
 /** @brief What plays: a set, or a track as deck A of a one-track set, with where its tracks lie. */
 struct Playing {
-    parh::SetScore set;   ///< the set, or the one track as deck A
-    bool isSet = false;   ///< a set (a DJ mix), not a single track
-    std::vector<TrackPlace> tracks;   ///< its tracks where they lie
-    parh::SetInfo setInfo;   ///< a set's (empty for a track)
-    bool resume = false;     ///< the performer's "now": loaded where the engine is, and it plays on (performNow)
-    std::vector<parh::Rewrite> rewrites;   ///< the "now"s this track was rewritten by, in order (a next one keeps them)
+    parh::SetScore m_set;   ///< the set, or the one track as deck A
+    bool m_isSet = false;   ///< a set (a DJ mix), not a single track
+    std::vector<TrackPlace> m_tracks;   ///< its tracks where they lie
+    parh::SetInfo m_setInfo;   ///< a set's (empty for a track)
+    bool m_resume = false;     ///< the performer's "now": loaded where the engine is, and it plays on (performNow)
+    std::vector<parh::Rewrite> m_rewrites;   ///< the "now"s this track was rewritten by, in order (a next one keeps them)
 };
 
 /** @brief The Parhelion processor. */
@@ -121,10 +121,10 @@ public:
      *        corrections kept. A set is not rewritten (its next blend would have to move with it).
      * @return the bar the rewrite begins at, or -1 where there is nothing to rewrite
      */
-    int performNow(parh::SectionKind kind);
+    int performNow(parh::SectionKindE kind);
     /** @brief The bar of the last performNow while it waits to be heard, -1 none. */
-    int pendingNow() const { return nowBar_.load(); }
-    bool isComposing() const { return composing_.load(); }   ///< whether the composer thread is at work
+    int pendingNow() const { return m_nowBar.load(); }
+    bool isComposing() const { return m_composing.load(); }   ///< whether the composer thread is at work
     /** @brief Whether the knobs ask for a DJ mix (set.minutes above 0) rather than a single track. */
     bool mixChosen() const;
     /**
@@ -132,8 +132,8 @@ public:
      *        back to the mix's last length (60 min at first); then composes, if what plays is not that already.
      */
     void chooseMix(bool mix);
-    bool playingMix() const { std::lock_guard<std::mutex> g(lock_); return current_.isSet; }   ///< whether what plays is a DJ mix
-    uint64_t seed() const { std::lock_guard<std::mutex> g(lock_); return seed_; }   ///< the seed of what plays
+    bool playingMix() const { std::lock_guard<std::mutex> g(m_lock); return m_current.m_isSet; }   ///< whether what plays is a DJ mix
+    uint64_t seed() const { std::lock_guard<std::mutex> g(m_lock); return m_seed; }   ///< the seed of what plays
     juce::String curationText() const;               ///< the rerolls, for the panel
     /** @brief The track under @p beat (its index in what plays), -1 if none. In a set, the one that owns the low end. */
     int trackAt(double beat) const;
@@ -145,28 +145,28 @@ public:
     juce::String rate(int value);
 
     // Transport (the standalone's; a host drives its own).
-    void setPlaying(bool on) { playing_ = on; }      ///< play or stop (the standalone's transport)
-    bool isPlaying() const { return playing_.load(); }   ///< whether the standalone plays
+    void setPlaying(bool on) { m_playing = on; }      ///< play or stop (the standalone's transport)
+    bool isPlaying() const { return m_playing.load(); }   ///< whether the standalone plays
     /** @brief The standalone's Ableton Link, as the settings menu says it: off, alone, or how many apps are with it. */
     juce::String linkStatus() const;
     /** @brief The family jam, as the settings menu says it (Jam.h): off, leading, or whom it follows. */
-    juce::String jamStatus() const { return jam_.status(); }
+    juce::String jamStatus() const { return m_jam.status(); }
     /** @brief The transposition a follower plays now (semitones; the family jam's root, Jam.h). */
-    int jamTranspose() const { return jamTransposeOut_.load(std::memory_order_relaxed); }
+    int jamTranspose() const { return m_jamTransposeOut.load(std::memory_order_relaxed); }
     /** @brief Jumps to @p beat at the next block (the display goes there at once, also while nothing plays). */
-    void seekTo(double beat) { seekRequest_ = beat; position_ = beat; }
-    double positionBeats() const { return position_.load(); }   ///< where the audio thread is, in beats
+    void seekTo(double beat) { m_seekRequest = beat; m_position = beat; }
+    double positionBeats() const { return m_position.load(); }   ///< where the audio thread is, in beats
     /** @brief Counts the scores the engine has loaded: a display compares it to know when to copy again. */
-    int scoreVersion() const { return scoreVersion_.load(); }
+    int scoreVersion() const { return m_scoreVersion.load(); }
     /** @brief A copy of what plays (message thread; for the arrange and eclipse views). */
-    void copyPlaying(Playing& out) const { std::lock_guard<std::mutex> g(lock_); out = current_; }
+    void copyPlaying(Playing& out) const { std::lock_guard<std::mutex> g(m_lock); out = m_current; }
     /**
      * @brief The factory preset the composer chose for instance @p instance of synth @p m in the track whose sounds the
      *        knobs show (Engine::leadDeck): its index in parh::factoryPresets(m), -1 if none.
      */
-    int composedPreset(parh::Module m, int instance) const;
+    int composedPreset(parh::ModuleE m, int instance) const;
     /** @brief Puts factory preset @p index of @p m on instance @p instance's knobs, through the host's parameters. */
-    void applyPreset(parh::Module m, int instance, int index);
+    void applyPreset(parh::ModuleE m, int instance, int index);
     /**
      * @brief Sets the knobs @p values (store id, real value) through the host's parameters as one undo step named @p what
      *        (15.10.2026: a value typed into the command palette).
@@ -186,13 +186,13 @@ public:
      * lane's sound loads into any lane (parh::userPresetText). PARH_USER_DIR moves the folder.
      * @{ */
     /** @brief The folder of one synth's user presets. */
-    juce::File userPresetFolder(parh::Module m, int instance) const;
+    juce::File userPresetFolder(parh::ModuleE m, int instance) const;
     /** @brief Its user presets, sorted by name. */
-    juce::Array<juce::File> userPresets(parh::Module m, int instance) const;
+    juce::Array<juce::File> userPresets(parh::ModuleE m, int instance) const;
     /** @brief Saves the synth's knobs as the user preset @p name; the file, or File() when it failed. */
-    juce::File saveUserPreset(parh::Module m, int instance, const juce::String& name);
+    juce::File saveUserPreset(parh::ModuleE m, int instance, const juce::String& name);
     /** @brief Puts user preset @p file on the synth's knobs, the rest of the sound at its defaults (as a factory preset). */
-    bool applyUserPreset(parh::Module m, int instance, const juce::File& file);
+    bool applyUserPreset(parh::ModuleE m, int instance, const juce::File& file);
     /** @} */
     /** @brief The length of what plays, in beats and seconds (as composed). */
     void length(double& beats, double& seconds) const;
@@ -201,11 +201,11 @@ public:
     bool saveSet(const juce::File& file);            ///< writes seed, lengths, rerolls and parameters as an .parhset
     bool loadSet(const juce::File& file);            ///< reads an .parhset and composes it
     /** @brief What an export writes beside the WAV and its MIDI and cues. */
-    enum ExportExtra { kStems = 1, kLoops = 2 };
+    enum ExportExtraE { STEMS = 1, LOOPS = 2 };
     /**
      * @brief Renders what plays offline (as composed: not live) to a 24-bit WAV with its cues (a cue chunk and JSON) and
-     *        MIDI beside it, on a thread; returns at once. @p extras: kStems a folder "<name>_stems" (their sum is the mix
-     *        before the master), kLoops a folder "<name>_loops" with the DJ loops (a track only).
+     *        MIDI beside it, on a thread; returns at once. @p extras: STEMS a folder "<name>_stems" (their sum is the mix
+     *        before the master), LOOPS a folder "<name>_loops" with the DJ loops (a track only).
      */
     void exportTo(const juce::File& wav, int extras);
     juce::String status() const;                     ///< one line for the panel
@@ -214,7 +214,7 @@ public:
      * @brief The test mode (PARH_SEED, PARH_PLAY = seconds, PARH_RECORD = a WAV file; PARH_SET = minutes, a set): a fixed
      *        seed, play at once, record what the audio thread renders; recordingDone() when the seconds are full.
      */
-    bool recordingDone() const { return recordTarget_ > 0 && recordPos_.load() >= recordTarget_; }
+    bool recordingDone() const { return m_recordTarget > 0 && m_recordPos.load() >= m_recordTarget; }
     void writeRecording();                           ///< writes the recording (message thread)
     /**
      * @brief The meters since the last call (message thread): per deck the peak and the RMS after its mixer channel, the
@@ -228,16 +228,16 @@ public:
     void takeStripMeters(float* peak, float* rms);
 
     // Muting.
-    bool muted() const { return mute_.load(std::memory_order_relaxed); }   ///< the output is silenced
+    bool muted() const { return m_mute.load(std::memory_order_relaxed); }   ///< the output is silenced
     /** @brief Mutes or unmutes; does nothing while `PARH_MUTE` forces it. */
-    void setMuted(bool on) { if (!forceMute_) mute_.store(on, std::memory_order_relaxed); }
-    bool muteForced() const { return forceMute_; }   ///< `PARH_MUTE` (or `PARH_SHOT`) was set: the switch is stuck on
+    void setMuted(bool on) { if (!m_forceMute) m_mute.store(on, std::memory_order_relaxed); }
+    bool muteForced() const { return m_forceMute; }   ///< `PARH_MUTE` (or `PARH_SHOT`) was set: the switch is stuck on
 
     // Undo (the frame).
     bool undo();                                     ///< takes the last step back; false if there was none
     bool redo();                                     ///< makes the last undone step again
-    juce::String undoName() const { return history_.undoName(); }   ///< what undo takes back (empty: nothing)
-    juce::String redoName() const { return history_.redoName(); }   ///< what redo makes again
+    juce::String undoName() const { return m_history.undoName(); }   ///< what undo takes back (empty: nothing)
+    juce::String redoName() const { return m_history.redoName(); }   ///< what redo makes again
     /** @brief Opens a step of several knobs (a preset, a reset): they are undone together. Close with endStep. */
     void beginStep(const juce::String& what);
     void endStep();                                  ///< closes beginStep's step
@@ -249,22 +249,22 @@ public:
     float playedNormalised(int id) const;
 
     // The headset (the frame).
-    frame::Headset& headset() { return headset_; }   ///< the hands arriving from the Quest app
+    frame::Headset& headset() { return m_headset; }   ///< the hands arriving from the Quest app
 
     // Performing.
     /** @brief Binds the next MIDI controller that arrives to store id @p id; -1 cancels. */
-    void learn(int id) { learn_ = id; }
-    int learning() const { return learn_.load(); }   ///< the store id waiting for a controller, or -1
+    void learn(int id) { m_learn = id; }
+    int learning() const { return m_learn.load(); }   ///< the store id waiting for a controller, or -1
     /** @brief The controller bound to store id @p id, or -1. */
     int controllerFor(int id) const;
     /** @brief Unbinds store id @p id. */
     void forget(int id);
 
-    parh::ParamStore& store() { return engine_.params(); }   ///< the engine's parameters
+    parh::ParamStore& store() { return m_engine.params(); }   ///< the engine's parameters
     /** @brief The parameters (read only). */
-    const parh::ParamStore& store() const { return engine_.params(); }
+    const parh::ParamStore& store() const { return m_engine.params(); }
     /** @brief The host parameter of store id @p id, or null. */
-    StoreParameter* parameter(int id) { return id >= 0 && id < static_cast<int>(params_.size()) ? params_[static_cast<size_t>(id)] : nullptr; }
+    StoreParameter* parameter(int id) { return id >= 0 && id < static_cast<int>(m_params.size()) ? m_params[static_cast<size_t>(id)] : nullptr; }
     /** @brief Sets store id @p id to the real value @p value through its host parameter (a gesture). */
     void setFromUi(int id, float value) { setFromMidi(id, value); }
 
@@ -309,20 +309,20 @@ private:
     void loadEngine(const Playing& p);
     /** @brief The performer's MIDI: keys toggle the mutes, controllers move what they are bound to (audio thread). */
     void perform(const juce::MidiBuffer& midi);
-    int keyboardSeen_ = 0;   ///< the keyboard target of the last block (audio thread): a change releases every key
+    int m_keyboardSeen = 0;   ///< the keyboard target of the last block (audio thread): a change releases every key
     // MIDI out (02.10.2026): the composer's notes as the decks play them, on the channels of the MIDI export (Midi.h).
-    parh::NoteTap noteTap_;   ///< what the decks played in the last process() call (audio thread)
-    frame::KeyMemory keyMemory_;   ///< where each held key went (the split, Scale Lock), so its release follows (02.10.2026)
+    parh::NoteTap m_noteTap;   ///< what the decks played in the last process() call (audio thread)
+    frame::KeyMemory m_keyMemory;   ///< where each held key went (the split, Scale Lock), so its release follows (02.10.2026)
     /** @brief A note-off due later, for a note whose part has none of its own (NoteTap::Note::offSample). */
     struct PendingOff {
-        int64_t sample;    ///< when, on the engine's sample counter
-        uint8_t channel;   ///< MIDI channel, 1..16
-        uint8_t pitch;     ///< MIDI note
+        int64_t m_sample;    ///< when, on the engine's sample counter
+        uint8_t m_channel;   ///< MIDI channel, 1..16
+        uint8_t m_pitch;     ///< MIDI note
     };
-    std::array<PendingOff, 256> pendingOff_{};   ///< the note-offs not yet sent (audio thread)
-    int pendingOffs_ = 0;                        ///< how many of pendingOff_ are due
-    int64_t midiExpect_ = -1;                    ///< the sample the next block should start at; another is a jump
-    bool midiSounding_ = false;                  ///< a note-on went out since the last all-notes-off
+    std::array<PendingOff, 256> m_pendingOff{};   ///< the note-offs not yet sent (audio thread)
+    int m_pendingOffs = 0;                        ///< how many of m_pendingOff are due
+    int64_t m_midiExpect = -1;                    ///< the sample the next block should start at; another is a jump
+    bool m_midiSounding = false;                  ///< a note-on went out since the last all-notes-off
     /** @brief Writes the notes the decks played in the block from @p start (@p n samples) into @p midi, and the due offs. */
     void emitMidi(juce::MidiBuffer& midi, int64_t start, int n);
     /** @brief All notes off on every channel, at the block's start, when a note sounded (a stop, a jump). */
@@ -330,88 +330,88 @@ private:
     /** @brief Sets store id @p id to the real value @p value through its host parameter. */
     void setFromMidi(int id, float value);
 
-    parh::Engine engine_;   ///< the engine
-    std::vector<StoreParameter*> params_;   ///< the host parameters, one per store id (owned by the processor)
-    uint64_t seed_ = 1;   ///< the seed of what plays
-    parh::Curation curation_;   ///< the rerolls and locks
-    mutable std::mutex lock_;   ///< guards what the composer thread hands over
-    std::vector<parh::Rating> ratings_;   ///< Phase 17: the player's ratings (lock_)
-    std::unique_ptr<Playing> pending_;               ///< composed, waiting to be loaded
-    Playing current_;                                ///< what the engine plays
-    std::atomic<bool> composing_{ false };   ///< the composer thread works
-    std::atomic<bool> playing_{ false };   ///< play is on
-    std::atomic<bool> exporting_{ false };   ///< an export runs
-    std::atomic<bool> again_{ false };               ///< compose was asked for while composing: once more when done
-    std::atomic<int> nowBar_{ -1 };                  ///< performNow's bar, -1 none (read by composeNow)
-    parh::SectionKind nowKind_ = parh::SectionKind::Breakdown;   ///< and its kind (lock_)
+    parh::Engine m_engine;   ///< the engine
+    std::vector<StoreParameter*> m_params;   ///< the host parameters, one per store id (owned by the processor)
+    uint64_t m_seed = 1;   ///< the seed of what plays
+    parh::Curation m_curation;   ///< the rerolls and locks
+    mutable std::mutex m_lock;   ///< guards what the composer thread hands over
+    std::vector<parh::Rating> m_ratings;   ///< Phase 17: the player's ratings (m_lock)
+    std::unique_ptr<Playing> m_pending;               ///< composed, waiting to be loaded
+    Playing m_current;                                ///< what the engine plays
+    std::atomic<bool> m_composing{ false };   ///< the composer thread works
+    std::atomic<bool> m_playing{ false };   ///< play is on
+    std::atomic<bool> m_exporting{ false };   ///< an export runs
+    std::atomic<bool> m_again{ false };               ///< compose was asked for while composing: once more when done
+    std::atomic<int> m_nowBar{ -1 };                  ///< performNow's bar, -1 none (read by composeNow)
+    parh::SectionKindE m_nowKind = parh::SectionKindE::BREAKDOWN;   ///< and its kind (m_lock)
     // The loudness (Leveler.h): measured on the composer thread once the score is handed over, while it plays.
-    std::atomic<bool> newer_{ false };               ///< a newer score is asked for: the measuring of the last one stops
-    uint64_t composed_ = 0;   ///< counts the compositions
-    uint64_t pendingId_ = 0;   ///< pending_'s number (lock_)
-    uint64_t playingId_ = 0;   ///< current_'s number (lock_)
-    std::vector<float> trims_[parh::kDecks];          ///< the corrections found for the composition trimsFor_ (lock_)
-    std::vector<parh::BalanceDb> bal_[parh::kDecks];   ///< Phase 18: the parts' corrections found with them (lock_)
-    uint64_t trimsFor_ = 0;   ///< the composition trims_ and bal_ belong to (lock_)
-    bool levelled_ = false;                          ///< current_ carries its corrections (lock_)
-    std::atomic<double> position_{ 0.0 };   ///< where the engine is, beats (audio thread writes)
-    std::atomic<double> seekRequest_{ -1.0 };   ///< a jump asked for, beats; -1 none
-    double sampleRate_ = 48000.0;   ///< the sample rate, Hz
-    int blockSize_ = 512;   ///< the largest block, samples
-    juce::String lastExport_;   ///< the last export's result, for the Export tab
-    float mixMinutes_ = 60.0f;                       ///< the mix's length while a single track is chosen (chooseMix; the state)
-    std::unique_ptr<std::thread> exporter_;   ///< the export thread while it runs
-    std::vector<float> record_;                      ///< interleaved, allocated in prepareToPlay in the test mode only
-    size_t recordTarget_ = 0;   ///< TOT_RECORD: how many values record_ takes, 0 off
-    std::atomic<size_t> recordPos_{ 0 };   ///< how many are written
-    bool autoPlay_ = false;   ///< TOT_PLAY: play once the first score is loaded
+    std::atomic<bool> m_newer{ false };               ///< a newer score is asked for: the measuring of the last one stops
+    uint64_t m_composed = 0;   ///< counts the compositions
+    uint64_t m_pendingId = 0;   ///< m_pending's number (m_lock)
+    uint64_t m_playingId = 0;   ///< m_current's number (m_lock)
+    std::vector<float> m_trims[parh::Decks];          ///< the corrections found for the composition m_trimsFor (m_lock)
+    std::vector<parh::BalanceDbT> m_bal[parh::Decks];   ///< Phase 18: the parts' corrections found with them (m_lock)
+    uint64_t m_trimsFor = 0;   ///< the composition m_trims and m_bal belong to (m_lock)
+    bool m_levelled = false;                          ///< m_current carries its corrections (m_lock)
+    std::atomic<double> m_position{ 0.0 };   ///< where the engine is, beats (audio thread writes)
+    std::atomic<double> m_seekRequest{ -1.0 };   ///< a jump asked for, beats; -1 none
+    double m_sampleRate = 48000.0;   ///< the sample rate, Hz
+    int m_blockSize = 512;   ///< the largest block, samples
+    juce::String m_lastExport;   ///< the last export's result, for the Export tab
+    float m_mixMinutes = 60.0f;                       ///< the mix's length while a single track is chosen (chooseMix; the state)
+    std::unique_ptr<std::thread> m_exporter;   ///< the export thread while it runs
+    std::vector<float> m_record;                      ///< interleaved, allocated in prepareToPlay in the test mode only
+    size_t m_recordTarget = 0;   ///< TOT_RECORD: how many values m_record takes, 0 off
+    std::atomic<size_t> m_recordPos{ 0 };   ///< how many are written
+    bool m_autoPlay = false;   ///< TOT_PLAY: play once the first score is loaded
     // The meters: the decks through their taps, the output's peak and a K-weighted mean square.
-    std::vector<float> tapBuf_;                      ///< kDecks x 2 x block (prepareToPlay)
-    std::array<float*, parh::kDecks> tapL_{};   ///< per deck: its tap's left channel in tapBuf_
-    std::array<float*, parh::kDecks> tapR_{};   ///< per deck: its tap's right channel in tapBuf_
+    std::vector<float> m_tapBuf;                      ///< Decks x 2 x block (prepareToPlay)
+    std::array<float*, parh::Decks> m_tapL{};   ///< per deck: its tap's left channel in m_tapBuf
+    std::array<float*, parh::Decks> m_tapR{};   ///< per deck: its tap's right channel in m_tapBuf
     // The stems as outputs of their own (02.10.2026): a stereo bus per stem (Engine::stemName) besides the main output,
     // off until the host switches one on; then the engine writes every stem (Engine::setStems) and each bus that is on
     // gets its own. Pre-master, as the export's stems: they sum to the mix before the master.
-    std::vector<float> stemBuf_;                                ///< kStems x 2 x block (prepareToPlay)
-    std::array<float*, parh::Engine::kStems> stemL_{};       ///< per stem: its left channel in stemBuf_
-    std::array<float*, parh::Engine::kStems> stemR_{};       ///< per stem: its right channel in stemBuf_
-    bool stemsOn_ = false;                                      ///< audio thread: the engine writes the stems now
+    std::vector<float> m_stemBuf;                                ///< STEMS x 2 x block (prepareToPlay)
+    std::array<float*, parh::Engine::STEMS> m_stemL{};       ///< per stem: its left channel in m_stemBuf
+    std::array<float*, parh::Engine::STEMS> m_stemR{};       ///< per stem: its right channel in m_stemBuf
+    bool m_stemsOn = false;                                      ///< audio thread: the engine writes the stems now
     /** @brief The buses: the main stereo output, then one stereo output per stem, those off by default. */
     static BusesProperties busLayout();
-    std::array<std::atomic<float>, parh::kDecks> meterPeak_{};   ///< audio thread raises, the editor takes (exchange 0)
-    std::array<std::atomic<double>, parh::kDecks> meterSum_{};   ///< sums of squares since the editor last took them
-    std::atomic<int> meterCount_{ 0 };               ///< samples in those sums
-    std::atomic<float> outPeak_{ 0.0f };   ///< the output's peak since the editor last took it
-    std::atomic<float> lufs_{ -70.0f };   ///< the output's momentary loudness, LUFS (400 ms)
+    std::array<std::atomic<float>, parh::Decks> m_meterPeak{};   ///< audio thread raises, the editor takes (exchange 0)
+    std::array<std::atomic<double>, parh::Decks> m_meterSum{};   ///< sums of squares since the editor last took them
+    std::atomic<int> m_meterCount{ 0 };               ///< samples in those sums
+    std::atomic<float> m_outPeak{ 0.0f };   ///< the output's peak since the editor last took it
+    std::atomic<float> m_lufs{ -70.0f };   ///< the output's momentary loudness, LUFS (400 ms)
     /** @brief A biquad in transposed direct form II (the K weighting). */
     struct Biquad {
-        double b0 = 1;   ///< feed-forward coefficient of x[n]
-        double b1 = 0;   ///< ... of x[n-1]
-        double b2 = 0;   ///< ... of x[n-2]
-        double a1 = 0;   ///< feedback coefficient of y[n-1]
-        double a2 = 0;   ///< ... of y[n-2]
-        double z1 = 0;   ///< the first state
-        double z2 = 0;   ///< the second state
+        double m_b0 = 1;   ///< feed-forward coefficient of x[n]
+        double m_b1 = 0;   ///< ... of x[n-1]
+        double m_b2 = 0;   ///< ... of x[n-2]
+        double m_a1 = 0;   ///< feedback coefficient of y[n-1]
+        double m_a2 = 0;   ///< ... of y[n-2]
+        double m_z1 = 0;   ///< the first state
+        double m_z2 = 0;   ///< the second state
         /** @brief One sample @p x through the filter. */
-        double run(double x) { const double y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
+        double run(double x) { const double y = m_b0 * x + m_z1; m_z1 = m_b1 * x - m_a1 * y + m_z2; m_z2 = m_b2 * x - m_a2 * y; return y; }
     };
-    Biquad kShelf_[2];   ///< the K weighting: its high shelf, per channel
-    Biquad kHigh_[2];   ///< ... and its high pass, per channel
-    double kMs_ = 0.0;   ///< the K-weighted mean square
-    double kCoef_ = 0.0;   ///< its one-pole coefficient
-    std::atomic<int> scoreVersion_{ 0 };   ///< counts the scores loaded (the editor redraws)
-    parh::CueSender cues_;                            ///< the OSC cues' socket and thread (message thread starts and stops it)
-    parh::CueTap cueTap_;                             ///< audio thread: beat range -> cues
-    int cuePort_ = 0;                                ///< the port the sender was started for, 0 = off (message thread)
-    double lastBeat_ = -1.0;                         ///< the beat after the last block (audio thread), to see a jump
-    std::array<std::atomic<int>, 128> ccMap_{};      ///< controller number -> store id, -1 unbound
-    std::atomic<int> learn_{ -1 };                   ///< learn()
-    std::atomic<bool> mute_{ false };                ///< muted()
-    bool forceMute_ = false;                         ///< muteForced()
-    std::vector<std::pair<int, float>> previewSaved_;   ///< the knobs a preview replaced (store id, real value)
-    std::atomic<double> hostBpm_{ 0.0 };             ///< the host's tempo as the audio thread last saw it, 0 outside a host
-    std::atomic<double> playedBpm_{ 0.0 };           ///< the tempo the engine's score was loaded with, 0 as composed
+    Biquad m_kShelf[2];   ///< the K weighting: its high shelf, per channel
+    Biquad m_kHigh[2];   ///< ... and its high pass, per channel
+    double m_kMs = 0.0;   ///< the K-weighted mean square
+    double m_kCoef = 0.0;   ///< its one-pole coefficient
+    std::atomic<int> m_scoreVersion{ 0 };   ///< counts the scores loaded (the editor redraws)
+    parh::CueSender m_cues;                            ///< the OSC cues' socket and thread (message thread starts and stops it)
+    parh::CueTap m_cueTap;                             ///< audio thread: beat range -> cues
+    int m_cuePort = 0;                                ///< the port the sender was started for, 0 = off (message thread)
+    double m_lastBeat = -1.0;                         ///< the beat after the last block (audio thread), to see a jump
+    std::array<std::atomic<int>, 128> m_ccMap{};      ///< controller number -> store id, -1 unbound
+    std::atomic<int> m_learn{ -1 };                   ///< learn()
+    std::atomic<bool> m_mute{ false };                ///< muted()
+    bool m_forceMute = false;                         ///< muteForced()
+    std::vector<std::pair<int, float>> m_previewSaved;   ///< the knobs a preview replaced (store id, real value)
+    std::atomic<double> m_hostBpm{ 0.0 };             ///< the host's tempo as the audio thread last saw it, 0 outside a host
+    std::atomic<double> m_playedBpm{ 0.0 };           ///< the tempo the engine's score was loaded with, 0 as composed
     // Ableton Link in the standalone (02.10.2026, LinkClock.h; Settings > Ableton Link).
-    frame::LinkClock link_;                          ///< the session (joined on the timer when the setting is on)
+    frame::LinkClock m_link;                          ///< the session (joined on the timer when the setting is on)
     // The family jam (02.10.2026, Jam.h; Settings > Family jam).
     /** @brief Audio thread: as the jam's leader, the sections and keys of the coming beat go out, stamped with their bar. */
     void jamLead(double before, double after, double shared);
@@ -421,26 +421,26 @@ private:
     int homeRootAt(double beat) const;
     /** @brief Which of compose.scale's values a mode named @p mode is (-1: none of them). */
     static int scaleOfMode(const juce::String& mode);
-    frame::JamBus jam_ { "Parhelion" };                     ///< the family jam's bus
-    bool jamLeadStarted_ = false;                    ///< audio thread: the leader has said where it stands
-    double jamLeadLast_ = -1.0;                      ///< audio thread: where the leader's last block ended (a jump)
-    double jamLastBefore_ = -1.0;                    ///< audio thread: the previous block's start (its length in beats)
-    int jamTranspose_ = 0;                           ///< audio thread: the transposition the engine plays now
-    std::atomic<int> jamTransposeOut_ { 0 };         ///< the same, for the message thread
-    bool jamFollowing_ = false;                      ///< audio thread: the engine follows the jam (setJam was called)
-    std::atomic<int> jamComposeKey_ { -1 };         ///< a follower's next track: the leader's root (-1: its own key)
-    std::atomic<int> jamComposeScale_ { -1 };       ///< and its mode as compose.scale (-1: its own)
-    juce::String jamLogged_;                         ///< the last line written to FAMILY_JAM_LOG
-    std::atomic<bool> linkFollowing_{ false };       ///< other apps are in the session: it rules tempo and phase as a host does
-    double linkBeat_ = -1.0;                         ///< audio thread: the session's beat at this block (the jam's timeline)
-    bool linkPlayed_ = false;                        ///< audio thread: the transport last told to or taken from the session
+    frame::JamBus m_jam { "Parhelion" };                     ///< the family jam's bus
+    bool m_jamLeadStarted = false;                    ///< audio thread: the leader has said where it stands
+    double m_jamLeadLast = -1.0;                      ///< audio thread: where the leader's last block ended (a jump)
+    double m_jamLastBefore = -1.0;                    ///< audio thread: the previous block's start (its length in beats)
+    int m_jamTranspose = 0;                           ///< audio thread: the transposition the engine plays now
+    std::atomic<int> m_jamTransposeOut { 0 };         ///< the same, for the message thread
+    bool m_jamFollowing = false;                      ///< audio thread: the engine follows the jam (setJam was called)
+    std::atomic<int> m_jamComposeKey { -1 };         ///< a follower's next track: the leader's root (-1: its own key)
+    std::atomic<int> m_jamComposeScale { -1 };       ///< and its mode as compose.scale (-1: its own)
+    juce::String m_jamLogged;                         ///< the last line written to FAMILY_JAM_LOG
+    std::atomic<bool> m_linkFollowing{ false };       ///< other apps are in the session: it rules tempo and phase as a host does
+    double m_linkBeat = -1.0;                         ///< audio thread: the session's beat at this block (the jam's timeline)
+    bool m_linkPlayed = false;                        ///< audio thread: the transport last told to or taken from the session
     /** @brief Whether a clock outside rules the tempo: a host's playhead, or a Link session with other apps in it. */
-    bool followsClock() const { return wrapperType != wrapperType_Standalone || linkFollowing_.load(std::memory_order_relaxed); }
-    parh::MeterSink meterSink_;                      ///< the strips' levels, added by the decks (the Mixer page)
-    std::atomic<int64_t> stripSamples_{ 0 };         ///< samples rendered since takeStripMeters
-    frame::UndoHistory history_;                     ///< undo and redo (message thread)
-    bool restoring_ = false;                         ///< an undo or the headset moves knobs: no step of their own
-    frame::Headset headset_;                         ///< the Quest's hands (message thread)
-    juce::TimedCallback headsetTick_{ [this] { pollHeadset(); } };   ///< polls the headset 30 times a second
-    uint32_t toldSounds_ = 0;                        ///< the engine's soundsVersion() the host was last told of
+    bool followsClock() const { return wrapperType != wrapperType_Standalone || m_linkFollowing.load(std::memory_order_relaxed); }
+    parh::MeterSink m_meterSink;                      ///< the strips' levels, added by the decks (the Mixer page)
+    std::atomic<int64_t> m_stripSamples{ 0 };         ///< samples rendered since takeStripMeters
+    frame::UndoHistory m_history;                     ///< undo and redo (message thread)
+    bool m_restoring = false;                         ///< an undo or the headset moves knobs: no step of their own
+    frame::Headset m_headset;                         ///< the Quest's hands (message thread)
+    juce::TimedCallback m_headsetTick{ [this] { pollHeadset(); } };   ///< polls the headset 30 times a second
+    uint32_t m_toldSounds = 0;                        ///< the engine's soundsVersion() the host was last told of
 };

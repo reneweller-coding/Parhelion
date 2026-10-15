@@ -19,8 +19,8 @@ namespace parh {
 
 /** @brief A cue: seconds and a label. */
 struct CueAt {
-    double seconds;   ///< when
-    std::string label;   ///< its text
+    double m_seconds;   ///< when
+    std::string m_label;   ///< its text
 };
 
 /** @brief The cues of a track: the bass's entry, every breakdown, every drop, the outro, at set beat @p at. */

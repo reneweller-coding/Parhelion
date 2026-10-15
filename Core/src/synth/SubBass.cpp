@@ -11,88 +11,88 @@
 namespace parh {
 
 namespace {
-constexpr double kTwoPiD = 6.283185307179586;   ///< 2 pi
+constexpr double TwoPiD = 6.283185307179586;   ///< 2 pi
 }
 
 void SubBass::prepare(double sampleRate)
 {
-    sr_ = sampleRate;
-    env_.setSampleRate(sampleRate);
-    duck_.prepare(sampleRate);
+    m_sr = sampleRate;
+    m_env.setSampleRate(sampleRate);
+    m_duck.prepare(sampleRate);
     reset();
 }
 
 void SubBass::reset()
 {
-    env_.kill();
-    duck_.reset();
-    sat_.reset();
-    lp_.reset();
-    phase_ = 0.0;
+    m_env.kill();
+    m_duck.reset();
+    m_sat.reset();
+    m_lp.reset();
+    m_phase = 0.0;
 }
 
 double SubBass::noteHz(int pitch) const
 {
-    double hz = midiToHz(pitch + 12 * octave_);
+    double hz = midiToHz(pitch + 12 * m_octave);
     while (hz < 35.0) hz *= 2.0;   // never under 35 Hz (Dok. 8.4)
     return hz;
 }
 
 void SubBass::update(const float* v)
 {
-    level_ = v[sub::Level] <= -59.9f ? 0.0f : dbToGain(v[sub::Level]);
-    octave_ = static_cast<int>(std::lround(v[sub::Octave]));
-    attackS_ = v[sub::Attack] * 0.001f;
-    decayS_ = v[sub::Decay] * 0.001f;
-    sustain_ = v[sub::Sustain];
-    releaseS_ = v[sub::Release] * 0.001f;
-    drive_ = 0.3f + 4.0f * v[sub::Drive];
-    driveNorm_ = 1.0f / std::tanh(drive_);
-    lpHz_ = v[sub::LowPass];
-    lp_.setQ(lpHz_, 0.7071f, static_cast<float>(sr_));
-    lock_ = std::lround(v[sub::Lock]) == 1;
-    duck_.set(1.0f - dbToGain(-v[sub::Duck]), 1.0f, v[sub::DuckHold], v[sub::DuckRelease]);
+    m_level = v[sub::LEVEL] <= -59.9f ? 0.0f : dbToGain(v[sub::LEVEL]);
+    m_octave = static_cast<int>(std::lround(v[sub::OCTAVE]));
+    m_attackS = v[sub::ATTACK] * 0.001f;
+    m_decayS = v[sub::DECAY] * 0.001f;
+    m_sustain = v[sub::SUSTAIN];
+    m_releaseS = v[sub::RELEASE] * 0.001f;
+    m_drive = 0.3f + 4.0f * v[sub::DRIVE];
+    m_driveNorm = 1.0f / std::tanh(m_drive);
+    m_lpHz = v[sub::LOW_PASS];
+    m_lp.setQ(m_lpHz, 0.7071f, static_cast<float>(m_sr));
+    m_lock = std::lround(v[sub::LOCK]) == 1;
+    m_duck.set(1.0f - dbToGain(-v[sub::DUCK]), 1.0f, v[sub::DUCK_HOLD], v[sub::DUCK_RELEASE]);
 }
 
 double SubBass::chainPhase(double hz) const
 {
-    const double w = kTwoPiD * hz / sr_;
-    const double x = std::tan(0.5 * w) / std::tan(0.5 * kTwoPiD * std::min<double>(lpHz_, 0.45 * sr_) / sr_);
+    const double w = TwoPiD * hz / m_sr;
+    const double x = std::tan(0.5 * w) / std::tan(0.5 * TwoPiD * std::min<double>(m_lpHz, 0.45 * m_sr) / m_sr);
     const double phase = -0.5 * w - std::atan2(std::sqrt(2.0) * x, 1.0 - x * x);
-    return phase / kTwoPiD;
+    return phase / TwoPiD;
 }
 
 void SubBass::noteOn(int pitch, float velocity, double late, double phase)
 {
     const double hz = noteHz(pitch);
-    inc_ = hz / sr_;
+    m_inc = hz / m_sr;
     // The release floor: at least half a period (Phosphene's rule).
-    const float release = std::max(releaseS_, static_cast<float>(0.5 / hz));
-    env_.setTimes(attackS_, decayS_, sustain_, release);
+    const float release = std::max(m_releaseS, static_cast<float>(0.5 / hz));
+    m_env.setTimes(m_attackS, m_decayS, m_sustain, release);
     if (phase >= 0.0) {
         // The phase at the ideal start, carried to this sample.
-        const double p = phase + inc_ * late;
-        phase_ = p - std::floor(p);
+        const double p = phase + m_inc * late;
+        m_phase = p - std::floor(p);
     }
-    velocity_ = clampv(velocity, 0.0f, 1.0f);
-    env_.noteOn();
-    env_.advanceAttack(late);
+    m_velocity = clampv(velocity, 0.0f, 1.0f);
+    m_env.noteOn();
+    m_env.advanceAttack(late);
 }
 
 void SubBass::noteOff()
 {
-    env_.noteOff();
+    m_env.noteOff();
 }
 
 void SubBass::process(float* out, int n)
 {
     for (int i = 0; i < n; ++i) {
-        const float e = env_.process();
-        const float s = static_cast<float>(std::sin(kTwoPiD * phase_)) * e * velocity_;
-        phase_ += inc_;
-        phase_ -= std::floor(phase_);
-        const float y = lp_.lp(sat_(s * drive_) * driveNorm_);
-        out[i] = y * level_ * duck_.next();
+        const float e = m_env.process();
+        const float s = static_cast<float>(std::sin(TwoPiD * m_phase)) * e * m_velocity;
+        m_phase += m_inc;
+        m_phase -= std::floor(m_phase);
+        const float y = m_lp.lp(m_sat(s * m_drive) * m_driveNorm);
+        out[i] = y * m_level * m_duck.next();
     }
 }
 

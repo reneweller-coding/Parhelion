@@ -32,19 +32,19 @@ namespace parh {
 
 /** @brief What the melodic writers share: the plan, the harmony, the score to write into, a velocity scatter. */
 struct MelodyContext {
-    const Plan* plan = nullptr;   ///< the track's plan
-    const Harmony* harmony = nullptr;   ///< its harmony
-    Score* score = nullptr;   ///< the score to write into
-    float humanize = 0.08f;   ///< velocity scatter (compose.humanize)
+    const Plan* m_plan = nullptr;   ///< the track's plan
+    const Harmony* m_harmony = nullptr;   ///< its harmony
+    Score* m_score = nullptr;   ///< the score to write into
+    float m_humanize = 0.08f;   ///< velocity scatter (compose.humanize)
     /** @brief The scatter's seed: a note's scatter is a hash of it and the note (its beat, part and pitch), so a voice
      *         drawn again changes no other voice's velocities (PLAN 6.9). */
-    uint64_t velSeed = 0;
-    bool piano = false;       ///< the lead is the piano's (Dream House): Part::Piano, legato, the piano corpus, no octave up
-    float anthemShare = 0.7f; ///< the chance of the anthem motif (long notes) over the sixteenth riff
+    uint64_t m_velSeed = 0;
+    bool m_piano = false;       ///< the lead is the piano's (Dream House): Part::Piano, legato, the piano corpus, no octave up
+    float m_anthemShare = 0.7f; ///< the chance of the anthem motif (long notes) over the sixteenth riff
     /** @brief Whether a note of @p part at @p beat falls into a vacuum (the silence before a drop): it is not written. */
-    bool silent(double beat, Part part) const;
+    bool silent(double beat, PartE part) const;
     /** @brief Adds a note (dropped in a vacuum), its velocity scattered. */
-    void note(double beat, double len, Part part, int pitch, float velocity, int shift = 0, bool accent = false, bool slide = false) const;
+    void note(double beat, double len, PartE part, int pitch, float velocity, int shift = 0, bool accent = false, bool slide = false) const;
 };
 
 /**

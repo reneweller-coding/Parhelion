@@ -46,32 +46,32 @@
 
 namespace parh {
 
-extern const char* const kDramaturgyNames[];   ///< "Warm-up", "Peak", "Closing", "Sunrise", "Journey"
+extern const char* const DramaturgyNames[];   ///< "Warm-up", "Peak", "Closing", "Sunrise", "Journey"
 
 /** @brief One track of a set, where it lies. */
 struct SetTrack {
-    int deck = 0;              ///< 0 or 1
-    double start = 0.0;        ///< set beat of its first bar
-    double swapIn = 0.0;       ///< set beat where its low end opens (the set's start for the first)
-    double swapOut = 0.0;      ///< set beat where it gives the low end up (its end for the last)
-    double end = 0.0;          ///< set beat of its end
-    float energy = 0.0f;       ///< the set's energy at its start
-    uint64_t seed = 0;         ///< its seed
-    TrackInfo info;            ///< what it told
+    int m_deck = 0;              ///< 0 or 1
+    double m_start = 0.0;        ///< set beat of its first bar
+    double m_swapIn = 0.0;       ///< set beat where its low end opens (the set's start for the first)
+    double m_swapOut = 0.0;      ///< set beat where it gives the low end up (its end for the last)
+    double m_end = 0.0;          ///< set beat of its end
+    float m_energy = 0.0f;       ///< the set's energy at its start
+    uint64_t m_seed = 0;         ///< its seed
+    TrackInfo m_info;            ///< what it told
 };
 
 /** @brief A tease on the third deck: the hook of track @p from, before its blend. */
 struct SetTease {
-    int from = 0;   ///< the track it comes from
-    double start = 0.0;   ///< set beat where it begins
-    double end = 0.0;   ///< set beat where it ends
+    int m_from = 0;   ///< the track it comes from
+    double m_start = 0.0;   ///< set beat where it begins
+    double m_end = 0.0;   ///< set beat where it ends
 };
 
 /** @brief What a set tells. */
 struct SetInfo {
-    Dramaturgy dramaturgy = Dramaturgy::Peak;   ///< the set's arc
-    std::vector<SetTrack> tracks;   ///< its tracks, in order
-    std::vector<SetTease> teases;   ///< the teases on the third deck
+    DramaturgyE m_dramaturgy = DramaturgyE::PEAK;   ///< the set's arc
+    std::vector<SetTrack> m_tracks;   ///< its tracks, in order
+    std::vector<SetTease> m_teases;   ///< the teases on the third deck
 };
 
 /**
@@ -89,11 +89,11 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
                     const std::function<bool()>& stop = {});
 
 /** @brief The energy of dramaturgy @p d at @p t (0..1 of the set). */
-float setEnergy(Dramaturgy d, float t);
+float setEnergy(DramaturgyE d, float t);
 /** @brief The tempo of dramaturgy @p d at @p t, before the 2-BPM rule. */
-float setTempo(Dramaturgy d, float t);
+float setTempo(DramaturgyE d, float t);
 /** @brief The place on the style ladder (0 Deep .. 4 Acid) of dramaturgy @p d at @p t and energy @p e (set.journey). */
-float setLadder(Dramaturgy d, float t, float e);
+float setLadder(DramaturgyE d, float t, float e);
 
 /** @brief All of a set as one score (the decks' notes and markers on the set's tempo; for MIDI and the displays). */
 Score flattenSet(const SetScore& set);

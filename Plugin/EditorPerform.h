@@ -20,8 +20,8 @@ public:
     void mouseUp(const juce::MouseEvent& e) override;       ///< right click forgets
 
 private:
-    ParhelionProcessor& proc_;   ///< the processor: its controller map
-    int id_;   ///< the store id it binds
+    ParhelionProcessor& m_proc;   ///< the processor: its controller map
+    int m_id;   ///< the store id it binds
 };
 
 /** @brief The Perform tab. */
@@ -37,43 +37,43 @@ public:
 private:
     /** @brief Follows the headset and the learn buttons. */
     void timerCallback() override;
-    ParhelionProcessor& proc_;   ///< the processor
-    juce::OwnedArray<juce::TextButton> mutes_;   ///< the mutes, one per group
-    std::vector<std::unique_ptr<juce::ButtonParameterAttachment>> muteAttach_;   ///< the mutes on their parameters
-    juce::Slider filter_;   ///< the master filter (perform.filter)
-    juce::Slider throw_;   ///< the echo throw (perform.throw)
-    juce::Slider wheel_;   ///< the mod wheel (perform.wheel): a source of every voice's modulation matrix
-    juce::TextButton breakdownNow_{ "Breakdown now" };   ///< a breakdown from the next 8-bar line (PLAN 9)
-    juce::TextButton dropNow_{ "Drop now" };   ///< a drop from the next 8-bar line
-    juce::Label now_;                                                            ///< where the rewrite begins
-    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> sliderAttach_;   ///< the filter, the throw and the faders on their parameters
+    ParhelionProcessor& m_proc;   ///< the processor
+    juce::OwnedArray<juce::TextButton> m_mutes;   ///< the mutes, one per group
+    std::vector<std::unique_ptr<juce::ButtonParameterAttachment>> m_muteAttach;   ///< the mutes on their parameters
+    juce::Slider m_filter;   ///< the master filter (perform.filter)
+    juce::Slider m_throw;   ///< the echo throw (perform.throw)
+    juce::Slider m_wheel;   ///< the mod wheel (perform.wheel): a source of every voice's modulation matrix
+    juce::TextButton m_breakdownNow{ "Breakdown now" };   ///< a breakdown from the next 8-bar line (PLAN 9)
+    juce::TextButton m_dropNow{ "Drop now" };   ///< a drop from the next 8-bar line
+    juce::Label m_now;                                                            ///< where the rewrite begins
+    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> m_sliderAttach;   ///< the filter, the throw and the faders on their parameters
     /** @brief A deck's strip: three kills and the fader. */
     struct Strip {
-        juce::TextButton kill[3];   ///< the kills: low, mid, high
-        juce::Slider fader;   ///< the deck's fader
+        juce::TextButton m_kill[3];   ///< the kills: low, mid, high
+        juce::Slider m_fader;   ///< the deck's fader
     };
-    Strip strips_[parh::kDecks];   ///< a strip per deck
-    juce::OwnedArray<LearnButton> learn_;   ///< the learn buttons beside the controls
-    std::vector<juce::Rectangle<int>> learnFor_;   ///< (layout) where each learn button sits
-    bool headset_ = false;                         ///< the headset's group is shown
-    juce::Rectangle<int> headsetArea_;             ///< where it is drawn
+    Strip m_strips[parh::Decks];   ///< a strip per deck
+    juce::OwnedArray<LearnButton> m_learn;   ///< the learn buttons beside the controls
+    std::vector<juce::Rectangle<int>> m_learnFor;   ///< (layout) where each learn button sits
+    bool m_headset = false;                         ///< the headset's group is shown
+    juce::Rectangle<int> m_headsetArea;             ///< where it is drawn
     // The keyboard (01.10.2026, Engine::queueLive): what a MIDI keyboard plays, Replace or Layer, the composer on or off.
-    std::unique_ptr<frame::Choice> keyPart_;   ///< perform.keyboard_part: what the keys play
-    std::unique_ptr<frame::Choice> keyMode_;   ///< perform.keyboard_mode: Replace or Layer
-    std::unique_ptr<frame::Switch> composer_;   ///< perform.composer: the composer's notes on or off
-    std::unique_ptr<juce::ComboBoxParameterAttachment> keyPartAttach_;   ///< keyPart_ on its parameter
-    std::unique_ptr<juce::ComboBoxParameterAttachment> keyModeAttach_;   ///< keyMode_ on its parameter
-    std::unique_ptr<juce::ButtonParameterAttachment> composerAttach_;   ///< composer_ on its parameter
+    std::unique_ptr<frame::Choice> m_keyPart;   ///< perform.keyboard_part: what the keys play
+    std::unique_ptr<frame::Choice> m_keyMode;   ///< perform.keyboard_mode: Replace or Layer
+    std::unique_ptr<frame::Switch> m_composer;   ///< perform.composer: the composer's notes on or off
+    std::unique_ptr<juce::ComboBoxParameterAttachment> m_keyPartAttach;   ///< m_keyPart on its parameter
+    std::unique_ptr<juce::ComboBoxParameterAttachment> m_keyModeAttach;   ///< m_keyMode on its parameter
+    std::unique_ptr<juce::ButtonParameterAttachment> m_composerAttach;   ///< m_composer on its parameter
     // The keyboard's options (02.10.2026): the lower keys' voice and the split, Scale Lock, the velocity curve.
-    std::unique_ptr<frame::Choice> keyLower_;   ///< perform.keyboard_lower: the voice under the split (Off: none)
-    std::unique_ptr<frame::Choice> keySplit_;   ///< perform.keyboard_split: the split key
-    std::unique_ptr<frame::Switch> keyScale_;   ///< perform.keyboard_scale: Scale Lock
-    std::unique_ptr<frame::Choice> keyVelocity_;   ///< perform.keyboard_velocity: the velocity curve
-    std::unique_ptr<juce::ComboBoxParameterAttachment> keyLowerAttach_;   ///< keyLower_ on its parameter
-    std::unique_ptr<juce::ComboBoxParameterAttachment> keySplitAttach_;   ///< keySplit_ on its parameter
-    std::unique_ptr<juce::ButtonParameterAttachment> keyScaleAttach_;     ///< keyScale_ on its parameter
-    std::unique_ptr<juce::ComboBoxParameterAttachment> keyVelocityAttach_;   ///< keyVelocity_ on its parameter
-    juce::Rectangle<int> keyArea_;                 ///< the Keyboard group's box
+    std::unique_ptr<frame::Choice> m_keyLower;   ///< perform.keyboard_lower: the voice under the split (Off: none)
+    std::unique_ptr<frame::Choice> m_keySplit;   ///< perform.keyboard_split: the split key
+    std::unique_ptr<frame::Switch> m_keyScale;   ///< perform.keyboard_scale: Scale Lock
+    std::unique_ptr<frame::Choice> m_keyVelocity;   ///< perform.keyboard_velocity: the velocity curve
+    std::unique_ptr<juce::ComboBoxParameterAttachment> m_keyLowerAttach;   ///< m_keyLower on its parameter
+    std::unique_ptr<juce::ComboBoxParameterAttachment> m_keySplitAttach;   ///< m_keySplit on its parameter
+    std::unique_ptr<juce::ButtonParameterAttachment> m_keyScaleAttach;     ///< m_keyScale on its parameter
+    std::unique_ptr<juce::ComboBoxParameterAttachment> m_keyVelocityAttach;   ///< m_keyVelocity on its parameter
+    juce::Rectangle<int> m_keyArea;                 ///< the Keyboard group's box
 };
 
 /** @brief The Decks sub-page: the decks' meters beside their channels' knobs. */
@@ -89,12 +89,12 @@ public:
     void meter(const float* peak, const float* rms, float out, float lufs);
 
 private:
-    ScrollingPage knobs_;   ///< the decks' channel knobs
-    float peak_[parh::kDecks] = {};   ///< per deck: its peak
-    float rms_[parh::kDecks] = {};   ///< per deck: its RMS
-    float out_ = 0.0f;   ///< the output's peak
-    float lufs_ = -70.0f;   ///< the output's momentary loudness, LUFS
-    float hold_[parh::kDecks + 1] = {};   ///< the held peaks: per deck, then the output
+    ScrollingPage m_knobs;   ///< the decks' channel knobs
+    float m_peak[parh::Decks] = {};   ///< per deck: its peak
+    float m_rms[parh::Decks] = {};   ///< per deck: its RMS
+    float m_out = 0.0f;   ///< the output's peak
+    float m_lufs = -70.0f;   ///< the output's momentary loudness, LUFS
+    float m_hold[parh::Decks + 1] = {};   ///< the held peaks: per deck, then the output
 };
 
 /**
@@ -113,16 +113,16 @@ public:
 private:
     /** @brief Reads the meters into the console's strips and the Decks page, and the sounds the strips name. */
     void timerCallback() override;
-    ParhelionProcessor& proc_;   ///< the processor
-    frame::ControlActions actions_;   ///< the controls' right-click menu
-    frame::LiveRings live_;   ///< where each knob's value plays
-    frame::SubTabs tabs_;   ///< Console, Buses and Master, Decks
-    frame::Console* console_ = nullptr;            ///< (owned by tabs_)
-    DecksPage* decks_ = nullptr;                   ///< (owned by tabs_, made when first shown)
-    std::vector<std::pair<int, std::pair<parh::Module, int>>> sounds_;   ///< per strip: its meter, and the synth it names
-    juce::OwnedArray<juce::TextButton> mutes_;   ///< the strips' mutes
-    std::vector<std::unique_ptr<juce::ButtonParameterAttachment>> muteLinks_;   ///< the mutes on their parameters
-    float lufs_ = -70.0f;   ///< the output's momentary loudness, LUFS
-    double lastPoll_ = 0.0;   ///< when the strip meters were last taken (ms)
-    int tick_ = 0;   ///< counts the timer ticks (some readings every few)
+    ParhelionProcessor& m_proc;   ///< the processor
+    frame::ControlActions m_actions;   ///< the controls' right-click menu
+    frame::LiveRings m_live;   ///< where each knob's value plays
+    frame::SubTabs m_tabs;   ///< Console, Buses and Master, Decks
+    frame::Console* m_console = nullptr;            ///< (owned by m_tabs)
+    DecksPage* m_decks = nullptr;                   ///< (owned by m_tabs, made when first shown)
+    std::vector<std::pair<int, std::pair<parh::ModuleE, int>>> m_sounds;   ///< per strip: its meter, and the synth it names
+    juce::OwnedArray<juce::TextButton> m_mutes;   ///< the strips' mutes
+    std::vector<std::unique_ptr<juce::ButtonParameterAttachment>> m_muteLinks;   ///< the mutes on their parameters
+    float m_lufs = -70.0f;   ///< the output's momentary loudness, LUFS
+    double m_lastPoll = 0.0;   ///< when the strip meters were last taken (ms)
+    int m_tick = 0;   ///< counts the timer ticks (some readings every few)
 };

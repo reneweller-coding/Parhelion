@@ -194,10 +194,10 @@ def emit(keys, out):
              " *        generated -- do not edit). Hashes only; no window can be read back from them.", " */",
              '#include "parh/compose/Memo.h"', "", "namespace parh {", "",
              f"/// {n} windows, {bits} bits, {BLOOM_K} hashes",
-             f"const int kMemoBloomBits = {bits};", f"const int kMemoBloomK = {BLOOM_K};   ///< hashes per window",
-             "const uint64_t kMemoProbeHash = 0x%016Xull;" % key_hash(PROBE),
+             f"const int MemoBloomBits = {bits};", f"const int MemoBloomK = {BLOOM_K};   ///< hashes per window",
+             "const uint64_t MemoProbeHash = 0x%016Xull;" % key_hash(PROBE),
              "/// The filter's bits, 64 a word.",
-             f"const uint64_t kMemoBloom[{len(words)}] = {{"]
+             f"const uint64_t MemoBloom[{len(words)}] = {{"]
     for i in range(0, len(words), 4):
         lines.append("    " + ", ".join("0x%016Xull" % w for w in words[i:i + 4]) + ",")
     lines += ["};", "", "} // namespace parh", ""]

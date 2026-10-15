@@ -35,17 +35,17 @@ namespace parh {
 
 /** @brief What levelScore found for one track. */
 struct LevelReading {
-    double beat = 0.0;       ///< the track's start
-    float measured = 0.0f;   ///< its loudest part as composed, LUFS
-    float target = 0.0f;     ///< what it should measure
-    float trim = 0.0f;       ///< the correction set, dB
-    float after = 0.0f;      ///< the part with the correction, LUFS
-    float gapBefore = 0.0f;  ///< the breakdown's loudest 3 s under the drop's, as composed, LU (NaN: no breakdown)
-    float gapAfter = 0.0f;   ///< and with the correction
-    float breakDb = 0.0f;    ///< the breakdown's correction, dB
-    float buildDb = 0.0f;    ///< the builds' correction, dB
-    BalanceDb found{};       ///< every part's loudest sample against the kick's as composed, dB (NaN: silent)
-    BalanceDb bal{};         ///< the parts' corrections set, dB
+    double m_beat = 0.0;       ///< the track's start
+    float m_measured = 0.0f;   ///< its loudest part as composed, LUFS
+    float m_target = 0.0f;     ///< what it should measure
+    float m_trim = 0.0f;       ///< the correction set, dB
+    float m_after = 0.0f;      ///< the part with the correction, LUFS
+    float m_gapBefore = 0.0f;  ///< the breakdown's loudest 3 s under the drop's, as composed, LU (NaN: no breakdown)
+    float m_gapAfter = 0.0f;   ///< and with the correction
+    float m_breakDb = 0.0f;    ///< the breakdown's correction, dB
+    float m_buildDb = 0.0f;    ///< the builds' correction, dB
+    BalanceDbT m_found{};       ///< every part's loudest sample against the kick's as composed, dB (NaN: silent)
+    BalanceDbT m_bal{};         ///< the parts' corrections set, dB
 };
 
 /**

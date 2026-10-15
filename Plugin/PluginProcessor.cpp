@@ -24,53 +24,53 @@ using namespace parh;
 
 StoreParameter::StoreParameter(ParamStore& store, int id, const juce::String& name)
     : juce::RangedAudioParameter(juce::ParameterID(juce::String(store.key(id)), 1), name,
-                                 juce::AudioProcessorParameterWithIDAttributes().withLabel(store.desc(id).unit)),
-      store_(store), id_(id), name_(name)
+                                 juce::AudioProcessorParameterWithIDAttributes().withLabel(store.desc(id).m_unit)),
+      m_store(store), m_id(id), m_name(name)
 {
     const ParamDesc& d = store.desc(id);
     ParamStore* s = &store;
-    range_ = juce::NormalisableRange<float>(
-        d.minValue, d.maxValue,
+    m_range = juce::NormalisableRange<float>(
+        d.m_minValue, d.m_maxValue,
         [s, id](float, float, float n) { return s->fromNormalised(id, n); },
         [s, id](float, float, float v) { return s->toNormalised(id, v); },
         [s, id](float lo, float hi, float v) {
             const ParamDesc& dd = s->desc(id);
             const float c = juce::jlimit(lo, hi, v);
-            return (dd.curve == Curve::Linear || dd.curve == Curve::Log) ? c : std::round(c);
+            return (dd.m_curve == CurveE::LINEAR || dd.m_curve == CurveE::LOG) ? c : std::round(c);
         });
 }
 
-float StoreParameter::getValue() const { return store_.toNormalised(id_, store_.get(id_)); }
-void StoreParameter::setValue(float newValue) { store_.setNormalised(id_, newValue); }
-float StoreParameter::getDefaultValue() const { return store_.toNormalised(id_, store_.defaultValue(id_)); }
+float StoreParameter::getValue() const { return m_store.toNormalised(m_id, m_store.get(m_id)); }
+void StoreParameter::setValue(float newValue) { m_store.setNormalised(m_id, newValue); }
+float StoreParameter::getDefaultValue() const { return m_store.toNormalised(m_id, m_store.defaultValue(m_id)); }
 // A length of 0 or less means no limit, as in JUCE's own parameters (the slider attachments ask with 0).
-juce::String StoreParameter::getName(int maximumStringLength) const { return maximumStringLength > 0 ? name_.substring(0, maximumStringLength) : name_; }
-juce::String StoreParameter::getLabel() const { return store_.desc(id_).unit; }
+juce::String StoreParameter::getName(int maximumStringLength) const { return maximumStringLength > 0 ? m_name.substring(0, maximumStringLength) : m_name; }
+juce::String StoreParameter::getLabel() const { return m_store.desc(m_id).m_unit; }
 
 int StoreParameter::getNumSteps() const
 {
-    const ParamDesc& d = store_.desc(id_);
-    if (d.curve == Curve::Toggle) return 2;
-    if (d.curve == Curve::Choice || d.curve == Curve::Int) return static_cast<int>(std::lround(d.maxValue - d.minValue)) + 1;
+    const ParamDesc& d = m_store.desc(m_id);
+    if (d.m_curve == CurveE::TOGGLE) return 2;
+    if (d.m_curve == CurveE::CHOICE || d.m_curve == CurveE::INT) return static_cast<int>(std::lround(d.m_maxValue - d.m_minValue)) + 1;
     return juce::AudioProcessor::getDefaultNumParameterSteps();
 }
 
 bool StoreParameter::isDiscrete() const
 {
-    const Curve c = store_.desc(id_).curve;
-    return c == Curve::Int || c == Curve::Choice || c == Curve::Toggle;
+    const CurveE c = m_store.desc(m_id).m_curve;
+    return c == CurveE::INT || c == CurveE::CHOICE || c == CurveE::TOGGLE;
 }
 
-bool StoreParameter::isBoolean() const { return store_.desc(id_).curve == Curve::Toggle; }
+bool StoreParameter::isBoolean() const { return m_store.desc(m_id).m_curve == CurveE::TOGGLE; }
 
 juce::String StoreParameter::getText(float normalisedValue, int maximumStringLength) const
 {
-    const ParamDesc& d = store_.desc(id_);
-    const float v = store_.fromNormalised(id_, normalisedValue);
+    const ParamDesc& d = m_store.desc(m_id);
+    const float v = m_store.fromNormalised(m_id, normalisedValue);
     juce::String t;
-    if (d.curve == Curve::Choice && d.choices != nullptr) t = d.choices[juce::jlimit(0, static_cast<int>(d.maxValue), static_cast<int>(std::lround(v)))];
-    else if (d.curve == Curve::Toggle) t = v >= 0.5f ? "On" : "Off";
-    else if (d.curve == Curve::Int) t = juce::String(static_cast<int>(std::lround(v)));
+    if (d.m_curve == CurveE::CHOICE && d.m_choices != nullptr) t = d.m_choices[juce::jlimit(0, static_cast<int>(d.m_maxValue), static_cast<int>(std::lround(v)))];
+    else if (d.m_curve == CurveE::TOGGLE) t = v >= 0.5f ? "On" : "Off";
+    else if (d.m_curve == CurveE::INT) t = juce::String(static_cast<int>(std::lround(v)));
     // (juce::String(v, 0) would mean "as precise as it gets", not "no decimals": 159.126 ms)
     else t = std::fabs(v) >= 100.0f ? juce::String(juce::roundToInt(v)) : juce::String(v, std::fabs(v) >= 10.0f ? 1 : 2);
     return maximumStringLength > 0 ? t.substring(0, maximumStringLength) : t;
@@ -78,12 +78,12 @@ juce::String StoreParameter::getText(float normalisedValue, int maximumStringLen
 
 float StoreParameter::getValueForText(const juce::String& text) const
 {
-    const ParamDesc& d = store_.desc(id_);
-    if (d.curve == Curve::Choice && d.choices != nullptr)
-        for (int c = 0; c <= static_cast<int>(d.maxValue); ++c)
-            if (text.equalsIgnoreCase(d.choices[c])) return store_.toNormalised(id_, static_cast<float>(c));
-    if (d.curve == Curve::Toggle) return text.equalsIgnoreCase("on") ? 1.0f : 0.0f;
-    return store_.toNormalised(id_, text.getFloatValue());
+    const ParamDesc& d = m_store.desc(m_id);
+    if (d.m_curve == CurveE::CHOICE && d.m_choices != nullptr)
+        for (int c = 0; c <= static_cast<int>(d.m_maxValue); ++c)
+            if (text.equalsIgnoreCase(d.m_choices[c])) return m_store.toNormalised(m_id, static_cast<float>(c));
+    if (d.m_curve == CurveE::TOGGLE) return text.equalsIgnoreCase("on") ? 1.0f : 0.0f;
+    return m_store.toNormalised(m_id, text.getFloatValue());
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -106,39 +106,39 @@ ParhelionProcessor::ParhelionProcessor()
 {
     ParamStore& s = store();
     for (int id = 0; id < s.count(); ++id) {
-        auto* p = new StoreParameter(s, id, juce::String(s.key(id)).replaceCharacter('.', ' ') + " (" + s.desc(id).name + ")");
-        params_.push_back(p);
+        auto* p = new StoreParameter(s, id, juce::String(s.key(id)).replaceCharacter('.', ' ') + " (" + s.desc(id).m_name + ")");
+        m_params.push_back(p);
         addParameter(p);
         p->addListener(this);   // undo: the panel's gestures (parameterGestureChanged)
     }
-    engine_.setLive(true);   // the performer's controls act, the mixer is in a track's path (Engine.h)
-    seed_ = static_cast<uint64_t>(juce::Time::currentTimeMillis() % 100000);
-    if (const char* env = std::getenv("PARH_SEED")) seed_ = std::strtoull(env, nullptr, 10);
-    autoPlay_ = std::getenv("PARH_PLAY") != nullptr;
-    if (const char* set = std::getenv("PARH_SET")) s.set(s.id(Module::Set, 0, set::Minutes), static_cast<float>(std::atof(set)));   // a set of so many minutes
+    m_engine.setLive(true);   // the performer's controls act, the mixer is in a track's path (Engine.h)
+    m_seed = static_cast<uint64_t>(juce::Time::currentTimeMillis() % 100000);
+    if (const char* env = std::getenv("PARH_SEED")) m_seed = std::strtoull(env, nullptr, 10);
+    m_autoPlay = std::getenv("PARH_PLAY") != nullptr;
+    if (const char* set = std::getenv("PARH_SET")) s.set(s.id(ModuleE::SET, 0, set::MINUTES), static_cast<float>(std::atof(set)));   // a set of so many minutes
     // PARH_MUTE=1 (and the screenshot mode): silent from the first sample, never unmuted from inside. The house rule for
     // every automated run -- tests, screenshots, the manual -- is that nothing makes a sound.
-    forceMute_ = std::getenv("PARH_MUTE") != nullptr || std::getenv("PARH_SHOT") != nullptr;
-    mute_ = forceMute_;
+    m_forceMute = std::getenv("PARH_MUTE") != nullptr || std::getenv("PARH_SHOT") != nullptr;
+    m_mute = m_forceMute;
     // The performer's controllers as a keyboard has them: the mod wheel the master filter, the expression pedal the throw.
-    for (auto& c : ccMap_) c = -1;
-    ccMap_[1] = s.id(Module::Perform, 0, perform::Wheel);     // the wheel: a source of every voice's matrix (Modulation.h)
-    ccMap_[74] = s.id(Module::Perform, 0, perform::Filter);   // brightness: the master filter
-    ccMap_[11] = s.id(Module::Perform, 0, perform::Throw);    // the expression pedal: the echo throw
+    for (auto& c : m_ccMap) c = -1;
+    m_ccMap[1] = s.id(ModuleE::PERFORM, 0, perform::WHEEL);     // the wheel: a source of every voice's matrix (Modulation.h)
+    m_ccMap[74] = s.id(ModuleE::PERFORM, 0, perform::FILTER);   // brightness: the master filter
+    m_ccMap[11] = s.id(ModuleE::PERFORM, 0, perform::THROW);    // the expression pedal: the echo throw
     // Phase 17: the player's ratings, if any.
-    ratings_ = loadRatings(ratingsFile().getFullPathName().toStdString());
+    m_ratings = loadRatings(ratingsFile().getFullPathName().toStdString());
     startTimerHz(10);
-    headsetTick_.startTimerHz(30);
+    m_headsetTick.startTimerHz(30);
     compose();
 }
 
 ParhelionProcessor::~ParhelionProcessor()
 {
-    headsetTick_.stopTimer();
+    m_headsetTick.stopTimer();
     stopTimer();
-    newer_ = true;
+    m_newer = true;
     stopThread(10000);
-    if (exporter_ && exporter_->joinable()) exporter_->join();
+    if (m_exporter && m_exporter->joinable()) m_exporter->join();
 }
 
 Playing ParhelionProcessor::composeNow(ParamStore& snapshot)
@@ -147,78 +147,78 @@ Playing ParhelionProcessor::composeNow(ParamStore& snapshot)
     Curation cur;
     uint64_t seed;
     {
-        std::lock_guard<std::mutex> g(lock_);
-        cur = curation_;
-        seed = seed_;
+        std::lock_guard<std::mutex> g(m_lock);
+        cur = m_curation;
+        seed = m_seed;
     }
     // Phase 17: the ratings' weights while compose.use_ratings is on.
     Preferences prefs;
-    const bool useRatings = snapshot.getBool(snapshot.id(Module::Compose, 0, compose::UseRatings));
+    const bool useRatings = snapshot.getBool(snapshot.id(ModuleE::COMPOSE, 0, compose::USE_RATINGS));
     if (useRatings) {
-        std::lock_guard<std::mutex> g(lock_);
-        prefs = preferencesFrom(ratings_);
+        std::lock_guard<std::mutex> g(m_lock);
+        prefs = preferencesFrom(m_ratings);
     }
     Playing out;
-    const double setMinutes = snapshot.get(snapshot.id(Module::Set, 0, set::Minutes));
+    const double setMinutes = snapshot.get(snapshot.id(ModuleE::SET, 0, set::MINUTES));
     if (setMinutes > 0.0) {
-        out.isSet = true;
+        out.m_isSet = true;
         // A newer score asked for breaks a long set off (its rest is thrown away, the timer composes the new one).
-        out.set = composeSet(snapshot, seed, setMinutes, &cur, &out.setInfo, useRatings ? &prefs : nullptr, {},
-                             [this] { return again_.load() || threadShouldExit(); });
-        for (const SetTrack& t : out.setInfo.tracks) out.tracks.push_back({ t.start, t.swapIn, t.end, t.deck, t.info });
+        out.m_set = composeSet(snapshot, seed, setMinutes, &cur, &out.m_setInfo, useRatings ? &prefs : nullptr, {},
+                             [this] { return m_again.load() || threadShouldExit(); });
+        for (const SetTrack& t : out.m_setInfo.m_tracks) out.m_tracks.push_back({ t.m_start, t.m_swapIn, t.m_end, t.m_deck, t.m_info });
     } else {
         TrackInfo info;
         TrackRequest req;
-        req.prefs = useRatings ? &prefs : nullptr;
-        if (const int k = jamComposeKey_.load(); k >= 0) {   // following the family jam: the leader's key and mode
-            req.key = k;
-            req.scale = jamComposeScale_.load();
+        req.m_prefs = useRatings ? &prefs : nullptr;
+        if (const int k = m_jamComposeKey.load(); k >= 0) {   // following the family jam: the leader's key and mode
+            req.m_key = k;
+            req.m_scale = m_jamComposeScale.load();
         }
         // The performer's "now": the same track rewritten from the bar asked for, loaded where it plays (performNow).
-        if (const int bar = nowBar_.load(); bar >= 0) {
-            std::lock_guard<std::mutex> g(lock_);
-            req.rewriteBar = bar;
-            req.rewriteKind = nowKind_;
-            req.earlier = current_.rewrites;   // a second "now" keeps the first (Phase 7)
-            out.rewrites = current_.rewrites;
-            out.rewrites.push_back({ bar, nowKind_ });
-            out.resume = true;
+        if (const int bar = m_nowBar.load(); bar >= 0) {
+            std::lock_guard<std::mutex> g(m_lock);
+            req.m_rewriteBar = bar;
+            req.m_rewriteKind = m_nowKind;
+            req.m_earlier = m_current.m_rewrites;   // a second "now" keeps the first (Phase 7)
+            out.m_rewrites = m_current.m_rewrites;
+            out.m_rewrites.push_back({ bar, m_nowKind });
+            out.m_resume = true;
         }
-        out.set.decks[0] = composeTrack(snapshot, seed, req, &cur, std::string(), &info);
-        if (out.resume) {
+        out.m_set.m_decks[0] = composeTrack(snapshot, seed, req, &cur, std::string(), &info);
+        if (out.m_resume) {
             // Its level corrections as the track had them, until the Leveler has measured the new one.
-            std::lock_guard<std::mutex> g(lock_);
-            const std::vector<LevelMark>& was = current_.set.decks[0].levels;
-            std::vector<LevelMark>& now = out.set.decks[0].levels;
+            std::lock_guard<std::mutex> g(m_lock);
+            const std::vector<LevelMark>& was = m_current.m_set.m_decks[0].m_levels;
+            std::vector<LevelMark>& now = out.m_set.m_decks[0].m_levels;
             if (!was.empty() && !now.empty()) {
-                now[0].trimDb = was[0].trimDb;
-                now[0].balDb = was[0].balDb;
-                now[0].breakDb = was[0].breakDb;
-                now[0].buildDb = was[0].buildDb;
+                now[0].m_trimDb = was[0].m_trimDb;
+                now[0].m_balDb = was[0].m_balDb;
+                now[0].m_breakDb = was[0].m_breakDb;
+                now[0].m_buildDb = was[0].m_buildDb;
             }
         }
-        out.set.lengthBeats = out.set.decks[0].lengthBeats;
-        out.tracks.push_back({ 0.0, 0.0, out.set.lengthBeats, 0, info });
+        out.m_set.m_lengthBeats = out.m_set.m_decks[0].m_lengthBeats;
+        out.m_tracks.push_back({ 0.0, 0.0, out.m_set.m_lengthBeats, 0, info });
     }
     return out;
 }
 
-int ParhelionProcessor::performNow(SectionKind kind)
+int ParhelionProcessor::performNow(SectionKindE kind)
 {
-    if (composing_) return -1;
+    if (m_composing) return -1;
     double start = 0.0, bpm = 138.0;
     {
-        std::lock_guard<std::mutex> g(lock_);
-        if (current_.isSet || current_.tracks.empty()) return -1;
-        start = current_.tracks[0].start;
-        bpm = current_.set.decks[0].tempo.bpmAt(position_.load());
-        nowKind_ = kind;
+        std::lock_guard<std::mutex> g(m_lock);
+        if (m_current.m_isSet || m_current.m_tracks.empty()) return -1;
+        start = m_current.m_tracks[0].m_start;
+        bpm = m_current.m_set.m_decks[0].m_tempo.bpmAt(m_position.load());
+        m_nowKind = kind;
     }
     // The next 8-bar line of the track; the one after it where it is under six seconds away.
-    const double beat = position_.load() - start;
+    const double beat = m_position.load() - start;
     int bar = (static_cast<int>(std::floor(beat / 4.0)) / 8 + 1) * 8;
     if ((4.0 * bar - beat) * 60.0 / std::max(60.0, bpm) < 6.0) bar += 8;
-    nowBar_ = bar;
+    m_nowBar = bar;
     compose();
     return bar;
 }
@@ -226,10 +226,10 @@ int ParhelionProcessor::performNow(SectionKind kind)
 void ParhelionProcessor::compose()
 {
     // One at a time: a press while composing is remembered and composed when the first is done.
-    if (composing_.exchange(true)) { again_ = true; return; }
-    newer_ = true;   // the last score's measuring, if it still runs, is broken off
+    if (m_composing.exchange(true)) { m_again = true; return; }
+    m_newer = true;   // the last score's measuring, if it still runs, is broken off
     if (isThreadRunning()) waitForThreadToExit(-1);
-    newer_ = false;
+    m_newer = false;
     startThread();
 }
 
@@ -237,9 +237,9 @@ void ParhelionProcessor::newSeed()
 {
     beginStep("New seed");
     {
-        std::lock_guard<std::mutex> g(lock_);
-        seed_ = static_cast<uint64_t>(juce::Random::getSystemRandom().nextInt64() & 0xFFFFFF);
-        curation_ = Curation{};
+        std::lock_guard<std::mutex> g(m_lock);
+        m_seed = static_cast<uint64_t>(juce::Random::getSystemRandom().nextInt64() & 0xFFFFFF);
+        m_curation = Curation{};
     }
     endStep();
     compose();
@@ -249,71 +249,71 @@ void ParhelionProcessor::reroll(const juce::String& unit)
 {
     beginStep("reroll " + unit);
     {
-        std::lock_guard<std::mutex> g(lock_);
-        curation_.reroll(unit.toStdString());
+        std::lock_guard<std::mutex> g(m_lock);
+        m_curation.reroll(unit.toStdString());
     }
     endStep();
     compose();
 }
 
-bool ParhelionProcessor::mixChosen() const { return store().get(store().id(Module::Set, 0, set::Minutes)) > 0.0f; }
+bool ParhelionProcessor::mixChosen() const { return store().get(store().id(ModuleE::SET, 0, set::MINUTES)) > 0.0f; }
 
 void ParhelionProcessor::chooseMix(bool mix)
 {
-    const int id = store().id(Module::Set, 0, set::Minutes);
+    const int id = store().id(ModuleE::SET, 0, set::MINUTES);
     const bool was = mixChosen();
     beginStep(mix ? "DJ mix" : "Track");
-    if (was && !mix) mixMinutes_ = store().get(id);
-    if (was != mix) setFromUi(id, mix ? std::max(10.0f, mixMinutes_) : 0.0f);
+    if (was && !mix) m_mixMinutes = store().get(id);
+    if (was != mix) setFromUi(id, mix ? std::max(10.0f, m_mixMinutes) : 0.0f);
     endStep();
     if (was != mix || playingMix() != mix) compose();
 }
 
 juce::String ParhelionProcessor::curationText() const
 {
-    std::lock_guard<std::mutex> g(lock_);
+    std::lock_guard<std::mutex> g(m_lock);
     juce::String t;
-    for (const auto& r : curation_.rerolls) t << r.first << " x" << r.second << "  ";
+    for (const auto& r : m_curation.m_rerolls) t << r.first << " x" << r.second << "  ";
     return t.isEmpty() ? juce::String("nothing rerolled") : t.trimEnd();
 }
 
 int ParhelionProcessor::trackAt(double beat) const
 {
-    std::lock_guard<std::mutex> g(lock_);
+    std::lock_guard<std::mutex> g(m_lock);
     int found = -1;
-    for (size_t i = 0; i < current_.tracks.size(); ++i) {
-        const TrackPlace& t = current_.tracks[i];
+    for (size_t i = 0; i < m_current.m_tracks.size(); ++i) {
+        const TrackPlace& t = m_current.m_tracks[i];
         // In a set, a track owns the time from its swap to the next's; its intro before belongs to the one it follows.
-        const double from = current_.isSet && i > 0 ? t.swapIn : t.start;
+        const double from = m_current.m_isSet && i > 0 ? t.m_swapIn : t.m_start;
         if (beat >= from - 1e-9) found = static_cast<int>(i);
     }
     return found;
 }
 
-int ParhelionProcessor::composedPreset(Module m, int instance) const
+int ParhelionProcessor::composedPreset(ModuleE m, int instance) const
 {
-    int lead = engine_.leadDeck();
-    const double beat = position_.load();
-    std::lock_guard<std::mutex> g(lock_);
-    if (lead < 0 || lead >= kDecks) {
+    int lead = m_engine.leadDeck();
+    const double beat = m_position.load();
+    std::lock_guard<std::mutex> g(m_lock);
+    if (lead < 0 || lead >= Decks) {
         // Before the engine has played a track's knob settings (stopped, a score just composed): the deck of the track
         // under the playhead, so the panel names the sounds before the first note.
         lead = 0;
-        for (const TrackPlace& t : current_.tracks)
-            if (beat >= t.start && beat < t.end) { lead = t.deck; break; }
+        for (const TrackPlace& t : m_current.m_tracks)
+            if (beat >= t.m_start && beat < t.m_end) { lead = t.m_deck; break; }
     }
     int preset = -1;
-    for (const SoundPick& k : current_.set.decks[lead].sounds)   // in beat order: the last one begun is the one that holds
-        if (k.module == static_cast<int>(m) && k.instance == instance && k.beat <= beat + 1.0) preset = k.preset;
+    for (const SoundPick& k : m_current.m_set.m_decks[lead].m_sounds)   // in beat order: the last one begun is the one that holds
+        if (k.m_module == static_cast<int>(m) && k.m_instance == instance && k.m_beat <= beat + 1.0) preset = k.m_preset;
     return preset;
 }
 
-void ParhelionProcessor::applyPreset(Module m, int instance, int index)
+void ParhelionProcessor::applyPreset(ModuleE m, int instance, int index)
 {
     const std::vector<SoundPreset>& list = factoryPresets(m, instance);
     if (index < 0 || index >= static_cast<int>(list.size())) return;
-    beginStep(juce::String("preset ") + list[static_cast<size_t>(index)].name);
-    const juce::ScopedValueSetter<bool> one(restoring_, true);   // the knobs' gestures join the step, not steps of their own
+    beginStep(juce::String("preset ") + list[static_cast<size_t>(index)].m_name);
+    const juce::ScopedValueSetter<bool> one(m_restoring, true);   // the knobs' gestures join the step, not steps of their own
     for (const auto& [k, v] : presetKnobs(m, instance, list[static_cast<size_t>(index)])) {
         const int id = store().id(m, instance, k);
         StoreParameter* p = parameter(id);
@@ -322,22 +322,22 @@ void ParhelionProcessor::applyPreset(Module m, int instance, int index)
         p->setValueNotifyingHost(store().toNormalised(id, v));
         p->endChangeGesture();
     }
-    restoring_ = false;
+    m_restoring = false;
     endStep();
 }
 
-juce::File ParhelionProcessor::userPresetFolder(Module m, int instance) const
+juce::File ParhelionProcessor::userPresetFolder(ModuleE m, int instance) const
 {
     const std::string key = store().key(store().id(m, instance, 0));
     juce::String synth(key.substr(0, key.find('.')));
-    if (m == Module::Perc) synth = synth.trimCharactersAtEnd("0123456789");   // every lane of the kit
+    if (m == ModuleE::PERC) synth = synth.trimCharactersAtEnd("0123456789");   // every lane of the kit
     const char* dir = std::getenv("PARH_USER_DIR");
     const juce::File user = dir != nullptr ? juce::File(dir)
                                            : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Parhelion");
     return user.getChildFile("Presets").getChildFile(synth);
 }
 
-juce::Array<juce::File> ParhelionProcessor::userPresets(Module m, int instance) const
+juce::Array<juce::File> ParhelionProcessor::userPresets(ModuleE m, int instance) const
 {
     juce::Array<juce::File> out = userPresetFolder(m, instance).findChildFiles(juce::File::findFiles, false, "*.txt");
     std::sort(out.begin(), out.end(), [](const juce::File& a, const juce::File& b) {
@@ -346,7 +346,7 @@ juce::Array<juce::File> ParhelionProcessor::userPresets(Module m, int instance) 
     return out;
 }
 
-juce::File ParhelionProcessor::saveUserPreset(Module m, int instance, const juce::String& name)
+juce::File ParhelionProcessor::saveUserPreset(ModuleE m, int instance, const juce::String& name)
 {
     const juce::String clean = juce::File::createLegalFileName(name.trim());
     if (clean.isEmpty()) return {};
@@ -358,12 +358,12 @@ juce::File ParhelionProcessor::saveUserPreset(Module m, int instance, const juce
     return f.replaceWithText(text, false, false, "\n") ? f : juce::File();
 }
 
-bool ParhelionProcessor::applyUserPreset(Module m, int instance, const juce::File& file)
+bool ParhelionProcessor::applyUserPreset(ModuleE m, int instance, const juce::File& file)
 {
     if (!file.existsAsFile()) return false;
     beginStep("preset " + file.getFileNameWithoutExtension());
     {
-        const juce::ScopedValueSetter<bool> one(restoring_, true);   // one step, not one per knob
+        const juce::ScopedValueSetter<bool> one(m_restoring, true);   // one step, not one per knob
         // The whole sound, as a factory preset has it: its knobs, the defaults for the rest it would set.
         for (const auto& [k, v] : userPresetKnobs(store(), m, instance, file.loadFileAsString().toStdString())) {
             const int id = store().id(m, instance, k);
@@ -383,7 +383,7 @@ void ParhelionProcessor::applyKnobs(const juce::String& what, const std::vector<
     endPreview();
     beginStep(what);
     {
-        const juce::ScopedValueSetter<bool> one(restoring_, true);   // the knobs' gestures join the step
+        const juce::ScopedValueSetter<bool> one(m_restoring, true);   // the knobs' gestures join the step
         for (const auto& [id, v] : values) {
             StoreParameter* p = parameter(id);
             if (p == nullptr) continue;
@@ -400,22 +400,22 @@ void ParhelionProcessor::previewKnobs(const std::vector<std::pair<int, float>>& 
     endPreview();
     for (const auto& [id, v] : values) {
         if (id < 0 || id >= store().count()) continue;
-        previewSaved_.emplace_back(id, store().get(id));
+        m_previewSaved.emplace_back(id, store().get(id));
         store().set(id, v);
     }
 }
 
 void ParhelionProcessor::endPreview()
 {
-    for (const auto& [id, v] : previewSaved_) store().set(id, v);
-    previewSaved_.clear();
+    for (const auto& [id, v] : m_previewSaved) store().set(id, v);
+    m_previewSaved.clear();
 }
 
 void ParhelionProcessor::length(double& beats, double& seconds) const
 {
-    std::lock_guard<std::mutex> g(lock_);
-    beats = current_.set.lengthBeats;
-    seconds = current_.set.decks[0].tempo.secondsAt(beats);
+    std::lock_guard<std::mutex> g(m_lock);
+    beats = m_current.m_set.m_lengthBeats;
+    seconds = m_current.m_set.m_decks[0].m_tempo.secondsAt(beats);
 }
 
 void ParhelionProcessor::run()
@@ -424,77 +424,77 @@ void ParhelionProcessor::run()
     Playing p = composeNow(snapshot);
     uint64_t id = 0;
     {
-        std::lock_guard<std::mutex> g(lock_);
-        pending_ = std::make_unique<Playing>(p);
-        id = pendingId_ = ++composed_;
+        std::lock_guard<std::mutex> g(m_lock);
+        m_pending = std::make_unique<Playing>(p);
+        id = m_pendingId = ++m_composed;
     }
-    composing_ = false;
+    m_composing = false;
     // Then its loudness (Leveler.h), while it already plays: 20 seconds of each track's loudest part rendered. The
     // corrections follow and glide in; a newer score asked for, or the plugin closing, breaks the measuring off.
-    const auto stop = [this] { return newer_.load() || threadShouldExit(); };
-    const bool done = p.isSet ? !levelSet(p.set, snapshot, 20.0, stop).empty() : !levelScore(p.set.decks[0], snapshot, 20.0, stop).empty();
+    const auto stop = [this] { return m_newer.load() || threadShouldExit(); };
+    const bool done = p.m_isSet ? !levelSet(p.m_set, snapshot, 20.0, stop).empty() : !levelScore(p.m_set.m_decks[0], snapshot, 20.0, stop).empty();
     if (!done) return;
-    std::lock_guard<std::mutex> g(lock_);
-    for (int d = 0; d < kDecks; ++d) {
-        trims_[d].clear();
-        bal_[d].clear();
-        for (const LevelMark& m : p.set.decks[d].levels) { trims_[d].push_back(m.trimDb); bal_[d].push_back(m.balDb); }
+    std::lock_guard<std::mutex> g(m_lock);
+    for (int d = 0; d < Decks; ++d) {
+        m_trims[d].clear();
+        m_bal[d].clear();
+        for (const LevelMark& m : p.m_set.m_decks[d].m_levels) { m_trims[d].push_back(m.m_trimDb); m_bal[d].push_back(m.m_balDb); }
     }
-    trimsFor_ = id;
+    m_trimsFor = id;
 }
 
 void ParhelionProcessor::takeTrims()
 {
-    std::vector<float> trims[kDecks];
-    std::vector<BalanceDb> bal[kDecks];
+    std::vector<float> trims[Decks];
+    std::vector<BalanceDbT> bal[Decks];
     {
-        std::lock_guard<std::mutex> g(lock_);
-        if (trimsFor_ == 0 || trimsFor_ > playingId_) return;   // (none, or for a score not yet loaded)
-        const bool mine = trimsFor_ == playingId_;
-        trimsFor_ = 0;
+        std::lock_guard<std::mutex> g(m_lock);
+        if (m_trimsFor == 0 || m_trimsFor > m_playingId) return;   // (none, or for a score not yet loaded)
+        const bool mine = m_trimsFor == m_playingId;
+        m_trimsFor = 0;
         if (!mine) return;
-        for (int d = 0; d < kDecks; ++d) {
-            trims[d].swap(trims_[d]);
-            bal[d].swap(bal_[d]);
-            for (size_t i = 0; i < current_.set.decks[d].levels.size() && i < trims[d].size(); ++i)
-                current_.set.decks[d].levels[i].trimDb = trims[d][i];
-            for (size_t i = 0; i < current_.set.decks[d].levels.size() && i < bal[d].size(); ++i)
-                current_.set.decks[d].levels[i].balDb = bal[d][i];
+        for (int d = 0; d < Decks; ++d) {
+            trims[d].swap(m_trims[d]);
+            bal[d].swap(m_bal[d]);
+            for (size_t i = 0; i < m_current.m_set.m_decks[d].m_levels.size() && i < trims[d].size(); ++i)
+                m_current.m_set.m_decks[d].m_levels[i].m_trimDb = trims[d][i];
+            for (size_t i = 0; i < m_current.m_set.m_decks[d].m_levels.size() && i < bal[d].size(); ++i)
+                m_current.m_set.m_decks[d].m_levels[i].m_balDb = bal[d][i];
         }
-        levelled_ = true;
+        m_levelled = true;
     }
     // A few numbers: the audio thread waits for them instead of losing a block (suspendProcessing would silence one).
     const juce::ScopedLock sl(getCallbackLock());
-    for (int d = 0; d < kDecks; ++d) {
-        if (!trims[d].empty()) engine_.setLevelTrims(d, trims[d]);
-        if (!bal[d].empty()) engine_.setLevelBalance(d, bal[d]);
+    for (int d = 0; d < Decks; ++d) {
+        if (!trims[d].empty()) m_engine.setLevelTrims(d, trims[d]);
+        if (!bal[d].empty()) m_engine.setLevelBalance(d, bal[d]);
     }
 }
 
 SetScore ParhelionProcessor::forPlayback(const Playing& p) const
 {
-    SetScore out = p.set;
-    const double bpm = hostBpm_.load();
+    SetScore out = p.m_set;
+    const double bpm = m_hostBpm.load();
     if (followsClock() && bpm > 0.0)
-        for (Score& s : out.decks) s.tempo.setConstant(bpm);
+        for (Score& s : out.m_decks) s.m_tempo.setConstant(bpm);
     return out;
 }
 
 void ParhelionProcessor::loadEngine(const Playing& p)
 {
     const SetScore s = forPlayback(p);
-    engine_.prepare(sampleRate_, blockSize_);
-    engine_.setMeterSink(&meterSink_);   // the Mixer page's strips (a handful of sums per sample)
-    if (p.isSet) engine_.loadSet(s);
-    else engine_.load(s.decks[0]);
-    std::lock_guard<std::mutex> g(lock_);
-    if (levelled_)   // the corrections already found go with the score (a reload at a new host tempo)
-        for (int d = 0; d < kDecks; ++d) {
+    m_engine.prepare(m_sampleRate, m_blockSize);
+    m_engine.setMeterSink(&m_meterSink);   // the Mixer page's strips (a handful of sums per sample)
+    if (p.m_isSet) m_engine.loadSet(s);
+    else m_engine.load(s.m_decks[0]);
+    std::lock_guard<std::mutex> g(m_lock);
+    if (m_levelled)   // the corrections already found go with the score (a reload at a new host tempo)
+        for (int d = 0; d < Decks; ++d) {
             std::vector<float> t;
-            std::vector<BalanceDb> b;
-            for (const LevelMark& m : p.set.decks[d].levels) { t.push_back(m.trimDb); b.push_back(m.balDb); }
-            if (!t.empty()) engine_.setLevelTrims(d, t);
-            if (!b.empty()) engine_.setLevelBalance(d, b);
+            std::vector<BalanceDbT> b;
+            for (const LevelMark& m : p.m_set.m_decks[d].m_levels) { t.push_back(m.m_trimDb); b.push_back(m.m_balDb); }
+            if (!t.empty()) m_engine.setLevelTrims(d, t);
+            if (!b.empty()) m_engine.setLevelBalance(d, b);
         }
 }
 
@@ -502,188 +502,188 @@ void ParhelionProcessor::timerCallback()
 {
     // Ableton Link (02.10.2026): the standalone joins the session while the setting is on; a DAW's transport rules the
     // plugin. The follow flag falls when the session goes.
-    link_.setEnabled(wrapperType == wrapperType_Standalone && (frame::Settings::of("Parhelion").link() || frame::LinkClock::forcedOn()));
-    link_.tick();
-    if (!link_.enabled()) linkFollowing_ = false;
+    m_link.setEnabled(wrapperType == wrapperType_Standalone && (frame::Settings::of("Parhelion").link() || frame::LinkClock::forcedOn()));
+    m_link.tick();
+    if (!m_link.enabled()) m_linkFollowing = false;
     // The family jam (02.10.2026, Jam.h): the role from the settings; a follower composes its next track in the
     // leader's key and mode.
-    jam_.setRole(frame::Settings::of("Parhelion").jamRole());
+    m_jam.setRole(frame::Settings::of("Parhelion").jamRole());
     // FAMILY_JAM_LOG=<file>: what the jam does here, a line whenever it changes (a test aid).
     if (const char* logFile = std::getenv("FAMILY_JAM_LOG")) {
-        const juce::String line = jam_.status() + "; transposed " + juce::String(jamTransposeOut_.load());
-        if (line != jamLogged_) {
-            jamLogged_ = line;
+        const juce::String line = m_jam.status() + "; transposed " + juce::String(m_jamTransposeOut.load());
+        if (line != m_jamLogged) {
+            m_jamLogged = line;
             juce::File(logFile).appendText(juce::Time::getCurrentTime().toString(false, true, true, true) + "  " + line + "\n");
         }
     }
-    if (jam_.role() == frame::Settings::JamRole::Follow && jam_.leaderRoot() >= 0) {
-        jamComposeKey_ = jam_.leaderRoot();
-        jamComposeScale_ = scaleOfMode(jam_.leaderMode());
+    if (m_jam.role() == frame::Settings::JamRoleE::FOLLOW && m_jam.leaderRoot() >= 0) {
+        m_jamComposeKey = m_jam.leaderRoot();
+        m_jamComposeScale = scaleOfMode(m_jam.leaderMode());
     } else {
-        jamComposeKey_ = -1;
-        jamComposeScale_ = -1;
+        m_jamComposeKey = -1;
+        m_jamComposeScale = -1;
     }
     // The cue sender follows its two parameters (message thread: the socket is opened and closed here).
     {
         const ParamStore& s = store();
-        const int port = s.getBool(s.id(Module::Cue, 0, cue::Enabled)) ? s.getInt(s.id(Module::Cue, 0, cue::Port)) : 0;
-        if (port != cuePort_) {
-            cues_.stop();
-            cuePort_ = port;
+        const int port = s.getBool(s.id(ModuleE::CUE, 0, cue::ENABLED)) ? s.getInt(s.id(ModuleE::CUE, 0, cue::PORT)) : 0;
+        if (port != m_cuePort) {
+            m_cues.stop();
+            m_cuePort = port;
             if (port > 0) {
                 const char* host = std::getenv("PARH_CUE_HOST");
-                if (!cues_.start(host != nullptr ? host : "127.0.0.1", port)) cuePort_ = 0;
+                if (!m_cues.start(host != nullptr ? host : "127.0.0.1", port)) m_cuePort = 0;
             }
         }
     }
     // A track began (or a jump landed in another): the engine wrote its sounds and mix on the knobs -- the host and the
     // pages are told (the values are in the store already).
-    if (const uint32_t v = engine_.soundsVersion(); v != toldSounds_) {
-        toldSounds_ = v;
-        for (StoreParameter* p : params_) p->sendValueChangedMessageToListeners(p->getValue());
+    if (const uint32_t v = m_engine.soundsVersion(); v != m_toldSounds) {
+        m_toldSounds = v;
+        for (StoreParameter* p : m_params) p->sendValueChangedMessageToListeners(p->getValue());
     }
     std::unique_ptr<Playing> next;
     uint64_t nextId = 0;
     {
-        std::lock_guard<std::mutex> g(lock_);
-        next = std::move(pending_);
-        nextId = pendingId_;
+        std::lock_guard<std::mutex> g(m_lock);
+        next = std::move(m_pending);
+        nextId = m_pendingId;
     }
     // A score asked for again while it was composed is out of date: the next one comes.
-    if (next && again_ && !composing_) {
+    if (next && m_again && !m_composing) {
         next.reset();
-        again_ = false;
+        m_again = false;
         compose();
         return;
     }
     if (!next) {
         // In a host the score plays at the host's tempo. A new tempo means new sample positions for every event, and
         // the engine allocates when it loads: so the score is loaded again here, and the engine goes on from its beat.
-        const double bpm = hostBpm_.load();
+        const double bpm = m_hostBpm.load();
         // A Link session the standalone followed and now leads again (the others left, or Link went off): back to the
         // composed tempo (02.10.2026).
-        const bool back = !followsClock() && playedBpm_.load() > 0.0;
-        if (back || (followsClock() && bpm > 0.0 && std::fabs(bpm - playedBpm_.load()) > 1.0e-3)) {
+        const bool back = !followsClock() && m_playedBpm.load() > 0.0;
+        if (back || (followsClock() && bpm > 0.0 && std::fabs(bpm - m_playedBpm.load()) > 1.0e-3)) {
             Playing p;
             copyPlaying(p);
             suspendProcessing(true);
-            const double beat = engine_.beat();
+            const double beat = m_engine.beat();
             loadEngine(p);
-            engine_.seek(beat);
-            playedBpm_ = back ? 0.0 : bpm;
+            m_engine.seek(beat);
+            m_playedBpm = back ? 0.0 : bpm;
             suspendProcessing(false);
         }
-        if (again_ && !composing_) { again_ = false; compose(); }
+        if (m_again && !m_composing) { m_again = false; compose(); }
         takeTrims();
         return;
     }
     // The engine allocates when it loads: never on the audio thread.
     suspendProcessing(true);
     {
-        std::lock_guard<std::mutex> g(lock_);
-        levelled_ = false;
+        std::lock_guard<std::mutex> g(m_lock);
+        m_levelled = false;
     }
-    const bool resume = next->resume;
-    const double at = engine_.beat();
+    const bool resume = next->m_resume;
+    const double at = m_engine.beat();
     loadEngine(*next);
-    playedBpm_ = followsClock() ? hostBpm_.load() : 0.0;
+    m_playedBpm = followsClock() ? m_hostBpm.load() : 0.0;
     {
-        std::lock_guard<std::mutex> g(lock_);
-        current_ = std::move(*next);
-        playingId_ = nextId;
+        std::lock_guard<std::mutex> g(m_lock);
+        m_current = std::move(*next);
+        m_playingId = nextId;
     }
-    ++scoreVersion_;
+    ++m_scoreVersion;
     if (resume) {
         // The performer's "now": the rewritten track goes on from where the old one was.
-        engine_.seek(at);
-        position_ = at;
-        nowBar_ = -1;
+        m_engine.seek(at);
+        m_position = at;
+        m_nowBar = -1;
     } else {
-        position_ = 0.0;
+        m_position = 0.0;
     }
-    cueTap_.reset();
-    if (autoPlay_) { autoPlay_ = false; playing_ = true; }
+    m_cueTap.reset();
+    if (m_autoPlay) { m_autoPlay = false; m_playing = true; }
     suspendProcessing(false);
     takeTrims();
 }
 
 void ParhelionProcessor::takeStripMeters(float* peak, float* rms)
 {
-    const double n = static_cast<double>(std::max<int64_t>(1, stripSamples_.exchange(0, std::memory_order_relaxed)));
-    for (int s = 0; s < MeterSink::kStrips; ++s) {
-        peak[s] = meterSink_.peak[s].exchange(0.0f, std::memory_order_relaxed);
-        rms[s] = static_cast<float>(std::sqrt(meterSink_.sum[s].exchange(0.0, std::memory_order_relaxed) / n));
+    const double n = static_cast<double>(std::max<int64_t>(1, m_stripSamples.exchange(0, std::memory_order_relaxed)));
+    for (int s = 0; s < MeterSink::Strips; ++s) {
+        peak[s] = m_meterSink.m_peak[s].exchange(0.0f, std::memory_order_relaxed);
+        rms[s] = static_cast<float>(std::sqrt(m_meterSink.m_sum[s].exchange(0.0, std::memory_order_relaxed) / n));
     }
 }
 
 void ParhelionProcessor::takeMeters(float* deckPeak, float* deckRms, float& outPeak, float& momentaryLufs)
 {
-    const int n = meterCount_.exchange(0, std::memory_order_acquire);
-    for (int d = 0; d < kDecks; ++d) {
+    const int n = m_meterCount.exchange(0, std::memory_order_acquire);
+    for (int d = 0; d < Decks; ++d) {
         const size_t k = static_cast<size_t>(d);
-        deckPeak[d] = meterPeak_[k].exchange(0.0f, std::memory_order_relaxed);
-        const double s = meterSum_[k].exchange(0.0, std::memory_order_relaxed);
+        deckPeak[d] = m_meterPeak[k].exchange(0.0f, std::memory_order_relaxed);
+        const double s = m_meterSum[k].exchange(0.0, std::memory_order_relaxed);
         deckRms[d] = n > 0 ? static_cast<float>(std::sqrt(s / n)) : 0.0f;
     }
-    outPeak = outPeak_.exchange(0.0f, std::memory_order_relaxed);
-    momentaryLufs = lufs_.load(std::memory_order_relaxed);
+    outPeak = m_outPeak.exchange(0.0f, std::memory_order_relaxed);
+    momentaryLufs = m_lufs.load(std::memory_order_relaxed);
 }
 
 void ParhelionProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    sampleRate_ = sampleRate;
-    blockSize_ = std::max(1, samplesPerBlock);
+    m_sampleRate = sampleRate;
+    m_blockSize = std::max(1, samplesPerBlock);
     // The deck taps for the meters (reading only: the mix is the same to the bit).
-    tapBuf_.assign(static_cast<size_t>(kDecks * 2 * blockSize_), 0.0f);
-    for (int d = 0; d < kDecks; ++d) {
-        tapL_[static_cast<size_t>(d)] = tapBuf_.data() + static_cast<size_t>(2 * d * blockSize_);
-        tapR_[static_cast<size_t>(d)] = tapBuf_.data() + static_cast<size_t>((2 * d + 1) * blockSize_);
+    m_tapBuf.assign(static_cast<size_t>(Decks * 2 * m_blockSize), 0.0f);
+    for (int d = 0; d < Decks; ++d) {
+        m_tapL[static_cast<size_t>(d)] = m_tapBuf.data() + static_cast<size_t>(2 * d * m_blockSize);
+        m_tapR[static_cast<size_t>(d)] = m_tapBuf.data() + static_cast<size_t>((2 * d + 1) * m_blockSize);
     }
-    engine_.setDeckTaps(tapL_.data(), tapR_.data());
+    m_engine.setDeckTaps(m_tapL.data(), m_tapR.data());
     // The stems' buffers for their outputs (02.10.2026); the engine writes them only while a stem's bus is on.
-    stemBuf_.assign(static_cast<size_t>(Engine::kStems * 2 * blockSize_), 0.0f);
-    for (int s = 0; s < Engine::kStems; ++s) {
-        stemL_[static_cast<size_t>(s)] = stemBuf_.data() + static_cast<size_t>(2 * s * blockSize_);
-        stemR_[static_cast<size_t>(s)] = stemBuf_.data() + static_cast<size_t>((2 * s + 1) * blockSize_);
+    m_stemBuf.assign(static_cast<size_t>(Engine::STEMS * 2 * m_blockSize), 0.0f);
+    for (int s = 0; s < Engine::STEMS; ++s) {
+        m_stemL[static_cast<size_t>(s)] = m_stemBuf.data() + static_cast<size_t>(2 * s * m_blockSize);
+        m_stemR[static_cast<size_t>(s)] = m_stemBuf.data() + static_cast<size_t>((2 * s + 1) * m_blockSize);
     }
-    engine_.setStems(nullptr, nullptr);
-    stemsOn_ = false;
-    engine_.setNoteTap(&noteTap_);   // MIDI out (02.10.2026)
+    m_engine.setStems(nullptr, nullptr);
+    m_stemsOn = false;
+    m_engine.setNoteTap(&m_noteTap);   // MIDI out (02.10.2026)
     // The K-weighting of BS.1770 at this rate (the pre-filter's shelf and the RLB high pass, as pyloudnorm designs them).
     {
         const double fs = sampleRate;
         double K = std::tan(juce::MathConstants<double>::pi * 1681.974450955533 / fs);
         const double Vh = std::pow(10.0, 3.999843853973347 / 20.0), Vb = std::pow(Vh, 0.4996667741545416), Q = 0.7071752369554196;
         const double a0 = 1.0 + K / Q + K * K;
-        for (Biquad& b : kShelf_) {
+        for (Biquad& b : m_kShelf) {
             designBiquad(Vh + Vb * K / Q + K * K, 2.0 * (K * K - Vh), Vh - Vb * K / Q + K * K, a0, 2.0 * (K * K - 1.0), 1.0 - K / Q + K * K,
-                         b.b0, b.b1, b.b2, b.a1, b.a2);
-            b.z1 = b.z2 = 0.0;
+                         b.m_b0, b.m_b1, b.m_b2, b.m_a1, b.m_a2);
+            b.m_z1 = b.m_z2 = 0.0;
         }
         K = std::tan(juce::MathConstants<double>::pi * 38.13547087602444 / fs);
         const double Q2 = 0.5003270373238773, a02 = 1.0 + K / Q2 + K * K;
-        for (Biquad& b : kHigh_) {
-            designBiquad(1.0, -2.0, 1.0, a02, 2.0 * (K * K - 1.0), 1.0 - K / Q2 + K * K, b.b0, b.b1, b.b2, b.a1, b.a2);
-            b.z1 = b.z2 = 0.0;
+        for (Biquad& b : m_kHigh) {
+            designBiquad(1.0, -2.0, 1.0, a02, 2.0 * (K * K - 1.0), 1.0 - K / Q2 + K * K, b.m_b0, b.m_b1, b.m_b2, b.m_a1, b.m_a2);
+            b.m_z1 = b.m_z2 = 0.0;
         }
-        kCoef_ = 1.0 - std::exp(-1.0 / (0.4 * fs / 3.0));   // a 400 ms window as an exponential of a third of it
-        kMs_ = 0.0;
+        m_kCoef = 1.0 - std::exp(-1.0 / (0.4 * fs / 3.0));   // a 400 ms window as an exponential of a third of it
+        m_kMs = 0.0;
     }
     if (const char* secs = std::getenv("PARH_PLAY"); secs != nullptr && std::getenv("PARH_RECORD") != nullptr) {
-        recordTarget_ = static_cast<size_t>(std::atof(secs) * sampleRate) * 2;
-        record_.assign(recordTarget_, 0.0f);
-        recordPos_ = 0;
+        m_recordTarget = static_cast<size_t>(std::atof(secs) * sampleRate) * 2;
+        m_record.assign(m_recordTarget, 0.0f);
+        m_recordPos = 0;
     }
     Playing p;
     copyPlaying(p);
     loadEngine(p);
-    playedBpm_ = followsClock() ? hostBpm_.load() : 0.0;
+    m_playedBpm = followsClock() ? m_hostBpm.load() : 0.0;
 }
 
 juce::AudioProcessor::BusesProperties ParhelionProcessor::busLayout()
 {
     BusesProperties b = BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true);
-    for (int s = 0; s < Engine::kStems; ++s) {
+    for (int s = 0; s < Engine::STEMS; ++s) {
         const juce::String name(Engine::stemName(s));
         b = b.withOutput(name.substring(0, 1).toUpperCase() + name.substring(1), juce::AudioChannelSet::stereo(), false);
     }
@@ -706,150 +706,150 @@ void ParhelionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     perform(midi);
     midi.clear();
     const int n = buffer.getNumSamples();
-    bool play = playing_.load();
+    bool play = m_playing.load();
     // In a host, the host's playhead is the clock.
     if (wrapperType != wrapperType_Standalone) {
         play = false;
         if (auto* ph = getPlayHead()) {
             if (const auto pos = ph->getPosition()) {
                 play = pos->getIsPlaying();
-                if (const auto bpm = pos->getBpm(); bpm && *bpm > 0.0) hostBpm_ = *bpm;
+                if (const auto bpm = pos->getBpm(); bpm && *bpm > 0.0) m_hostBpm = *bpm;
                 // Until the message thread has loaded the score at a new host tempo, the positions drift apart by
                 // design: only a real jump of the host's playhead is followed then.
-                const bool tempoPending = std::fabs(hostBpm_.load() - playedBpm_.load()) > 1.0e-3;
+                const bool tempoPending = std::fabs(m_hostBpm.load() - m_playedBpm.load()) > 1.0e-3;
                 if (play)
                     if (const auto ppq = pos->getPpqPosition())
-                        if (std::fabs(*ppq - engine_.beat()) > (tempoPending ? 4.0 : 0.05)) engine_.seek(*ppq);
+                        if (std::fabs(*ppq - m_engine.beat()) > (tempoPending ? 4.0 : 0.05)) m_engine.seek(*ppq);
             }
         }
-    } else if (link_.enabled()) {
+    } else if (m_link.enabled()) {
         // Ableton Link (02.10.2026, LinkClock.h): with other apps in the session the standalone follows it as a DAW's
         // playhead -- its tempo (the score reloaded at it on the message thread), its bar phase (the bars line up, the
         // place in the track stays), its start and stop; alone in it, the standalone leads (the tempo goes out below).
-        const double latency = static_cast<double>(getLatencySamples() + n) / sampleRate_;
-        const frame::LinkClock::Now ln = link_.capture(latency, 4.0);
-        linkFollowing_ = ln.peers > 0;
-        if (ln.peers > 0) {
-            if (play != linkPlayed_) {
-                link_.setPlaying(play, latency, 4.0);   // Play or Stop pressed here: to the session
-            } else if (ln.playing != play) {
-                play = ln.playing;                      // pressed elsewhere: here too
-                playing_ = play;
+        const double latency = static_cast<double>(getLatencySamples() + n) / m_sampleRate;
+        const frame::LinkClock::Now ln = m_link.capture(latency, 4.0);
+        m_linkFollowing = ln.m_peers > 0;
+        if (ln.m_peers > 0) {
+            if (play != m_linkPlayed) {
+                m_link.setPlaying(play, latency, 4.0);   // Play or Stop pressed here: to the session
+            } else if (ln.m_playing != play) {
+                play = ln.m_playing;                      // pressed elsewhere: here too
+                m_playing = play;
             }
-            hostBpm_ = ln.bpm;
-            linkBeat_ = ln.beat;
-            const bool tempoPending = std::fabs(hostBpm_.load() - playedBpm_.load()) > 1.0e-3;
+            m_hostBpm = ln.m_bpm;
+            m_linkBeat = ln.m_beat;
+            const bool tempoPending = std::fabs(m_hostBpm.load() - m_playedBpm.load()) > 1.0e-3;
             if (play && !tempoPending) {
-                double d = std::fmod(ln.beat - engine_.beat(), 4.0);
+                double d = std::fmod(ln.m_beat - m_engine.beat(), 4.0);
                 if (d > 2.0) d -= 4.0;
                 else if (d <= -2.0) d += 4.0;
-                if (std::fabs(d) > 0.05) engine_.seek(engine_.beat() + d);
+                if (std::fabs(d) > 0.05) m_engine.seek(m_engine.beat() + d);
             }
         }
-        linkPlayed_ = play;
+        m_linkPlayed = play;
     } else {
-        linkFollowing_ = false;
+        m_linkFollowing = false;
     }
-    const double seek = seekRequest_.exchange(-1.0);
-    if (seek >= 0.0) engine_.seek(seek);
+    const double seek = m_seekRequest.exchange(-1.0);
+    if (seek >= 0.0) m_engine.seek(seek);
     // The family jam's shared timeline (Jam.h): the host's beat in a DAW, Link's with others in the session; none alone.
     double shared = -1.0;
-    if (play && wrapperType != wrapperType_Standalone) shared = engine_.beat();
-    else if (play && linkFollowing_.load(std::memory_order_relaxed)) shared = linkBeat_;
+    if (play && wrapperType != wrapperType_Standalone) shared = m_engine.beat();
+    else if (play && m_linkFollowing.load(std::memory_order_relaxed)) shared = m_linkBeat;
     {   // Stopped, or another keyboard target: every played key is released (01.10.2026).
-        const int target = store().getInt(store().id(Module::Perform, 0, perform::KeyboardPart));
-        if (!play || target != keyboardSeen_) engine_.liveAllOff();
-        keyboardSeen_ = target;
+        const int target = store().getInt(store().id(ModuleE::PERFORM, 0, perform::KEYBOARD_PART));
+        if (!play || target != m_keyboardSeen) m_engine.liveAllOff();
+        m_keyboardSeen = target;
     }
-    if (!play || buffer.getNumChannels() < 2 || n > blockSize_) {
+    if (!play || buffer.getNumChannels() < 2 || n > m_blockSize) {
         silenceMidi(midi);
         buffer.clear();
         return;
     }
-    const double before = engine_.beat();
-    const int64_t start = engine_.samplePosition();
-    if (start != midiExpect_) silenceMidi(midi);   // a jump: whatever sounded is released
-    noteTap_.clear();
+    const double before = m_engine.beat();
+    const int64_t start = m_engine.samplePosition();
+    if (start != m_midiExpect) silenceMidi(midi);   // a jump: whatever sounded is released
+    m_noteTap.clear();
     {   // The stems' outputs (02.10.2026): the engine writes the stems while the host has one of their buses on.
         bool want = false;
         for (int b = 1; b < getBusCount(false) && !want; ++b)
             if (const auto* bus = getBus(false, b)) want = bus->isEnabled();
-        if (want != stemsOn_) {
-            engine_.setStems(want ? stemL_.data() : nullptr, want ? stemR_.data() : nullptr);
-            stemsOn_ = want;
+        if (want != m_stemsOn) {
+            m_engine.setStems(want ? m_stemL.data() : nullptr, want ? m_stemR.data() : nullptr);
+            m_stemsOn = want;
         }
     }
     jamFollow(before, shared);
-    engine_.process(buffer.getWritePointer(0), buffer.getWritePointer(1), n);
-    jamLead(before, engine_.beat(), shared);
+    m_engine.process(buffer.getWritePointer(0), buffer.getWritePointer(1), n);
+    jamLead(before, m_engine.beat(), shared);
     emitMidi(midi, start, n);
-    if (stemsOn_)
-        for (int b = 1; b < getBusCount(false) && b - 1 < Engine::kStems; ++b) {
+    if (m_stemsOn)
+        for (int b = 1; b < getBusCount(false) && b - 1 < Engine::STEMS; ++b) {
             const auto* bus = getBus(false, b);
             if (bus == nullptr || !bus->isEnabled()) continue;
             auto out = getBusBuffer(buffer, false, b);
             if (out.getNumChannels() < 2) continue;
-            out.copyFrom(0, 0, stemL_[static_cast<size_t>(b - 1)], n);
-            out.copyFrom(1, 0, stemR_[static_cast<size_t>(b - 1)], n);
+            out.copyFrom(0, 0, m_stemL[static_cast<size_t>(b - 1)], n);
+            out.copyFrom(1, 0, m_stemR[static_cast<size_t>(b - 1)], n);
         }
-    if (link_.enabled() && !linkFollowing_.load(std::memory_order_relaxed) && n > 0)   // alone in the session: it takes our tempo
-        link_.proposeTempo(60.0 * (engine_.beat() - before) * sampleRate_ / static_cast<double>(n), 0.0);
-    midiExpect_ = engine_.samplePosition();
-    stripSamples_.fetch_add(n, std::memory_order_relaxed);
-    position_ = engine_.beat();
-    if (cues_.running()) {
+    if (m_link.enabled() && !m_linkFollowing.load(std::memory_order_relaxed) && n > 0)   // alone in the session: it takes our tempo
+        m_link.proposeTempo(60.0 * (m_engine.beat() - before) * m_sampleRate / static_cast<double>(n), 0.0);
+    m_midiExpect = m_engine.samplePosition();
+    m_stripSamples.fetch_add(n, std::memory_order_relaxed);
+    m_position = m_engine.beat();
+    if (m_cues.running()) {
         // The cues of this block, stamped with the moment it is heard (Cue.h); a jump starts the marks again.
-        if (std::fabs(before - lastBeat_) > 1.0e-6) cueTap_.reset();
-        const double blockSeconds = static_cast<double>(n) / sampleRate_;
-        const double bpm = 60.0 * (engine_.beat() - before) / std::max(1e-9, blockSeconds);
-        cueTap_.scan(engine_.cueMarks(), before, engine_.beat(), static_cast<float>(bpm), CueSender::nowNanos(),
-                     static_cast<int64_t>(blockSeconds * 1.0e9), static_cast<int64_t>(blockSeconds * 1.0e9), cues_.ring());
+        if (std::fabs(before - m_lastBeat) > 1.0e-6) m_cueTap.reset();
+        const double blockSeconds = static_cast<double>(n) / m_sampleRate;
+        const double bpm = 60.0 * (m_engine.beat() - before) / std::max(1e-9, blockSeconds);
+        m_cueTap.scan(m_engine.cueMarks(), before, m_engine.beat(), static_cast<float>(bpm), CueSender::nowNanos(),
+                     static_cast<int64_t>(blockSeconds * 1.0e9), static_cast<int64_t>(blockSeconds * 1.0e9), m_cues.ring());
     }
-    lastBeat_ = engine_.beat();
+    m_lastBeat = m_engine.beat();
     {
         // The meters: raised here, taken by the editor (takeMeters). One writer, so a load and a store will do.
-        for (int d = 0; d < kDecks; ++d) {
+        for (int d = 0; d < Decks; ++d) {
             const size_t k = static_cast<size_t>(d);
             float pk = 0.0f;
             double ss = 0.0;
             for (int i = 0; i < n; ++i) {
-                const float l = tapL_[k][i], r = tapR_[k][i];
+                const float l = m_tapL[k][i], r = m_tapR[k][i];
                 pk = std::max(pk, std::max(std::fabs(l), std::fabs(r)));
                 ss += 0.5 * (static_cast<double>(l) * l + static_cast<double>(r) * r);
             }
-            if (pk > meterPeak_[k].load(std::memory_order_relaxed)) meterPeak_[k].store(pk, std::memory_order_relaxed);
-            meterSum_[k].store(meterSum_[k].load(std::memory_order_relaxed) + ss, std::memory_order_relaxed);
+            if (pk > m_meterPeak[k].load(std::memory_order_relaxed)) m_meterPeak[k].store(pk, std::memory_order_relaxed);
+            m_meterSum[k].store(m_meterSum[k].load(std::memory_order_relaxed) + ss, std::memory_order_relaxed);
         }
-        meterCount_.fetch_add(n, std::memory_order_release);
+        m_meterCount.fetch_add(n, std::memory_order_release);
         const float* l = buffer.getReadPointer(0);
         const float* r = buffer.getReadPointer(1);
-        float pk = outPeak_.load(std::memory_order_relaxed);
+        float pk = m_outPeak.load(std::memory_order_relaxed);
         for (int i = 0; i < n; ++i) {
             pk = std::max(pk, std::max(std::fabs(l[i]), std::fabs(r[i])));
-            const double kl = kHigh_[0].run(kShelf_[0].run(l[i])), kr = kHigh_[1].run(kShelf_[1].run(r[i]));
-            kMs_ += kCoef_ * (kl * kl + kr * kr - kMs_);
+            const double kl = m_kHigh[0].run(m_kShelf[0].run(l[i])), kr = m_kHigh[1].run(m_kShelf[1].run(r[i]));
+            m_kMs += m_kCoef * (kl * kl + kr * kr - m_kMs);
         }
-        outPeak_.store(pk, std::memory_order_relaxed);
-        lufs_.store(kMs_ > 1e-10 ? static_cast<float>(-0.691 + 10.0 * std::log10(kMs_)) : -70.0f, std::memory_order_relaxed);
+        m_outPeak.store(pk, std::memory_order_relaxed);
+        m_lufs.store(m_kMs > 1e-10 ? static_cast<float>(-0.691 + 10.0 * std::log10(m_kMs)) : -70.0f, std::memory_order_relaxed);
     }
-    if (recordTarget_ > 0) {
+    if (m_recordTarget > 0) {
         const float* l = buffer.getReadPointer(0);
         const float* r = buffer.getReadPointer(1);
-        size_t pos = recordPos_.load();
-        for (int i = 0; i < n && pos + 1 < recordTarget_; ++i) { record_[pos++] = l[i]; record_[pos++] = r[i]; }
-        recordPos_ = pos + 1 >= recordTarget_ ? recordTarget_ : pos;
+        size_t pos = m_recordPos.load();
+        for (int i = 0; i < n && pos + 1 < m_recordTarget; ++i) { m_record[pos++] = l[i]; m_record[pos++] = r[i]; }
+        m_recordPos = pos + 1 >= m_recordTarget ? m_recordTarget : pos;
     }
-    if (mute_.load(std::memory_order_relaxed)) buffer.clear();   // after the meters and the recording
+    if (m_mute.load(std::memory_order_relaxed)) buffer.clear();   // after the meters and the recording
     // The standalone stops at the end, with the rooms rung out.
-    if (wrapperType == wrapperType_Standalone && engine_.seconds() > engine_.lengthSeconds() + 8.0) playing_ = false;
+    if (wrapperType == wrapperType_Standalone && m_engine.seconds() > m_engine.lengthSeconds() + 8.0) m_playing = false;
 }
 
 void ParhelionProcessor::silenceMidi(juce::MidiBuffer& midi)
 {
-    pendingOffs_ = 0;
-    midiExpect_ = -1;
-    if (!midiSounding_) return;
-    midiSounding_ = false;
+    m_pendingOffs = 0;
+    m_midiExpect = -1;
+    if (!m_midiSounding) return;
+    m_midiSounding = false;
     for (int ch = 1; ch <= 16; ++ch) midi.addEvent(juce::MidiMessage::allNotesOff(ch), 0);
 }
 
@@ -858,34 +858,34 @@ void ParhelionProcessor::emitMidi(juce::MidiBuffer& midi, int64_t start, int n)
     const int64_t end = start + n;
     auto at = [&](int64_t s) { return static_cast<int>(std::clamp<int64_t>(s - start, 0, n - 1)); };
     // The one-shots' offs that are due (an off and an on at one sample: the off first).
-    for (int i = 0; i < pendingOffs_;) {
-        const PendingOff& p = pendingOff_[static_cast<size_t>(i)];
-        if (p.sample < end) {
-            midi.addEvent(juce::MidiMessage::noteOff(p.channel, p.pitch), at(p.sample));
-            pendingOff_[static_cast<size_t>(i)] = pendingOff_[static_cast<size_t>(--pendingOffs_)];
+    for (int i = 0; i < m_pendingOffs;) {
+        const PendingOff& p = m_pendingOff[static_cast<size_t>(i)];
+        if (p.m_sample < end) {
+            midi.addEvent(juce::MidiMessage::noteOff(p.m_channel, p.m_pitch), at(p.m_sample));
+            m_pendingOff[static_cast<size_t>(i)] = m_pendingOff[static_cast<size_t>(--m_pendingOffs)];
         } else {
             ++i;
         }
     }
-    for (int i = 0; i < noteTap_.count; ++i) {
-        const parh::NoteTap::Note& nt = noteTap_.notes[i];
-        const int channel = parh::midiChannelOf(static_cast<parh::Part>(nt.part)) + 1;
-        if (nt.velocity == 0) {
-            midi.addEvent(juce::MidiMessage::noteOff(channel, nt.pitch), at(nt.sample));
+    for (int i = 0; i < m_noteTap.m_count; ++i) {
+        const parh::NoteTap::Note& nt = m_noteTap.m_notes[i];
+        const int channel = parh::midiChannelOf(static_cast<parh::PartE>(nt.m_part)) + 1;
+        if (nt.m_velocity == 0) {
+            midi.addEvent(juce::MidiMessage::noteOff(channel, nt.m_pitch), at(nt.m_sample));
             continue;
         }
-        midi.addEvent(juce::MidiMessage::noteOn(channel, nt.pitch, static_cast<juce::uint8>(nt.velocity)), at(nt.sample));
-        midiSounding_ = true;
-        if (nt.offSample >= 0 && pendingOffs_ < static_cast<int>(pendingOff_.size()))
-            pendingOff_[static_cast<size_t>(pendingOffs_++)] = PendingOff{ std::max(nt.offSample, nt.sample + 1), static_cast<uint8_t>(channel), nt.pitch };
+        midi.addEvent(juce::MidiMessage::noteOn(channel, nt.m_pitch, static_cast<juce::uint8>(nt.m_velocity)), at(nt.m_sample));
+        m_midiSounding = true;
+        if (nt.m_offSample >= 0 && m_pendingOffs < static_cast<int>(m_pendingOff.size()))
+            m_pendingOff[static_cast<size_t>(m_pendingOffs++)] = PendingOff{ std::max(nt.m_offSample, nt.m_sample + 1), static_cast<uint8_t>(channel), nt.m_pitch };
     }
 }
 
 int ParhelionProcessor::scaleOfMode(const juce::String& mode)
 {
     const juce::String m = mode.trim();
-    for (int i = 0; i < static_cast<int>(parh::Scale::Count); ++i)
-        if (m.equalsIgnoreCase(parh::kScaleNames[i])) return i;
+    for (int i = 0; i < static_cast<int>(parh::ScaleE::COUNT); ++i)
+        if (m.equalsIgnoreCase(parh::ScaleNames[i])) return i;
     // The family's other names for its scales: a minor is an Aeolian, the just minor too.
     if (m.containsIgnoreCase("minor") && !m.containsIgnoreCase("penta")) return scaleOfMode("Aeolian");
     if (m.containsIgnoreCase("penta")) return scaleOfMode("Minor Pentatonic");
@@ -895,99 +895,99 @@ int ParhelionProcessor::scaleOfMode(const juce::String& mode)
 
 int ParhelionProcessor::homeRootAt(double beat) const
 {
-    int root = engine_.score().keyRoot;
-    for (const CueMark& m : engine_.cueMarks()) {
-        if (m.beat > beat + 1.0e-6) break;
-        if (m.kind != CueKind::Key) continue;
-        const int n = std::atoi(m.text);   // a Camelot label: "8A" the minor key 7 (n - 5) (mod 12), "8B" its relative major
-        if (n >= 1 && n <= 12) root = ((7 * (n - 5) + (std::strchr(m.text, 'B') != nullptr ? 3 : 0)) % 12 + 12) % 12;
+    int root = m_engine.score().m_keyRoot;
+    for (const CueMark& m : m_engine.cueMarks()) {
+        if (m.m_beat > beat + 1.0e-6) break;
+        if (m.m_kind != CueKindE::KEY) continue;
+        const int n = std::atoi(m.m_text);   // a Camelot label: "8A" the minor key 7 (n - 5) (mod 12), "8B" its relative major
+        if (n >= 1 && n <= 12) root = ((7 * (n - 5) + (std::strchr(m.m_text, 'B') != nullptr ? 3 : 0)) % 12 + 12) % 12;
     }
     return root;
 }
 
 void ParhelionProcessor::jamFollow(double before, double shared)
 {
-    if (jam_.role() != frame::Settings::JamRole::Follow) {
-        if (jamFollowing_) engine_.setJam(0, -1.0f, false);
-        jamFollowing_ = false;
-        jamTranspose_ = 0;
-        jamTransposeOut_ = 0;
-        jamLastBefore_ = before;
+    if (m_jam.role() != frame::Settings::JamRoleE::FOLLOW) {
+        if (m_jamFollowing) m_engine.setJam(0, -1.0f, false);
+        m_jamFollowing = false;
+        m_jamTranspose = 0;
+        m_jamTransposeOut = 0;
+        m_jamLastBefore = before;
         return;
     }
     // The block's length in beats, from the last one (none after a jump or a stop).
-    const double step = (jamLastBefore_ >= 0.0 && before > jamLastBefore_ && before - jamLastBefore_ < 1.0) ? before - jamLastBefore_ : 0.0;
-    jamLastBefore_ = before;
+    const double step = (m_jamLastBefore >= 0.0 && before > m_jamLastBefore && before - m_jamLastBefore < 1.0) ? before - m_jamLastBefore : 0.0;
+    m_jamLastBefore = before;
     // What the leader says, as it stands by the end of this block: a drop on a bar line inside it is played on it.
-    const frame::JamState js = jam_.stateAt(shared >= 0.0 ? shared + step : -1.0);
+    const frame::JamState js = m_jam.stateAt(shared >= 0.0 ? shared + step : -1.0);
     int want = 0;
-    if (js.root >= 0) {
-        const int d = ((js.root - homeRootAt(before)) % 12 + 12) % 12;
+    if (js.m_root >= 0) {
+        const int d = ((js.m_root - homeRootAt(before)) % 12 + 12) % 12;
         want = d > 6 ? d - 12 : d;   // the shortest way, up to a tritone either side
     }
     // The root moves on a bar line: inside this block, or at once when there is no step to tell.
     const bool barLine = step <= 0.0 || std::floor((before + step) / 4.0) > std::floor(before / 4.0);
-    if (want != jamTranspose_ && barLine) jamTranspose_ = want;
-    jamTransposeOut_ = jamTranspose_;
-    engine_.setJam(jamTranspose_, js.root >= 0 ? js.energy : -1.0f, js.root >= 0 && js.rhythmOut);
-    jamFollowing_ = true;
+    if (want != m_jamTranspose && barLine) m_jamTranspose = want;
+    m_jamTransposeOut = m_jamTranspose;
+    m_engine.setJam(m_jamTranspose, js.m_root >= 0 ? js.m_energy : -1.0f, js.m_root >= 0 && js.m_rhythmOut);
+    m_jamFollowing = true;
 }
 
 void ParhelionProcessor::jamLead(double before, double after, double shared)
 {
-    if (jam_.role() != frame::Settings::JamRole::Lead) {
-        jamLeadStarted_ = false;
+    if (m_jam.role() != frame::Settings::JamRoleE::LEAD) {
+        m_jamLeadStarted = false;
         return;
     }
-    const auto& marks = engine_.cueMarks();
-    const char* mode = parh::kScaleNames[juce::jlimit(0, static_cast<int>(parh::Scale::Count) - 1, engine_.score().scale)];
+    const auto& marks = m_engine.cueMarks();
+    const char* mode = parh::ScaleNames[juce::jlimit(0, static_cast<int>(parh::ScaleE::COUNT) - 1, m_engine.score().m_scale)];
     const auto barOf = [&](double beat) {
         return shared >= 0.0 ? static_cast<int64_t>(std::llround((shared + beat - before) / 4.0)) : int64_t(-1);
     };
     const auto keyOf = [](const CueMark& m) {
-        const int n = std::atoi(m.text);
-        return n >= 1 && n <= 12 ? ((7 * (n - 5) + (std::strchr(m.text, 'B') != nullptr ? 3 : 0)) % 12 + 12) % 12 : -1;
+        const int n = std::atoi(m.m_text);
+        return n >= 1 && n <= 12 ? ((7 * (n - 5) + (std::strchr(m.m_text, 'B') != nullptr ? 3 : 0)) % 12 + 12) % 12 : -1;
     };
     // The first block, or a jump: where it stands now -- the last section and key at the coming beat, at once.
-    if (!jamLeadStarted_ || std::fabs(before - jamLeadLast_) > 1.0e-6) {
+    if (!m_jamLeadStarted || std::fabs(before - m_jamLeadLast) > 1.0e-6) {
         const CueMark* block = nullptr;
         const CueMark* key = nullptr;
         for (const CueMark& m : marks) {
-            if (m.beat > before + 1.0) break;
-            if (m.kind == CueKind::Block) block = &m;
-            else if (m.kind == CueKind::Key) key = &m;
+            if (m.m_beat > before + 1.0) break;
+            if (m.m_kind == CueKindE::BLOCK) block = &m;
+            else if (m.m_kind == CueKindE::KEY) key = &m;
         }
-        jam_.postKey(key != nullptr ? keyOf(*key) : engine_.score().keyRoot, mode);
+        m_jam.postKey(key != nullptr ? keyOf(*key) : m_engine.score().m_keyRoot, mode);
         if (block != nullptr) {
             float e = 0.5f;
             bool drop = false;
-            const frame::JamSection s = frame::jamSectionOf(block->text, e, drop);   // before e is read
-            jam_.postSection(s, e, false, -1);
+            const frame::JamSectionE s = frame::jamSectionOf(block->m_text, e, drop);   // before e is read
+            m_jam.postSection(s, e, false, -1);
         }
-        jamLeadStarted_ = true;
+        m_jamLeadStarted = true;
     } else {
         // One beat ahead: a follower acts on the very bar line the leader means.
         for (const CueMark& m : marks) {
-            if (m.beat < before + 1.0) continue;
-            if (m.beat >= after + 1.0) break;
-            if (m.kind == CueKind::Block) {
+            if (m.m_beat < before + 1.0) continue;
+            if (m.m_beat >= after + 1.0) break;
+            if (m.m_kind == CueKindE::BLOCK) {
                 float e = 0.5f;
                 bool drop = false;
-                const frame::JamSection s = frame::jamSectionOf(m.text, e, drop);
-                jam_.postSection(s, e, drop, barOf(m.beat));
-            } else if (m.kind == CueKind::Key) {
+                const frame::JamSectionE s = frame::jamSectionOf(m.m_text, e, drop);
+                m_jam.postSection(s, e, drop, barOf(m.m_beat));
+            } else if (m.m_kind == CueKindE::KEY) {
                 const int k = keyOf(m);
-                if (k >= 0) jam_.postKey(k, mode);
+                if (k >= 0) m_jam.postKey(k, mode);
             }
         }
     }
-    jamLeadLast_ = after;
+    m_jamLeadLast = after;
 }
 
 juce::String ParhelionProcessor::linkStatus() const
 {
-    if (!link_.enabled()) return "off";
-    const int n = link_.peers();
+    if (!m_link.enabled()) return "off";
+    const int n = m_link.peers();
     return n == 0 ? "alone in the session: it takes this tempo" : juce::String(n) + (n == 1 ? " other app" : " other apps");
 }
 
@@ -995,12 +995,12 @@ bool ParhelionProcessor::saveSet(const juce::File& file)
 {
     SetFile sf;
     {
-        std::lock_guard<std::mutex> g(lock_);
-        sf.seed = seed_;
-        sf.curation = curation_;
+        std::lock_guard<std::mutex> g(m_lock);
+        sf.m_seed = m_seed;
+        sf.m_curation = m_curation;
     }
-    sf.minutes = store().get(store().id(Module::Compose, 0, compose::Minutes));
-    sf.set = store().get(store().id(Module::Set, 0, set::Minutes));
+    sf.m_minutes = store().get(store().id(ModuleE::COMPOSE, 0, compose::MINUTES));
+    sf.m_set = store().get(store().id(ModuleE::SET, 0, set::MINUTES));
     return parh::saveSet(file.getFullPathName().toRawUTF8(), sf, store());
 }
 
@@ -1011,12 +1011,12 @@ bool ParhelionProcessor::loadSet(const juce::File& file)
     beginStep("load " + file.getFileName());
     if (!parh::loadSet(file.getFullPathName().toRawUTF8(), sf, store(), &err)) { endStep(); return false; }
     {
-        std::lock_guard<std::mutex> g(lock_);
-        seed_ = sf.seed;
-        curation_ = sf.curation;
+        std::lock_guard<std::mutex> g(m_lock);
+        m_seed = sf.m_seed;
+        m_curation = sf.m_curation;
     }
-    if (sf.minutes > 0.0) store().set(store().id(Module::Compose, 0, compose::Minutes), static_cast<float>(sf.minutes));
-    store().set(store().id(Module::Set, 0, set::Minutes), static_cast<float>(sf.set));
+    if (sf.m_minutes > 0.0) store().set(store().id(ModuleE::COMPOSE, 0, compose::MINUTES), static_cast<float>(sf.m_minutes));
+    store().set(store().id(ModuleE::SET, 0, set::MINUTES), static_cast<float>(sf.m_set));
     for (int id = 0; id < store().count(); ++id)
         if (StoreParameter* p = parameter(id)) p->sendValueChangedMessageToListeners(p->getValue());
     endStep();
@@ -1026,74 +1026,74 @@ bool ParhelionProcessor::loadSet(const juce::File& file)
 
 void ParhelionProcessor::exportTo(const juce::File& wav, int extras)
 {
-    if (exporting_.exchange(true)) return;
-    if (exporter_ && exporter_->joinable()) exporter_->join();
+    if (m_exporting.exchange(true)) return;
+    if (m_exporter && m_exporter->joinable()) m_exporter->join();
     Playing p;
     bool levelled = true;
     uint64_t seed = 0;
     {
-        std::lock_guard<std::mutex> g(lock_);
-        p = current_;
-        levelled = levelled_;
-        seed = seed_;
+        std::lock_guard<std::mutex> g(m_lock);
+        p = m_current;
+        levelled = m_levelled;
+        seed = m_seed;
     }
     auto params = std::make_shared<ParamStore>();
     params->copyValuesFrom(store());
-    exporter_ = std::make_unique<std::thread>([this, p, params, wav, extras, levelled, seed]() mutable {
+    m_exporter = std::make_unique<std::thread>([this, p, params, wav, extras, levelled, seed]() mutable {
         if (!levelled) {   // exported before its measuring was done: measured here
-            if (p.isSet) levelSet(p.set, *params);
-            else levelScore(p.set.decks[0], *params);
+            if (p.m_isSet) levelSet(p.m_set, *params);
+            else levelScore(p.m_set.m_decks[0], *params);
         }
-        constexpr double kRate = 48000.0;
+        constexpr double Rate = 48000.0;
         Engine e;
         e.params().copyValuesFrom(*params);
-        e.prepare(kRate, 512);
-        if (p.isSet) e.loadSet(p.set);
-        else e.load(p.set.decks[0]);
+        e.prepare(Rate, 512);
+        if (p.m_isSet) e.loadSet(p.m_set);
+        else e.load(p.m_set.m_decks[0]);
         // The cues (PLAN 9): in the WAV and as JSON beside it; the tags.
         std::vector<CueAt> cues;
         std::string title;
-        const TempoMap& tm = p.set.decks[0].tempo;
-        if (p.isSet) {
-            cues = setCues(p.setInfo, tm);
-            title = std::string("Parhelion set ") + kDramaturgyNames[static_cast<int>(p.setInfo.dramaturgy)] + " seed " + std::to_string(seed);
-        } else if (!p.tracks.empty()) {
-            const TrackInfo& info = p.tracks[0].info;
+        const TempoMap& tm = p.m_set.m_decks[0].m_tempo;
+        if (p.m_isSet) {
+            cues = setCues(p.m_setInfo, tm);
+            title = std::string("Parhelion set ") + DramaturgyNames[static_cast<int>(p.m_setInfo.m_dramaturgy)] + " seed " + std::to_string(seed);
+        } else if (!p.m_tracks.empty()) {
+            const TrackInfo& info = p.m_tracks[0].m_info;
             trackCues(info, 0.0, tm, std::string(), cues);
-            title = "Parhelion " + info.style + " " + kFormTemplateNames[static_cast<int>(info.form)] + " " + kKeyNames[info.key] + " " + info.camelot
+            title = "Parhelion " + info.m_style + " " + FormTemplateNames[static_cast<int>(info.m_form)] + " " + KeyNames[info.m_key] + " " + info.m_camelot
                   + " seed " + std::to_string(seed);
         }
         WavWriter w;
-        bool ok = w.open(wav.getFullPathName().toRawUTF8(), static_cast<int>(kRate), 2, WavFormat::Pcm24);
-        for (const CueAt& c : cues) w.addCue(static_cast<uint64_t>(std::llround(c.seconds * kRate)), c.label);
+        bool ok = w.open(wav.getFullPathName().toRawUTF8(), static_cast<int>(Rate), 2, WavFormatE::PCM24);
+        for (const CueAt& c : cues) w.addCue(static_cast<uint64_t>(std::llround(c.m_seconds * Rate)), c.m_label);
         w.setInfo("INAM", title);
         w.setInfo("ISFT", std::string("Parhelion ") + PARH_VERSION);
         w.setInfo("IGNR", "Trance");
-        ok = ok && writeCuesJson(wav.getFullPathName().toStdString() + ".cues.json", cues, kRate);
+        ok = ok && writeCuesJson(wav.getFullPathName().toStdString() + ".cues.json", cues, Rate);
         // Phase 16: the WAV as a rekordbox collection (its grid and its cues) beside it.
         {
-            const int key = p.isSet ? (p.setInfo.tracks.empty() ? -1 : p.setInfo.tracks[0].info.key) : (p.tracks.empty() ? -1 : p.tracks[0].info.key);
+            const int key = p.m_isSet ? (p.m_setInfo.m_tracks.empty() ? -1 : p.m_setInfo.m_tracks[0].m_info.m_key) : (p.m_tracks.empty() ? -1 : p.m_tracks[0].m_info.m_key);
             const std::string wavPath = wav.getFullPathName().toStdString();
-            ok = ok && writeRekordboxXml(wavPath + ".rekordbox.xml", wavPath, title, key >= 0 ? std::string(kKeyNames[key]) + "m" : std::string(),
-                                         cues, tm, p.set.lengthBeats, kRate);
+            ok = ok && writeRekordboxXml(wavPath + ".rekordbox.xml", wavPath, title, key >= 0 ? std::string(KeyNames[key]) + "m" : std::string(),
+                                         cues, tm, p.m_set.m_lengthBeats, Rate);
         }
         // The stems: a WAV per element, their sum the mix before the master (Engine.h).
-        const bool stems = (extras & kStems) != 0;
-        std::vector<std::vector<float>> stemBuf(stems ? 2 * Engine::kStems : 0, std::vector<float>(512));
-        std::vector<float*> stemL(Engine::kStems), stemR(Engine::kStems);
-        std::vector<WavWriter> stemWav(stems ? Engine::kStems : 0);
+        const bool stems = (extras & STEMS) != 0;
+        std::vector<std::vector<float>> stemBuf(stems ? 2 * Engine::STEMS : 0, std::vector<float>(512));
+        std::vector<float*> stemL(Engine::STEMS), stemR(Engine::STEMS);
+        std::vector<WavWriter> stemWav(stems ? Engine::STEMS : 0);
         if (stems && ok) {
             const juce::File dir = wav.getParentDirectory().getChildFile(wav.getFileNameWithoutExtension() + "_stems");
             dir.createDirectory();
-            for (int s = 0; s < Engine::kStems; ++s) {
+            for (int s = 0; s < Engine::STEMS; ++s) {
                 stemL[static_cast<size_t>(s)] = stemBuf[static_cast<size_t>(2 * s)].data();
                 stemR[static_cast<size_t>(s)] = stemBuf[static_cast<size_t>(2 * s + 1)].data();
                 const juce::String name = juce::String(s + 1).paddedLeft('0', 2) + "_" + Engine::stemName(s) + ".wav";
-                ok = ok && stemWav[static_cast<size_t>(s)].open(dir.getChildFile(name).getFullPathName().toRawUTF8(), static_cast<int>(kRate), 2, WavFormat::Float32);
+                ok = ok && stemWav[static_cast<size_t>(s)].open(dir.getChildFile(name).getFullPathName().toRawUTF8(), static_cast<int>(Rate), 2, WavFormatE::FLOAT32);
             }
             e.setStems(stemL.data(), stemR.data());
         }
-        const int64_t total = static_cast<int64_t>((e.lengthSeconds() + 2.0) * kRate);
+        const int64_t total = static_cast<int64_t>((e.lengthSeconds() + 2.0) * Rate);
         std::vector<float> L(512), R(512);
         for (int64_t done = 0; ok && done < total; done += 512) {
             const int n = static_cast<int>(std::min<int64_t>(512, total - done));
@@ -1104,33 +1104,33 @@ void ParhelionProcessor::exportTo(const juce::File& wav, int extras)
         w.close();
         for (WavWriter& sw : stemWav) sw.close();
         const juce::File mid = wav.withFileExtension(".mid");
-        ok = ok && writeMidiFile(p.isSet ? flattenSet(p.set) : p.set.decks[0], mid.getFullPathName().toRawUTF8(), "Parhelion", params.get());
+        ok = ok && writeMidiFile(p.m_isSet ? flattenSet(p.m_set) : p.m_set.m_decks[0], mid.getFullPathName().toRawUTF8(), "Parhelion", params.get());
         // The DJ loops of a track.
-        if (ok && (extras & kLoops) != 0 && !p.isSet && !p.tracks.empty()) {
+        if (ok && (extras & LOOPS) != 0 && !p.m_isSet && !p.m_tracks.empty()) {
             const juce::File dir = wav.getParentDirectory().getChildFile(wav.getFileNameWithoutExtension() + "_loops");
-            ok = renderLoops(*params, p.set.decks[0], p.tracks[0].info, dir.getFullPathName().toStdString(), kRate);
+            ok = renderLoops(*params, p.m_set.m_decks[0], p.m_tracks[0].m_info, dir.getFullPathName().toStdString(), Rate);
         }
         {
-            std::lock_guard<std::mutex> g(lock_);
-            lastExport_ = ok ? "exported " + wav.getFileName() + ", its MIDI and cues" + (stems ? juce::String(", stems") : juce::String())
-                                   + ((extras & kLoops) != 0 && !p.isSet ? juce::String(", loops") : juce::String())
+            std::lock_guard<std::mutex> g(m_lock);
+            m_lastExport = ok ? "exported " + wav.getFileName() + ", its MIDI and cues" + (stems ? juce::String(", stems") : juce::String())
+                                   + ((extras & LOOPS) != 0 && !p.m_isSet ? juce::String(", loops") : juce::String())
                              : "could not write " + wav.getFileName();
         }
-        exporting_ = false;
+        m_exporting = false;
     });
 }
 
 void ParhelionProcessor::writeRecording()
 {
     const char* path = std::getenv("PARH_RECORD");
-    if (path == nullptr || record_.empty()) return;
+    if (path == nullptr || m_record.empty()) return;
     WavWriter w;
-    if (!w.open(path, static_cast<int>(sampleRate_), 2, WavFormat::Float32)) return;
-    std::vector<float> L(record_.size() / 2), R(record_.size() / 2);
-    for (size_t i = 0; i < L.size(); ++i) { L[i] = record_[2 * i]; R[i] = record_[2 * i + 1]; }
+    if (!w.open(path, static_cast<int>(m_sampleRate), 2, WavFormatE::FLOAT32)) return;
+    std::vector<float> L(m_record.size() / 2), R(m_record.size() / 2);
+    for (size_t i = 0; i < L.size(); ++i) { L[i] = m_record[2 * i]; R[i] = m_record[2 * i + 1]; }
     w.write(L.data(), R.data(), static_cast<int>(L.size()));
     w.close();
-    recordTarget_ = 0;
+    m_recordTarget = 0;
 }
 
 juce::File ParhelionProcessor::ratingsFile()
@@ -1144,25 +1144,25 @@ juce::String ParhelionProcessor::rate(int value)
     Rating r;
     juce::String what;
     {
-        std::lock_guard<std::mutex> g(lock_);
-        if (t < 0 || t >= static_cast<int>(current_.tracks.size())) return {};
-        const TrackInfo& info = current_.tracks[static_cast<size_t>(t)].info;
-        r.value = value > 0 ? 1 : -1;
-        r.form = static_cast<int>(info.form);
-        r.style = info.style;
-        r.seed = current_.isSet ? current_.setInfo.tracks[static_cast<size_t>(t)].seed : seed_;
+        std::lock_guard<std::mutex> g(m_lock);
+        if (t < 0 || t >= static_cast<int>(m_current.m_tracks.size())) return {};
+        const TrackInfo& info = m_current.m_tracks[static_cast<size_t>(t)].m_info;
+        r.m_value = value > 0 ? 1 : -1;
+        r.m_form = static_cast<int>(info.m_form);
+        r.m_style = info.m_style;
+        r.m_seed = m_current.m_isSet ? m_current.m_setInfo.m_tracks[static_cast<size_t>(t)].m_seed : m_seed;
         // The groups of the presets it plays (its SoundPicks where it begins, on its deck).
-        const TrackPlace& place = current_.tracks[static_cast<size_t>(t)];
-        for (const SoundPick& s : current_.set.decks[place.deck].sounds) {
-            if (s.beat != place.start) continue;
-            const std::vector<SoundPreset>& ps = factoryPresets(static_cast<Module>(s.module), s.instance);
-            if (s.preset < 0 || static_cast<size_t>(s.preset) >= ps.size()) continue;
-            const std::string& grp = ps[static_cast<size_t>(s.preset)].group;
-            if (std::find(r.groups.begin(), r.groups.end(), grp) == r.groups.end()) r.groups.push_back(grp);
+        const TrackPlace& place = m_current.m_tracks[static_cast<size_t>(t)];
+        for (const SoundPick& s : m_current.m_set.m_decks[place.m_deck].m_sounds) {
+            if (s.m_beat != place.m_start) continue;
+            const std::vector<SoundPreset>& ps = factoryPresets(static_cast<ModuleE>(s.m_module), s.m_instance);
+            if (s.m_preset < 0 || static_cast<size_t>(s.m_preset) >= ps.size()) continue;
+            const std::string& grp = ps[static_cast<size_t>(s.m_preset)].m_group;
+            if (std::find(r.m_groups.begin(), r.m_groups.end(), grp) == r.m_groups.end()) r.m_groups.push_back(grp);
         }
-        ratings_.push_back(r);
-        what << (r.value > 0 ? "liked: " : "not liked: ") << (current_.isSet ? "T" + juce::String(t + 1) + " " : juce::String())
-             << juce::String(info.style) << " " << kFormTemplateNames[static_cast<int>(info.form)] << " (" << static_cast<int>(ratings_.size()) << " ratings)";
+        m_ratings.push_back(r);
+        what << (r.m_value > 0 ? "liked: " : "not liked: ") << (m_current.m_isSet ? "T" + juce::String(t + 1) + " " : juce::String())
+             << juce::String(info.m_style) << " " << FormTemplateNames[static_cast<int>(info.m_form)] << " (" << static_cast<int>(m_ratings.size()) << " ratings)";
     }
     ratingsFile().getParentDirectory().createDirectory();
     appendRating(ratingsFile().getFullPathName().toStdString(), r);
@@ -1171,33 +1171,33 @@ juce::String ParhelionProcessor::rate(int value)
 
 juce::String ParhelionProcessor::status() const
 {
-    if (composing_) return "composing ...";
-    if (exporting_) return "exporting ...";
-    std::lock_guard<std::mutex> g(lock_);
+    if (m_composing) return "composing ...";
+    if (m_exporting) return "exporting ...";
+    std::lock_guard<std::mutex> g(m_lock);
     juce::String t;
-    const double secs = current_.set.decks[0].tempo.secondsAt(current_.set.lengthBeats);
-    t << "seed " << juce::String(static_cast<juce::int64>(seed_)) << "   ";
-    if (current_.isSet) t << "DJ mix of " << static_cast<int>(current_.tracks.size()) << " tracks, " << kDramaturgyNames[static_cast<int>(current_.setInfo.dramaturgy)];
-    else if (!current_.tracks.empty()) {
-        const TrackInfo& i = current_.tracks[0].info;
-        t << "single track, " << juce::String(i.style) << " " << kFormTemplateNames[static_cast<int>(i.form)] << ", " << juce::String(i.bpm, 1) << " BPM, " << kKeyNames[i.key] << " "
-          << kScaleNames[i.scale] << " (" << juce::String(i.camelot) << ")";
+    const double secs = m_current.m_set.m_decks[0].m_tempo.secondsAt(m_current.m_set.m_lengthBeats);
+    t << "seed " << juce::String(static_cast<juce::int64>(m_seed)) << "   ";
+    if (m_current.m_isSet) t << "DJ mix of " << static_cast<int>(m_current.m_tracks.size()) << " tracks, " << DramaturgyNames[static_cast<int>(m_current.m_setInfo.m_dramaturgy)];
+    else if (!m_current.m_tracks.empty()) {
+        const TrackInfo& i = m_current.m_tracks[0].m_info;
+        t << "single track, " << juce::String(i.m_style) << " " << FormTemplateNames[static_cast<int>(i.m_form)] << ", " << juce::String(i.m_bpm, 1) << " BPM, " << KeyNames[i.m_key] << " "
+          << ScaleNames[i.m_scale] << " (" << juce::String(i.m_camelot) << ")";
     }
     t << ", " << juce::String(secs / 60.0, 1) << " min";
-    if (!levelled_ && !current_.tracks.empty()) t << ", levelling";
-    if (lastExport_.isNotEmpty()) t << "   " << lastExport_;
+    if (!m_levelled && !m_current.m_tracks.empty()) t << ", levelling";
+    if (m_lastExport.isNotEmpty()) t << "   " << m_lastExport;
     return t;
 }
 
 int ParhelionProcessor::controllerFor(int id) const
 {
-    for (int c = 0; c < 128; ++c) if (ccMap_[static_cast<size_t>(c)].load() == id) return c;
+    for (int c = 0; c < 128; ++c) if (m_ccMap[static_cast<size_t>(c)].load() == id) return c;
     return -1;
 }
 
 void ParhelionProcessor::forget(int id)
 {
-    for (auto& c : ccMap_) if (c.load() == id) c = -1;
+    for (auto& c : m_ccMap) if (c.load() == id) c = -1;
 }
 
 void ParhelionProcessor::setFromMidi(int id, float value)
@@ -1216,61 +1216,61 @@ void ParhelionProcessor::perform(const juce::MidiBuffer& midi)
     const ParamStore& s = store();
     // A keyboard that plays (perform.keyboard_part, 01.10.2026): its keys go to the engine, on their samples; else the
     // keys from middle C toggle the mutes.
-    const bool keys = s.getInt(s.id(Module::Perform, 0, perform::KeyboardPart)) != perform::keys::Off;
+    const bool keys = s.getInt(s.id(ModuleE::PERFORM, 0, perform::KEYBOARD_PART)) != perform::keys::OFF;
     for (const auto meta : midi) {
         const juce::MidiMessage m = meta.getMessage();
         if (m.isAllNotesOff() || m.isAllSoundOff()) {
-            engine_.liveAllOff();
-            keyMemory_.clear();
+            m_engine.liveAllOff();
+            m_keyMemory.clear();
         } else if (keys && (m.isNoteOn() || m.isNoteOff())) {
             // The keyboard's options (02.10.2026): the keys under the split play the lower voice, Scale Lock moves a key
             // to the nearest note of the track's key and scale (not on the kit, whose keys are its instruments), the
             // velocity goes through its curve. Where a press went, its release goes too.
             const int ch = m.getChannel() - 1, key = m.getNoteNumber();
             if (m.isNoteOn()) {
-                const int lower = s.getInt(s.id(Module::Perform, 0, perform::KeyboardLower));
-                const int split = 36 + 12 * s.getInt(s.id(Module::Perform, 0, perform::KeyboardSplit));
-                const int target = lower != perform::keys::Off && key < split ? lower : -1;
+                const int lower = s.getInt(s.id(ModuleE::PERFORM, 0, perform::KEYBOARD_LOWER));
+                const int split = 36 + 12 * s.getInt(s.id(ModuleE::PERFORM, 0, perform::KEYBOARD_SPLIT));
+                const int target = lower != perform::keys::OFF && key < split ? lower : -1;
                 int pitch = key;
-                if (s.getBool(s.id(Module::Perform, 0, perform::KeyboardScale))
-                    && (target >= 0 ? target : engine_.keyTargetFor(ch)) != perform::keys::Kit) {
-                    const Score& sc = engine_.deck(std::max(0, engine_.leadDeck())).score();
-                    pitch = frame::snapToScale(key, sc.keyRoot, frame::scaleMask(kScaleNames[std::clamp(sc.scale, 0, 5)]));
+                if (s.getBool(s.id(ModuleE::PERFORM, 0, perform::KEYBOARD_SCALE))
+                    && (target >= 0 ? target : m_engine.keyTargetFor(ch)) != perform::keys::KIT) {
+                    const Score& sc = m_engine.deck(std::max(0, m_engine.leadDeck())).score();
+                    pitch = frame::snapToScale(key, sc.m_keyRoot, frame::scaleMask(ScaleNames[std::clamp(sc.m_scale, 0, 5)]));
                 }
-                const int velocity = frame::shapeVelocity(m.getVelocity(), s.getInt(s.id(Module::Perform, 0, perform::KeyboardVelocity)));
-                keyMemory_.press(ch, key, target, pitch);
-                engine_.queueLive(meta.samplePosition, pitch, velocity, ch, true, target);
+                const int velocity = frame::shapeVelocity(m.getVelocity(), s.getInt(s.id(ModuleE::PERFORM, 0, perform::KEYBOARD_VELOCITY)));
+                m_keyMemory.press(ch, key, target, pitch);
+                m_engine.queueLive(meta.samplePosition, pitch, velocity, ch, true, target);
             } else {
                 int target = -1, pitch = key;
-                keyMemory_.release(ch, key, target, pitch);
-                engine_.queueLive(meta.samplePosition, pitch, 0, ch, false, target);
+                m_keyMemory.release(ch, key, target, pitch);
+                m_engine.queueLive(meta.samplePosition, pitch, 0, ch, false, target);
             }
         } else if (m.isNoteOn()) {
             // The keys from middle C: C kick, C# bass, D hats, D# perc, E lead, F synths, F# pads -- each press toggles.
             const int k = m.getNoteNumber() - 60;
-            if (k >= 0 && k < perform::kMutes) {
-                const int id = s.id(Module::Perform, 0, perform::MuteKick + k);
+            if (k >= 0 && k < perform::Mutes) {
+                const int id = s.id(ModuleE::PERFORM, 0, perform::MUTE_KICK + k);
                 setFromMidi(id, s.getBool(id) ? 0.0f : 1.0f);
             }
         } else if (m.isChannelPressure()) {
             // The pressure: a source of every voice's matrix (perform.pressure).
-            setFromMidi(s.id(Module::Perform, 0, perform::Pressure), static_cast<float>(m.getChannelPressureValue()) / 127.0f);
+            setFromMidi(s.id(ModuleE::PERFORM, 0, perform::PRESSURE), static_cast<float>(m.getChannelPressureValue()) / 127.0f);
         } else if (m.isController()) {
             const int cc = m.getControllerNumber();
             if (cc < 0 || cc > 127) continue;
-            const int learning = learn_.exchange(-1);
+            const int learning = m_learn.exchange(-1);
             if (learning >= 0) {
-                for (auto& c : ccMap_) if (c.load() == learning) c = -1;   // one controller per control
-                ccMap_[static_cast<size_t>(cc)] = learning;
+                for (auto& c : m_ccMap) if (c.load() == learning) c = -1;   // one controller per control
+                m_ccMap[static_cast<size_t>(cc)] = learning;
             }
-            const int id = ccMap_[static_cast<size_t>(cc)].load();
+            const int id = m_ccMap[static_cast<size_t>(cc)].load();
             if (id < 0) continue;
             const ParamDesc& d = s.desc(id);
             const float u = static_cast<float>(m.getControllerValue()) / 127.0f;
-            float v = d.minValue + u * (d.maxValue - d.minValue);
+            float v = d.m_minValue + u * (d.m_maxValue - d.m_minValue);
             // A bipolar control has its middle on the controller's middle (64), exactly; a switch turns at the middle.
-            if (d.minValue < 0.0f && d.maxValue > 0.0f && m.getControllerValue() == 64) v = 0.0f;
-            if (d.curve == Curve::Toggle) v = m.getControllerValue() >= 64 ? 1.0f : 0.0f;
+            if (d.m_minValue < 0.0f && d.m_maxValue > 0.0f && m.getControllerValue() == 64) v = 0.0f;
+            if (d.m_curve == CurveE::TOGGLE) v = m.getControllerValue() >= 64 ? 1.0f : 0.0f;
             setFromMidi(id, v);
         }
     }
@@ -1280,18 +1280,18 @@ void ParhelionProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     juce::XmlElement xml("Parhelion");
     {
-        std::lock_guard<std::mutex> g(lock_);
-        xml.setAttribute("seed", juce::String(static_cast<juce::int64>(seed_)));
+        std::lock_guard<std::mutex> g(m_lock);
+        xml.setAttribute("seed", juce::String(static_cast<juce::int64>(m_seed)));
         juce::String rerolls;
-        for (const auto& r : curation_.rerolls) rerolls << r.first << "=" << r.second << ";";
+        for (const auto& r : m_curation.m_rerolls) rerolls << r.first << "=" << r.second << ";";
         xml.setAttribute("rerolls", rerolls);
     }
     xml.setAttribute("params", juce::String(store().toText(true)));
     juce::String cc;
     for (int c = 0; c < 128; ++c)
-        if (const int id = ccMap_[static_cast<size_t>(c)].load(); id >= 0) cc << c << "=" << juce::String(store().key(id)) << ";";
+        if (const int id = m_ccMap[static_cast<size_t>(c)].load(); id >= 0) cc << c << "=" << juce::String(store().key(id)) << ";";
     xml.setAttribute("controllers", cc);
-    xml.setAttribute("mixMinutes", static_cast<double>(mixMinutes_));
+    xml.setAttribute("mixMinutes", static_cast<double>(m_mixMinutes));
     copyXmlToBinary(xml, destData);
 }
 
@@ -1301,23 +1301,23 @@ void ParhelionProcessor::setStateInformation(const void* data, int sizeInBytes)
     if (xml == nullptr || !xml->hasTagName("Parhelion")) return;
     store().resetDefaults();
     store().parseText(xml->getStringAttribute("params").toStdString());
-    if (xml->hasAttribute("mixMinutes")) mixMinutes_ = static_cast<float>(xml->getDoubleAttribute("mixMinutes", 60.0));
+    if (xml->hasAttribute("mixMinutes")) m_mixMinutes = static_cast<float>(xml->getDoubleAttribute("mixMinutes", 60.0));
     if (xml->hasAttribute("controllers")) {
-        for (auto& c : ccMap_) c = -1;
+        for (auto& c : m_ccMap) c = -1;
         for (const auto& item : juce::StringArray::fromTokens(xml->getStringAttribute("controllers"), ";", "")) {
             const int c = item.upToFirstOccurrenceOf("=", false, false).getIntValue();
             const int id = store().find(item.fromFirstOccurrenceOf("=", false, false).toStdString());
-            if (c >= 0 && c < 128 && id >= 0) ccMap_[static_cast<size_t>(c)] = id;
+            if (c >= 0 && c < 128 && id >= 0) m_ccMap[static_cast<size_t>(c)] = id;
         }
     }
     {
-        std::lock_guard<std::mutex> g(lock_);
-        seed_ = static_cast<uint64_t>(xml->getStringAttribute("seed").getLargeIntValue());
-        curation_ = Curation{};
+        std::lock_guard<std::mutex> g(m_lock);
+        m_seed = static_cast<uint64_t>(xml->getStringAttribute("seed").getLargeIntValue());
+        m_curation = Curation{};
         for (const auto& item : juce::StringArray::fromTokens(xml->getStringAttribute("rerolls"), ";", ""))
-            if (item.contains("=")) curation_.rerolls[item.upToFirstOccurrenceOf("=", false, false).toStdString()] = item.fromFirstOccurrenceOf("=", false, false).getIntValue();
+            if (item.contains("=")) m_curation.m_rerolls[item.upToFirstOccurrenceOf("=", false, false).toStdString()] = item.fromFirstOccurrenceOf("=", false, false).getIntValue();
     }
-    history_.clear();   // a host's state is a new beginning
+    m_history.clear();   // a host's state is a new beginning
     compose();
 }
 
@@ -1325,7 +1325,7 @@ void ParhelionProcessor::setStateInformation(const void* data, int sizeInBytes)
 
 std::vector<float> ParhelionProcessor::values() const
 {
-    const ParamStore& s = engine_.params();
+    const ParamStore& s = m_engine.params();
     std::vector<float> v(static_cast<size_t>(s.count()));
     for (int id = 0; id < s.count(); ++id) v[static_cast<size_t>(id)] = s.get(id);
     return v;
@@ -1333,10 +1333,10 @@ std::vector<float> ParhelionProcessor::values() const
 
 juce::String ParhelionProcessor::extraState() const
 {
-    std::lock_guard<std::mutex> g(lock_);
+    std::lock_guard<std::mutex> g(m_lock);
     juce::String t;
-    t << "seed=" << juce::String(static_cast<juce::int64>(seed_)) << "\nmix=" << juce::String(mixMinutes_) << "\nrerolls=";
-    for (const auto& r : curation_.rerolls) t << r.first << ":" << r.second << ";";
+    t << "seed=" << juce::String(static_cast<juce::int64>(m_seed)) << "\nmix=" << juce::String(m_mixMinutes) << "\nrerolls=";
+    for (const auto& r : m_curation.m_rerolls) t << r.first << ":" << r.second << ";";
     return t;
 }
 
@@ -1345,79 +1345,79 @@ void ParhelionProcessor::applyExtra(const juce::String& text)
     if (text == extraState()) return;
     bool again = false;
     {
-        std::lock_guard<std::mutex> g(lock_);
+        std::lock_guard<std::mutex> g(m_lock);
         for (const juce::String& line : juce::StringArray::fromLines(text)) {
             const juce::String k = line.upToFirstOccurrenceOf("=", false, false), v = line.fromFirstOccurrenceOf("=", false, false);
             if (k == "seed") {
                 const uint64_t seed = static_cast<uint64_t>(v.getLargeIntValue());
-                again = again || seed != seed_;
-                seed_ = seed;
+                again = again || seed != m_seed;
+                m_seed = seed;
             } else if (k == "mix") {
-                mixMinutes_ = v.getFloatValue();
+                m_mixMinutes = v.getFloatValue();
             } else if (k == "rerolls") {
                 Curation c;
                 for (const juce::String& item : juce::StringArray::fromTokens(v, ";", ""))
-                    if (item.contains(":")) c.rerolls[item.upToLastOccurrenceOf(":", false, false).toStdString()] = item.fromLastOccurrenceOf(":", false, false).getIntValue();
-                again = again || c.rerolls != curation_.rerolls;
-                curation_ = c;
+                    if (item.contains(":")) c.m_rerolls[item.upToLastOccurrenceOf(":", false, false).toStdString()] = item.fromLastOccurrenceOf(":", false, false).getIntValue();
+                again = again || c.m_rerolls != m_curation.m_rerolls;
+                m_curation = c;
             }
         }
     }
     if (again) compose();
 }
 
-void ParhelionProcessor::beginStep(const juce::String& what) { history_.begin(what, values(), extraState(), true); }
+void ParhelionProcessor::beginStep(const juce::String& what) { m_history.begin(what, values(), extraState(), true); }
 
-void ParhelionProcessor::endStep() { history_.end(values(), extraState()); }
+void ParhelionProcessor::endStep() { m_history.end(values(), extraState()); }
 
 void ParhelionProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting)
 {
     // Only the panel's gestures, which come on the message thread: a controller's (perform(), the audio thread) and an
     // undo's own are not steps.
-    if (restoring_ || !juce::MessageManager::existsAndIsCurrentThread()) return;
+    if (m_restoring || !juce::MessageManager::existsAndIsCurrentThread()) return;
     if (gestureIsStarting) {
         const ParamStore& s = store();
-        history_.begin(parameterIndex >= 0 && parameterIndex < s.count() ? juce::String(s.desc(parameterIndex).name) : juce::String("knob"),
+        m_history.begin(parameterIndex >= 0 && parameterIndex < s.count() ? juce::String(s.desc(parameterIndex).m_name) : juce::String("knob"),
                        values(), extraState(), false);
-        history_.touch(parameterIndex);
+        m_history.touch(parameterIndex);
     } else {
-        history_.end(values(), extraState());
+        m_history.end(values(), extraState());
     }
 }
 
 void ParhelionProcessor::applyStep(const frame::UndoStep& step, bool after)
 {
-    const juce::ScopedValueSetter<bool> quiet(restoring_, true);
-    for (const auto& [id, before, now] : step.values) setFromUi(id, after ? now : before);
-    applyExtra(after ? step.extraAfter : step.extraBefore);
+    const juce::ScopedValueSetter<bool> quiet(m_restoring, true);
+    for (const auto& [id, before, now] : step.m_values) setFromUi(id, after ? now : before);
+    applyExtra(after ? step.m_extraAfter : step.m_extraBefore);
 }
 
 bool ParhelionProcessor::undo()
 {
-    if (const frame::UndoStep* s = history_.undo()) { applyStep(*s, false); return true; }
+    if (const frame::UndoStep* s = m_history.undo()) { applyStep(*s, false); return true; }
     return false;
 }
 
 bool ParhelionProcessor::redo()
 {
-    if (const frame::UndoStep* s = history_.redo()) { applyStep(*s, true); return true; }
+    if (const frame::UndoStep* s = m_history.redo()) { applyStep(*s, true); return true; }
     return false;
 }
 
 void ParhelionProcessor::resetToDefault(int id)
 {
     if (id < 0 || id >= store().count()) return;
-    beginStep(juce::String(store().desc(id).name) + " to its default");
-    setFromUi(id, store().desc(id).defValue);
+    beginStep(juce::String(store().desc(id).m_name) + " to its default");
+    setFromUi(id, store().desc(id).m_defValue);
     endStep();
 }
 
 float ParhelionProcessor::playedNormalised(int id) const
 {
-    const ParamStore& s = engine_.params();
+    const ParamStore& s = m_engine.params();
     if (id < 0 || id >= s.count()) return std::numeric_limits<float>::quiet_NaN();
-    const int lead = std::clamp(engine_.leadDeck(), 0, kDecks - 1);
-    const float v = engine_.deck(lead).played(id), k = s.get(id);
+    const int lead = std::clamp(m_engine.leadDeck(), 0, Decks - 1);
+    const float v = m_engine.deck(lead).played(id), k = s.get(id);
     if (std::fabs(s.toNormalised(id, v) - s.toNormalised(id, k)) < 1.0e-4f) return std::numeric_limits<float>::quiet_NaN();
     return s.toNormalised(id, v);
 }
@@ -1427,38 +1427,38 @@ float ParhelionProcessor::playedNormalised(int id) const
 void ParhelionProcessor::pollHeadset()
 {
     frame::Settings& st = frame::Settings::of("Parhelion");
-    headset_.listen(st.headset() == frame::Settings::HeadsetMode::Off ? 0 : st.headsetPort());
-    const frame::HeadsetEvents e = headset_.poll();
+    m_headset.listen(st.headset() == frame::Settings::HeadsetModeE::OFF ? 0 : st.headsetPort());
+    const frame::HeadsetEvents e = m_headset.poll();
     const ParamStore& s = store();
     {
         // The hands' moves are performing, not editing: no steps of their own.
-        const juce::ScopedValueSetter<bool> quiet(restoring_, true);
-        if (e.playStop && wrapperType == wrapperType_Standalone) setPlaying(!isPlaying());
-        if (e.action) {
-            const int id = s.id(Module::Perform, 0, perform::MuteKick);
+        const juce::ScopedValueSetter<bool> quiet(m_restoring, true);
+        if (e.m_playStop && wrapperType == wrapperType_Standalone) setPlaying(!isPlaying());
+        if (e.m_action) {
+            const int id = s.id(ModuleE::PERFORM, 0, perform::MUTE_KICK);
             setFromUi(id, s.getBool(id) ? 0.0f : 1.0f);
         }
-        if (e.filterMoved) setFromUi(s.id(Module::Perform, 0, perform::Filter), e.filter);
-        if (e.throwMoved) setFromUi(s.id(Module::Perform, 0, perform::Throw), e.throwAmount);
+        if (e.m_filterMoved) setFromUi(s.id(ModuleE::PERFORM, 0, perform::FILTER), e.m_filter);
+        if (e.m_throwMoved) setFromUi(s.id(ModuleE::PERFORM, 0, perform::THROW), e.m_throwAmount);
     }
-    if (e.hold) {
+    if (e.m_hold) {
         // The performer's "now", as the Quest app has it: a drop in a breakdown, a break or a build, else a breakdown.
-        SectionKind kind = SectionKind::Breakdown;
+        SectionKindE kind = SectionKindE::BREAKDOWN;
         const double beat = positionBeats();
         const int t = trackAt(beat);
         {
-            std::lock_guard<std::mutex> g(lock_);
-            if (t >= 0 && t < static_cast<int>(current_.tracks.size())) {
-                const Score& deck = current_.set.decks[static_cast<size_t>(current_.tracks[static_cast<size_t>(t)].deck)];
+            std::lock_guard<std::mutex> g(m_lock);
+            if (t >= 0 && t < static_cast<int>(m_current.m_tracks.size())) {
+                const Score& deck = m_current.m_set.m_decks[static_cast<size_t>(m_current.m_tracks[static_cast<size_t>(t)].m_deck)];
                 const Section* sec = nullptr;
-                for (const Section& x : deck.sections) { if (x.beat > beat) break; sec = &x; }
-                if (sec != nullptr && (sec->kind == SectionKind::Breakdown || sec->kind == SectionKind::Break || sec->kind == SectionKind::Build))
-                    kind = SectionKind::Drop;
+                for (const Section& x : deck.m_sections) { if (x.m_beat > beat) break; sec = &x; }
+                if (sec != nullptr && (sec->m_kind == SectionKindE::BREAKDOWN || sec->m_kind == SectionKindE::BREAK || sec->m_kind == SectionKindE::BUILD))
+                    kind = SectionKindE::DROP;
             }
         }
         performNow(kind);
     }
-    if (e.next) newSeed();
+    if (e.m_next) newSeed();
 }
 
 juce::AudioProcessorEditor* ParhelionProcessor::createEditor() { return new ParhelionEditor(*this); }

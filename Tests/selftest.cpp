@@ -60,7 +60,7 @@ using namespace parhtest;
 
 namespace {
 
-constexpr double kPiD = 3.141592653589793;   ///< pi
+constexpr double PiD = 3.141592653589793;   ///< pi
 
 /** The tempo map converts beats to seconds in closed form; checked against a numerical integral over a ramp. */
 void testTempoMap()
@@ -91,17 +91,17 @@ void testParams()
     for (int i = 0; i < p->count(); ++i) keys.insert(p->key(i));
     check(static_cast<int>(keys.size()) == p->count(), "every key is unique", fmt("%d parameters", p->count()));
     bool named = true;
-    for (int i = 0; i < kPolyInstances; ++i) named = named && p->find(std::string(kPolyInstanceNames[i]) + ".detune") >= 0;
+    for (int i = 0; i < PolyInstances; ++i) named = named && p->find(std::string(PolyInstanceNames[i]) + ".detune") >= 0;
     check(named, "the polyphonic voices have their names (lead.detune .. stab.detune)");
-    check(p->getInt(p->find("lead.osc")) == static_cast<int>(PolyOsc::Supersaw) && p->getInt(p->find("lead.osc2")) == static_cast<int>(PolyOsc2::Supersaw)
-          && p->getInt(p->find("lead.osc2_interval")) == static_cast<int>(PolyOsc2Interval::OctaveDown),
+    check(p->getInt(p->find("lead.osc")) == static_cast<int>(PolyOscE::SUPERSAW) && p->getInt(p->find("lead.osc2")) == static_cast<int>(PolyOsc2E::SUPERSAW)
+          && p->getInt(p->find("lead.osc2_interval")) == static_cast<int>(PolyOsc2IntervalE::OCTAVE_DOWN),
           "the lead: a supersaw with a second one an octave down (Dok. 5)");
-    check(p->getInt(p->find("pluck.osc")) == static_cast<int>(PolyOsc::Va) && p->get(p->find("pluck.amp_sustain")) == 0.0f,
+    check(p->getInt(p->find("pluck.osc")) == static_cast<int>(PolyOscE::VA) && p->get(p->find("pluck.amp_sustain")) == 0.0f,
           "the pluck: VA, no sustain");
-    check(p->getInt(p->find("perc2.role")) == static_cast<int>(PercRole::OpenHat) && p->getInt(p->find("perc3.role")) == static_cast<int>(PercRole::Clap)
-          && p->getInt(p->find("perc6.role")) == static_cast<int>(PercRole::Crash), "the kit's roles");
+    check(p->getInt(p->find("perc2.role")) == static_cast<int>(PercRoleE::OPEN_HAT) && p->getInt(p->find("perc3.role")) == static_cast<int>(PercRoleE::CLAP)
+          && p->getInt(p->find("perc6.role")) == static_cast<int>(PercRoleE::CRASH), "the kit's roles");
     p->parseText("compose.key=F; compose.style=Dream House; lead.gate_pattern=Trance 1");
-    check(p->getInt(p->find("compose.key")) == 5 && p->getInt(p->find("compose.style")) == static_cast<int>(Style::DreamHouse)
+    check(p->getInt(p->find("compose.key")) == 5 && p->getInt(p->find("compose.style")) == static_cast<int>(StyleE::DREAM_HOUSE)
           && p->getInt(p->find("lead.gate_pattern")) == 6, "choices by name");
     const std::string text = p->toText(true);
     auto q = std::make_unique<ParamStore>();
@@ -115,7 +115,7 @@ void testParams()
 std::vector<float> renderKick(const ParamStore& p, int keyRoot, double late, int n, Kick& k)
 {
     float v[64];
-    p.readModule(Module::Kick, 0, v);
+    p.readModule(ModuleE::KICK, 0, v);
     Kick::constrain(v, 0.0, keyRoot);
     k.prepare(48000.0);
     k.update(v, keyRoot);
@@ -131,10 +131,10 @@ double phaseAt(const std::vector<float>& x, double hz, int from, int len, double
     double re = 0.0, im = 0.0;
     for (int i = from; i < from + len; ++i) {
         const double t = (i + t0Samples) / sr;
-        re += x[static_cast<size_t>(i)] * std::cos(2.0 * kPiD * hz * t);
-        im += x[static_cast<size_t>(i)] * std::sin(2.0 * kPiD * hz * t);
+        re += x[static_cast<size_t>(i)] * std::cos(2.0 * PiD * hz * t);
+        im += x[static_cast<size_t>(i)] * std::sin(2.0 * PiD * hz * t);
     }
-    return std::atan2(re, im) / (2.0 * kPiD);
+    return std::atan2(re, im) / (2.0 * PiD);
 }
 
 /** @brief Phase @p c in cycles, wrapped into -0.5 .. 0.5. */
@@ -169,13 +169,13 @@ void testKickTuning()
     bool keyOk = true, fifthOk = true;
     std::string detail;
     for (int root = 0; root < 12; ++root) {
-        const float f = Kick::tuneToKey(root, static_cast<int>(KickTune::Key), 52.0f);
+        const float f = Kick::tuneToKey(root, static_cast<int>(KickTuneE::KEY), 52.0f);
         const double note = 69.0 + 12.0 * std::log2(f / 440.0);
         const int pc = ((static_cast<int>(std::lround(note)) % 12) + 12) % 12;
         const bool tonicFits = root >= 4;
         const int want = tonicFits ? root : (root + 7) % 12;
-        if (pc != want || f < 40.0f || f > 66.0f) { keyOk = false; detail += fmt("%s->%.1f ", kKeyNames[root], f); }
-        const float g = Kick::tuneToKey(root, static_cast<int>(KickTune::Fifth), 52.0f);
+        if (pc != want || f < 40.0f || f > 66.0f) { keyOk = false; detail += fmt("%s->%.1f ", KeyNames[root], f); }
+        const float g = Kick::tuneToKey(root, static_cast<int>(KickTuneE::FIFTH), 52.0f);
         const int pg = ((static_cast<int>(std::lround(69.0 + 12.0 * std::log2(g / 440.0))) % 12) + 12) % 12;
         fifthOk = fifthOk && pg == (root + 7) % 12;
     }
@@ -187,11 +187,11 @@ void testKickTuning()
 void testGate()
 {
     section("trance gate masks");
-    const char* const kMasks[3] = { "x.xx.x.xx.x.x.x.", "xx.x.xx.xx.x.xx.", "x..x..x..x..x.x." };
+    const char* const Masks[3] = { "x.xx.x.xx.x.x.x.", "xx.x.xx.xx.x.xx.", "x..x..x..x..x.x." };
     for (int m = 0; m < 3; ++m) {
         std::string got;
         for (int s = 0; s < 16; ++s) got += TranceGate::open(0.25 * s + 0.0625, 6 + m, 0.5f, 0.001, 0.001) > 0.5f ? 'x' : '.';
-        check(got == kMasks[m], fmt("pattern %d is %s", 6 + m, kMasks[m]).c_str(), got);
+        check(got == Masks[m], fmt("pattern %d is %s", 6 + m, Masks[m]).c_str(), got);
     }
 }
 
@@ -206,43 +206,43 @@ void testStudyForm()
     auto p = std::make_unique<ParamStore>();
     const Score sc = composeStudy(*p, 7);
     bool lines = true;
-    for (const Section& s : sc.sections) lines = lines && std::fmod(s.beat, 32.0) == 0.0 && std::fmod(s.length, 32.0) == 0.0;
-    check(lines && !sc.sections.empty(), "every section starts and ends on an 8-bar line", fmt("%zu sections", sc.sections.size()));
-    bool blocks = sc.layers.size() * 32 == static_cast<size_t>(sc.lengthBeats);
+    for (const Section& s : sc.m_sections) lines = lines && std::fmod(s.m_beat, 32.0) == 0.0 && std::fmod(s.m_length, 32.0) == 0.0;
+    check(lines && !sc.m_sections.empty(), "every section starts and ends on an 8-bar line", fmt("%zu sections", sc.m_sections.size()));
+    bool blocks = sc.m_layers.size() * 32 == static_cast<size_t>(sc.m_lengthBeats);
     int unchanged = 0;
-    for (size_t b = 0; b < sc.layers.size(); ++b) {
-        blocks = blocks && sc.layers[b].beat == 32.0 * static_cast<double>(b);
-        if (b > 0 && sc.layers[b].state == sc.layers[b - 1].state) ++unchanged;
+    for (size_t b = 0; b < sc.m_layers.size(); ++b) {
+        blocks = blocks && sc.m_layers[b].m_beat == 32.0 * static_cast<double>(b);
+        if (b > 0 && sc.m_layers[b].m_state == sc.m_layers[b - 1].m_state) ++unchanged;
     }
-    check(blocks, "one layer block per 8 bars", fmt("%zu blocks", sc.layers.size()));
+    check(blocks, "one layer block per 8 bars", fmt("%zu blocks", sc.m_layers.size()));
     check(unchanged <= 2, "almost every block adds, filters or takes away an element", fmt("%d blocks without a change", unchanged));
     double firstBreakdown = -1.0, firstLead = -1.0;
-    for (const Section& s : sc.sections) if (s.kind == SectionKind::Breakdown && firstBreakdown < 0.0) firstBreakdown = s.beat;
+    for (const Section& s : sc.m_sections) if (s.m_kind == SectionKindE::BREAKDOWN && firstBreakdown < 0.0) firstBreakdown = s.m_beat;
     bool leadInEdges = false;
-    for (const NoteEvent& n : sc.notes) {
-        if (n.part != Part::Lead) continue;
-        if (firstLead < 0.0) firstLead = n.beat;
-        for (const Section& s : sc.sections)
-            if ((s.kind == SectionKind::Intro || s.kind == SectionKind::Outro) && n.beat >= s.beat && n.beat < s.beat + s.length) leadInEdges = true;
+    for (const NoteEvent& n : sc.m_notes) {
+        if (n.m_part != PartE::LEAD) continue;
+        if (firstLead < 0.0) firstLead = n.m_beat;
+        for (const Section& s : sc.m_sections)
+            if ((s.m_kind == SectionKindE::INTRO || s.m_kind == SectionKindE::OUTRO) && n.m_beat >= s.m_beat && n.m_beat < s.m_beat + s.m_length) leadInEdges = true;
     }
     check(firstLead >= firstBreakdown && firstBreakdown >= 0.0, "the lead is introduced in the breakdown, not before",
           fmt("first lead at bar %.0f, breakdown at bar %.0f", firstLead / 4.0, firstBreakdown / 4.0));
     check(!leadInEdges, "no lead in the intro or the outro");
     double drop = -1.0;
-    for (const Section& s : sc.sections) if (s.kind == SectionKind::Drop) { drop = s.beat; break; }
+    for (const Section& s : sc.m_sections) if (s.m_kind == SectionKindE::DROP) { drop = s.m_beat; break; }
     int inVacuum = 0;
-    for (const NoteEvent& n : sc.notes) if (n.beat >= drop - 1.0 && n.beat < drop) ++inVacuum;
+    for (const NoteEvent& n : sc.m_notes) if (n.m_beat >= drop - 1.0 && n.m_beat < drop) ++inVacuum;
     check(drop > 0.0 && inVacuum == 0, "the last beat before the drop is empty (Dok. 6, rule 5)", fmt("%d notes start in it", inVacuum));
     std::set<double> ghosts;
-    for (const NoteEvent& n : sc.notes) if (n.part == Part::Ghost) ghosts.insert(n.beat);
-    check(static_cast<double>(ghosts.size()) == sc.lengthBeats - 1.0, "the ghost kick on every quarter but that one",
-          fmt("%zu of %.0f", ghosts.size(), sc.lengthBeats));
+    for (const NoteEvent& n : sc.m_notes) if (n.m_part == PartE::GHOST) ghosts.insert(n.m_beat);
+    check(static_cast<double>(ghosts.size()) == sc.m_lengthBeats - 1.0, "the ghost kick on every quarter but that one",
+          fmt("%zu of %.0f", ghosts.size(), sc.m_lengthBeats));
 }
 
 /** @brief What render() gives. */
 struct Run {
-    std::vector<std::vector<float>> stems;   ///< the stems, left channel
-    std::vector<float> out;                  ///< the output
+    std::vector<std::vector<float>> m_stems;   ///< the stems, left channel
+    std::vector<float> m_out;                  ///< the output
 };
 /** Renders @p score from beat @p from for @p seconds with stems; returns the stems (left channel) and the output. */
 Run render(const Score& score, const char* knobs, double from, double seconds, int block = 256)
@@ -252,21 +252,21 @@ Run render(const Score& score, const char* knobs, double from, double seconds, i
     e->prepare(48000.0, block);
     e->load(score);
     e->seek(from);
-    std::vector<std::vector<float>> sl(Engine::kStems, std::vector<float>(static_cast<size_t>(block))), sr = sl;
+    std::vector<std::vector<float>> sl(Engine::STEMS, std::vector<float>(static_cast<size_t>(block))), sr = sl;
     std::vector<float*> pl, pr;
-    for (int k = 0; k < Engine::kStems; ++k) { pl.push_back(sl[static_cast<size_t>(k)].data()); pr.push_back(sr[static_cast<size_t>(k)].data()); }
+    for (int k = 0; k < Engine::STEMS; ++k) { pl.push_back(sl[static_cast<size_t>(k)].data()); pr.push_back(sr[static_cast<size_t>(k)].data()); }
     e->setStems(pl.data(), pr.data());
     Run run;
-    run.stems.assign(Engine::kStems, {});
+    run.m_stems.assign(Engine::STEMS, {});
     std::vector<float> L(static_cast<size_t>(block)), R(static_cast<size_t>(block));
     const int n = static_cast<int>(seconds * 48000.0);
     for (int done = 0; done < n; done += block) {
         const int m = std::min(block, n - done);
         e->process(L.data(), R.data(), m);
         for (int i = 0; i < m; ++i) {
-            run.out.push_back(L[static_cast<size_t>(i)]);
-            run.out.push_back(R[static_cast<size_t>(i)]);
-            for (int s = 0; s < Engine::kStems; ++s) run.stems[static_cast<size_t>(s)].push_back(sl[static_cast<size_t>(s)][static_cast<size_t>(i)]);
+            run.m_out.push_back(L[static_cast<size_t>(i)]);
+            run.m_out.push_back(R[static_cast<size_t>(i)]);
+            for (int s = 0; s < Engine::STEMS; ++s) run.m_stems[static_cast<size_t>(s)].push_back(sl[static_cast<size_t>(s)][static_cast<size_t>(i)]);
         }
     }
     return run;
@@ -290,14 +290,14 @@ void testPump()
     section("the pump: ghost kick, duck depth, no kick needed");
     Score sc;
     sc.clear(120.0);   // a beat of 0.5 s: 24000 samples
-    sc.lengthBeats = 16.0;
-    sc.notes.push_back(NoteEvent{ 0.0, 15.0, Part::Pad, 57, 0.8f, 0, false, false });
-    for (int q = 4; q < 16; ++q) sc.notes.push_back(NoteEvent{ static_cast<double>(q), 0.25, Part::Ghost, 36, 1.0f, 0, false, false });
+    sc.m_lengthBeats = 16.0;
+    sc.m_notes.push_back(NoteEvent{ 0.0, 15.0, PartE::PAD, 57, 0.8f, 0, false, false });
+    for (int q = 4; q < 16; ++q) sc.m_notes.push_back(NoteEvent{ static_cast<double>(q), 0.25, PartE::GHOST, 36, 1.0f, 0, false, false });
     sc.sort();
     auto pad = [&](float depth) {
         const std::string knobs = fmt("pad.duck=%.1f; pad.osc=VA; pad.detune=0; pad.amp_attack=5; pad.amp_sustain=1; pad.gate=0;"
                                       "pad.lfo_cutoff=0; pad.drift=0; pump.attack=0.5; pump.hold=40; pump.release=120", depth);
-        return render(sc, knobs.c_str(), 0.0, 7.0).stems[Engine::kStemPad];
+        return render(sc, knobs.c_str(), 0.0, 7.0).m_stems[Engine::STEM_PAD];
     };
     const std::vector<float> ref = pad(0.0f);
     for (float depth : { 4.0f, 9.0f }) {
@@ -336,13 +336,13 @@ void testLowEnd()
     };
     std::string worst;
     double worstDb = -300.0;
-    for (int s : { Engine::kStemLead, Engine::kStemPluck, Engine::kStemPad, Engine::kStemArp, Engine::kStemRoom,
-                   Engine::kStemPlate, Engine::kStemHall }) {
-        const double db = lowShare(r.stems[static_cast<size_t>(s)]);
+    for (int s : { Engine::STEM_LEAD, Engine::STEM_PLUCK, Engine::STEM_PAD, Engine::STEM_ARP, Engine::STEM_ROOM,
+                   Engine::STEM_PLATE, Engine::STEM_HALL }) {
+        const double db = lowShare(r.m_stems[static_cast<size_t>(s)]);
         if (db > worstDb) { worstDb = db; worst = Engine::stemName(s); }
     }
     check(worstDb < -25.0, "voices and rooms under 150 Hz at least 25 dB under themselves", fmt("worst: %s at %.1f dB", worst.c_str(), worstDb));
-    const double kickLow = lowShare(r.stems[Engine::kStemKick]), subLow = lowShare(r.stems[Engine::kStemSub]);
+    const double kickLow = lowShare(r.m_stems[Engine::STEM_KICK]), subLow = lowShare(r.m_stems[Engine::STEM_SUB]);
     check(kickLow > -6.0 && subLow > -3.0, "the kick and the sub live there", fmt("kick %.1f dB, sub %.1f dB", kickLow, subLow));
 }
 
@@ -397,9 +397,9 @@ void testStems()
         e->prepare(48000.0, 37);
         e->load(sc);
         e->seek(4.0 * 50);
-        std::vector<std::vector<float>> sl(Engine::kStems, std::vector<float>(37)), sr = sl;
+        std::vector<std::vector<float>> sl(Engine::STEMS, std::vector<float>(37)), sr = sl;
         std::vector<float*> pl, pr;
-        for (int k = 0; k < Engine::kStems; ++k) { pl.push_back(sl[static_cast<size_t>(k)].data()); pr.push_back(sr[static_cast<size_t>(k)].data()); }
+        for (int k = 0; k < Engine::STEMS; ++k) { pl.push_back(sl[static_cast<size_t>(k)].data()); pr.push_back(sr[static_cast<size_t>(k)].data()); }
         std::vector<float> L(37), R(37), preL(37), preR(37);
         if (stems) { e->setStems(pl.data(), pr.data()); e->setPremasterTap(preL.data(), preR.data()); }
         for (int done = 0; done < 48000 * 10; done += 37) {
@@ -408,7 +408,7 @@ void testStems()
                 out.push_back(L[static_cast<size_t>(i)]);
                 if (!stems) continue;
                 float s = 0.0f;
-                for (int k = 0; k < Engine::kStems; ++k) s += sl[static_cast<size_t>(k)][static_cast<size_t>(i)];
+                for (int k = 0; k < Engine::STEMS; ++k) s += sl[static_cast<size_t>(k)][static_cast<size_t>(i)];
                 sum.push_back(s);
                 pre.push_back(preL[static_cast<size_t>(i)]);
             }
@@ -444,10 +444,10 @@ void testEnergy()
     e->load(sc);
     LoudnessMeter whole, breakdown, drop;
     for (LoudnessMeter* m : { &whole, &breakdown, &drop }) m->prepare(48000.0);
-    const auto startOf = [&](SectionKind k) { for (const Section& s : sc.sections) if (s.kind == k) return s; return Section{}; };
-    const Section b = startOf(SectionKind::Breakdown), d = startOf(SectionKind::Drop);
-    const int64_t b0 = static_cast<int64_t>(sc.tempo.secondsAt(b.beat) * 48000.0), b1 = static_cast<int64_t>(sc.tempo.secondsAt(b.beat + b.length) * 48000.0);
-    const int64_t d0 = static_cast<int64_t>(sc.tempo.secondsAt(d.beat) * 48000.0), d1 = static_cast<int64_t>(sc.tempo.secondsAt(d.beat + d.length) * 48000.0);
+    const auto startOf = [&](SectionKindE k) { for (const Section& s : sc.m_sections) if (s.m_kind == k) return s; return Section{}; };
+    const Section b = startOf(SectionKindE::BREAKDOWN), d = startOf(SectionKindE::DROP);
+    const int64_t b0 = static_cast<int64_t>(sc.m_tempo.secondsAt(b.m_beat) * 48000.0), b1 = static_cast<int64_t>(sc.m_tempo.secondsAt(b.m_beat + b.m_length) * 48000.0);
+    const int64_t d0 = static_cast<int64_t>(sc.m_tempo.secondsAt(d.m_beat) * 48000.0), d1 = static_cast<int64_t>(sc.m_tempo.secondsAt(d.m_beat + d.m_length) * 48000.0);
     std::vector<float> L(512), R(512);
     bool finite = true;
     for (int64_t done = 0; done < d1; done += 512) {
@@ -459,10 +459,10 @@ void testEnergy()
     }
     const LoudnessReport rw = whole.report(), rb = breakdown.report(), rd = drop.report();
     check(finite, "every sample a number");
-    check(rw.truePeak <= -0.9, "the true peak at the master's ceiling", fmt("%.2f dBTP", rw.truePeak));
-    const double gap = rd.shortTermMax - rb.shortTermMax;
-    check(gap >= 3.0, "the drop louder than the breakdown", fmt("breakdown %.1f, drop %.1f LUFS short-term max: %.1f LU", rb.shortTermMax,
-                                                                rd.shortTermMax, gap));
+    check(rw.m_truePeak <= -0.9, "the true peak at the master's ceiling", fmt("%.2f dBTP", rw.m_truePeak));
+    const double gap = rd.m_shortTermMax - rb.m_shortTermMax;
+    check(gap >= 3.0, "the drop louder than the breakdown", fmt("breakdown %.1f, drop %.1f LUFS short-term max: %.1f LU", rb.m_shortTermMax,
+                                                                rd.m_shortTermMax, gap));
 }
 
 /** The MIDI export: every part on its channel, the ghost kick on 16 (for a host's sidechain). */
@@ -473,7 +473,7 @@ void testMidi()
     const Score sc = composeStudy(*p, 2);
     const std::vector<uint8_t> bytes = encodeMidi(sc, "test", p.get());
     check(bytes.size() > 1000 && bytes[0] == 'M' && bytes[1] == 'T', "an SMF file", fmt("%zu bytes", bytes.size()));
-    check(midiChannelOf(Part::Ghost) == 15 && midiChannelOf(Part::Lead) == 3 && midiChannelOf(Part::Kick) == 9, "the channels");
+    check(midiChannelOf(PartE::GHOST) == 15 && midiChannelOf(PartE::LEAD) == 3 && midiChannelOf(PartE::KICK) == 9, "the channels");
 }
 
 
@@ -488,40 +488,40 @@ void testPlanner()
     section("the planner (Dok. 6) for every style");
     int bad[8] = {};
     std::string where;
-    for (int st = 0; st < static_cast<int>(Style::Count); ++st) {
-        const StyleProfile& prof = styleProfile(static_cast<Style>(st));
+    for (int st = 0; st < static_cast<int>(StyleE::COUNT); ++st) {
+        const StyleProfile& prof = styleProfile(static_cast<StyleE>(st));
         for (uint64_t seed = 1; seed <= 8; ++seed) {
-            const int ask = static_cast<int>(0.5f * (prof.minutesLow + prof.minutesHigh) * 0.5f * (prof.bpmLow + prof.bpmHigh) / 4.0f);
+            const int ask = static_cast<int>(0.5f * (prof.m_minutesLow + prof.m_minutesHigh) * 0.5f * (prof.m_bpmLow + prof.m_bpmHigh) / 4.0f);
             const Plan plan = planTrack(prof, ask, seed);
-            bool lines = plan.bars % 32 == 0;
-            for (const Section& sec : plan.sections) lines = lines && std::fmod(sec.beat, 32.0) == 0.0 && std::fmod(sec.length, 32.0) == 0.0;
-            if (!lines) { ++bad[0]; where += fmt("%s/%llu lines; ", prof.name, static_cast<unsigned long long>(seed)); }
-            for (size_t b = 1; b < plan.blocks.size(); ++b) if (plan.blocks[b].state == plan.blocks[b - 1].state) { ++bad[1]; break; }
+            bool lines = plan.m_bars % 32 == 0;
+            for (const Section& sec : plan.m_sections) lines = lines && std::fmod(sec.m_beat, 32.0) == 0.0 && std::fmod(sec.m_length, 32.0) == 0.0;
+            if (!lines) { ++bad[0]; where += fmt("%s/%llu lines; ", prof.m_name, static_cast<unsigned long long>(seed)); }
+            for (size_t b = 1; b < plan.m_blocks.size(); ++b) if (plan.m_blocks[b].m_state == plan.m_blocks[b - 1].m_state) { ++bad[1]; break; }
             double firstBreak = 1e30;
-            for (const Section& sec : plan.sections)
-                if (sec.kind == SectionKind::Break || sec.kind == SectionKind::Breakdown || sec.kind == SectionKind::Intro) { firstBreak = std::min(firstBreak, sec.beat); if (sec.kind != SectionKind::Intro) break; }
-            for (const LayerBlock& blk : plan.blocks) {
-                if (blk.at(Layer::Lead) != LayerState::On) continue;
-                const int si = plan.sectionAt(static_cast<int>(blk.beat / 4.0));
-                const SectionKind k = plan.sections[static_cast<size_t>(si)].kind;
-                if (k == SectionKind::Intro || k == SectionKind::Outro) { ++bad[2]; break; }
+            for (const Section& sec : plan.m_sections)
+                if (sec.m_kind == SectionKindE::BREAK || sec.m_kind == SectionKindE::BREAKDOWN || sec.m_kind == SectionKindE::INTRO) { firstBreak = std::min(firstBreak, sec.m_beat); if (sec.m_kind != SectionKindE::INTRO) break; }
+            for (const LayerBlock& blk : plan.m_blocks) {
+                if (blk.at(LayerE::LEAD) != LayerStateE::ON) continue;
+                const int si = plan.sectionAt(static_cast<int>(blk.m_beat / 4.0));
+                const SectionKindE k = plan.m_sections[static_cast<size_t>(si)].m_kind;
+                if (k == SectionKindE::INTRO || k == SectionKindE::OUTRO) { ++bad[2]; break; }
             }
-            if (plan.firstLeadBar >= 0) {
-                const int si = plan.sectionAt(plan.firstLeadBar);
-                const SectionKind k = plan.sections[static_cast<size_t>(si)].kind;
-                const bool ok = k == SectionKind::Break || k == SectionKind::Breakdown
-                             || (k == SectionKind::Intro && plan.at(plan.firstLeadBar, Layer::Lead) == LayerState::Filtered);
-                if (!ok) { ++bad[3]; where += fmt("%s/%llu lead first in %s; ", prof.name, static_cast<unsigned long long>(seed), kSectionNames[static_cast<int>(k)]); }
+            if (plan.m_firstLeadBar >= 0) {
+                const int si = plan.sectionAt(plan.m_firstLeadBar);
+                const SectionKindE k = plan.m_sections[static_cast<size_t>(si)].m_kind;
+                const bool ok = k == SectionKindE::BREAK || k == SectionKindE::BREAKDOWN
+                             || (k == SectionKindE::INTRO && plan.at(plan.m_firstLeadBar, LayerE::LEAD) == LayerStateE::FILTERED);
+                if (!ok) { ++bad[3]; where += fmt("%s/%llu lead first in %s; ", prof.m_name, static_cast<unsigned long long>(seed), SectionNames[static_cast<int>(k)]); }
             }
-            for (size_t i = 1; i < plan.sections.size(); ++i)
-                if (plan.sections[i].kind == SectionKind::Drop
-                    && std::none_of(plan.vacuums.begin(), plan.vacuums.end(), [&](const Vacuum& v) { return v.bar == static_cast<int>(plan.sections[i].beat / 4.0) - 1; }))
+            for (size_t i = 1; i < plan.m_sections.size(); ++i)
+                if (plan.m_sections[i].m_kind == SectionKindE::DROP
+                    && std::none_of(plan.m_vacuums.begin(), plan.m_vacuums.end(), [&](const Vacuum& v) { return v.m_bar == static_cast<int>(plan.m_sections[i].m_beat / 4.0) - 1; }))
                     ++bad[4];
-            if (std::abs(plan.bars - ask) > ask / 4) { ++bad[5]; where += fmt("%s/%llu %d bars for %d; ", prof.name, static_cast<unsigned long long>(seed), plan.bars, ask); }
+            if (std::abs(plan.m_bars - ask) > ask / 4) { ++bad[5]; where += fmt("%s/%llu %d bars for %d; ", prof.m_name, static_cast<unsigned long long>(seed), plan.m_bars, ask); }
             const float share = breakdownShare(plan);
-            if (share < prof.breakdownLow - 0.1f || share > prof.breakdownHigh + 0.1f) {
+            if (share < prof.m_breakdownLow - 0.1f || share > prof.m_breakdownHigh + 0.1f) {
                 ++bad[6];
-                where += fmt("%s/%llu share %.2f; ", prof.name, static_cast<unsigned long long>(seed), share);
+                where += fmt("%s/%llu share %.2f; ", prof.m_name, static_cast<unsigned long long>(seed), share);
             }
         }
     }
@@ -542,9 +542,9 @@ void testHarmony()
 {
     section("harmony (Dok. 4)");
     int liftBad = 0, resolveBad = 0, scaleBad = 0, voiceBad = 0, keyChanges = 0;
-    for (int st = 0; st < static_cast<int>(Style::Count); ++st) {
-        const StyleProfile& prof = styleProfile(static_cast<Style>(st));
-        if (prof.barsPerChord >= 16) continue;   // Acid's static harmony has no lift
+    for (int st = 0; st < static_cast<int>(StyleE::COUNT); ++st) {
+        const StyleProfile& prof = styleProfile(static_cast<StyleE>(st));
+        if (prof.m_barsPerChord >= 16) continue;   // Acid's static harmony has no lift
         for (uint64_t seed = 1; seed <= 6; ++seed) {
             Rng r;
             r.seed(seed);
@@ -552,24 +552,24 @@ void testHarmony()
             drawKey(prof, r, key, scale);
             const Plan plan = planTrack(prof, 256, seed);
             const Harmony h = composeHarmony(plan, prof, key, scale, seed * 7);
-            const bool major = scale == static_cast<int>(Scale::Ionian);
-            if (h.changeBar >= 0) ++keyChanges;
-            for (size_t i = 1; i < plan.sections.size(); ++i) {
-                if (plan.sections[i].kind != SectionKind::Drop) continue;
-                const int d = static_cast<int>(plan.sections[i].beat / 4.0);
-                if (h.bars[static_cast<size_t>(d - 1)].degree != (major ? 4 : 6) || h.bars[static_cast<size_t>(d - 2)].degree != (major ? 4 : 6)) ++liftBad;
-                if (h.bars[static_cast<size_t>(d)].degree != (major ? 5 : 0) && h.bars[static_cast<size_t>(d)].degree != 0) ++resolveBad;
+            const bool major = scale == static_cast<int>(ScaleE::IONIAN);
+            if (h.m_changeBar >= 0) ++keyChanges;
+            for (size_t i = 1; i < plan.m_sections.size(); ++i) {
+                if (plan.m_sections[i].m_kind != SectionKindE::DROP) continue;
+                const int d = static_cast<int>(plan.m_sections[i].m_beat / 4.0);
+                if (h.m_bars[static_cast<size_t>(d - 1)].m_degree != (major ? 4 : 6) || h.m_bars[static_cast<size_t>(d - 2)].m_degree != (major ? 4 : 6)) ++liftBad;
+                if (h.m_bars[static_cast<size_t>(d)].m_degree != (major ? 5 : 0) && h.m_bars[static_cast<size_t>(d)].m_degree != 0) ++resolveBad;
             }
             std::array<int, 4> prev{ 60, 64, 67, 72 };
-            for (int bar = 0; bar < plan.bars; ++bar) {
+            for (int bar = 0; bar < plan.m_bars; ++bar) {
                 for (int t = 0; t < 3; ++t) {
-                    const int iv = ((h.bars[static_cast<size_t>(bar)].tones[t]) % 12 + 12) % 12;
-                    const int cs = scale == static_cast<int>(Scale::Dorian) || scale == static_cast<int>(Scale::Phrygian) || major ? scale : 0;
-                    if (!inScale(cs, iv) && !(t == 1 && h.bars[static_cast<size_t>(bar)].degree == 4)) ++scaleBad;
+                    const int iv = ((h.m_bars[static_cast<size_t>(bar)].m_tones[t]) % 12 + 12) % 12;
+                    const int cs = scale == static_cast<int>(ScaleE::DORIAN) || scale == static_cast<int>(ScaleE::PHRYGIAN) || major ? scale : 0;
+                    if (!inScale(cs, iv) && !(t == 1 && h.m_bars[static_cast<size_t>(bar)].m_degree == 4)) ++scaleBad;
                 }
                 const std::array<int, 4> v = voicePad(h, bar, prev, bar == 0);
                 prev = v;
-                if (v[0] < 52 || ((v[0] - h.key - h.shift[static_cast<size_t>(bar)]) % 12 + 12) % 12 == ((h.bars[static_cast<size_t>(bar)].tones[0]) % 12 + 12) % 12) ++voiceBad;
+                if (v[0] < 52 || ((v[0] - h.m_key - h.m_shift[static_cast<size_t>(bar)]) % 12 + 12) % 12 == ((h.m_bars[static_cast<size_t>(bar)].m_tones[0]) % 12 + 12) % 12) ++voiceBad;
             }
         }
     }
@@ -589,69 +589,69 @@ void testComposer()
     section("the composer: determinism and rerolls");
     auto p = std::make_unique<ParamStore>();
     const Score a = composeTrack(*p, 21), b = composeTrack(*p, 21);
-    bool same = a.notes.size() == b.notes.size();
-    for (size_t i = 0; same && i < a.notes.size(); ++i)
-        same = a.notes[i].beat == b.notes[i].beat && a.notes[i].pitch == b.notes[i].pitch && a.notes[i].part == b.notes[i].part
-            && a.notes[i].velocity == b.notes[i].velocity;
-    check(same && !a.notes.empty(), "the same seed, the same score", fmt("%zu notes", a.notes.size()));
+    bool same = a.m_notes.size() == b.m_notes.size();
+    for (size_t i = 0; same && i < a.m_notes.size(); ++i)
+        same = a.m_notes[i].m_beat == b.m_notes[i].m_beat && a.m_notes[i].m_pitch == b.m_notes[i].m_pitch && a.m_notes[i].m_part == b.m_notes[i].m_part
+            && a.m_notes[i].m_velocity == b.m_notes[i].m_velocity;
+    check(same && !a.m_notes.empty(), "the same seed, the same score", fmt("%zu notes", a.m_notes.size()));
     // The track's key reaches the knobs the deck tunes the kick, the kit and the effects by.
     {
         int right = 0;
         for (uint64_t seed = 1; seed <= 6; ++seed) {
             const Score s = composeTrack(*p, seed);
-            right += s.knobAt(p->id(Module::Compose, 0, compose::Key), 0.0) == static_cast<float>(s.keyRoot)
-                  && s.knobAt(p->id(Module::Compose, 0, compose::Scale), 0.0) == static_cast<float>(s.scale);
+            right += s.knobAt(p->id(ModuleE::COMPOSE, 0, compose::KEY), 0.0) == static_cast<float>(s.m_keyRoot)
+                  && s.knobAt(p->id(ModuleE::COMPOSE, 0, compose::SCALE), 0.0) == static_cast<float>(s.m_scale);
         }
         check(right == 6, "the track's key and scale on the knobs (the kick's, the kit's, the effects' tuning)", fmt("%d of 6", right));
     }
     // PLAN 6.9: a unit rerolled draws its voices again and leaves every other note as it was, to the velocity.
-    using Key = std::tuple<double, double, int, int, float>;
-    auto notesOf = [](const Score& s, std::initializer_list<Part> parts, bool inside) {
-        std::vector<Key> out;
-        for (const NoteEvent& n : s.notes) {
-            const bool in = std::find(parts.begin(), parts.end(), n.part) != parts.end();
-            if (in == inside) out.push_back({ n.beat, n.length, static_cast<int>(n.part), n.pitch, n.velocity });
+    using KeyT = std::tuple<double, double, int, int, float>;
+    auto notesOf = [](const Score& s, std::initializer_list<PartE> parts, bool inside) {
+        std::vector<KeyT> out;
+        for (const NoteEvent& n : s.m_notes) {
+            const bool in = std::find(parts.begin(), parts.end(), n.m_part) != parts.end();
+            if (in == inside) out.push_back({ n.m_beat, n.m_length, static_cast<int>(n.m_part), n.m_pitch, n.m_velocity });
         }
         return out;
     };
     auto sameForm = [](const Score& x, const Score& y) {
-        bool s = x.sections.size() == y.sections.size();
-        for (size_t i = 0; s && i < x.sections.size(); ++i) s = x.sections[i].beat == y.sections[i].beat && x.sections[i].kind == y.sections[i].kind;
+        bool s = x.m_sections.size() == y.m_sections.size();
+        for (size_t i = 0; s && i < x.m_sections.size(); ++i) s = x.m_sections[i].m_beat == y.m_sections[i].m_beat && x.m_sections[i].m_kind == y.m_sections[i].m_kind;
         return s;
     };
-    struct Case { const char* style; const char* unit; std::initializer_list<Part> parts; };
+    struct Case { const char* m_style; const char* m_unit; std::initializer_list<PartE> m_parts; };
     const Case cases[] = {
-        { "Uplifting", "motif", { Part::Lead, Part::Counter, Part::Strings } },
-        { "Uplifting", "lead", { Part::Lead, Part::Counter, Part::Strings } },
-        { "Uplifting", "arp", { Part::Arp } },
-        { "Uplifting", "pluck", { Part::Pluck, Part::Stab } },
-        { "Uplifting", "drums", { Part::Perc1, Part::Perc2, Part::Perc3, Part::Perc4, Part::Perc5, Part::Perc6, Part::Perc7, Part::Perc8, Part::Perc9, Part::Perc10 } },
-        { "Uplifting", "fx", { Part::Fx } },
+        { "Uplifting", "motif", { PartE::LEAD, PartE::COUNTER, PartE::STRINGS } },
+        { "Uplifting", "lead", { PartE::LEAD, PartE::COUNTER, PartE::STRINGS } },
+        { "Uplifting", "arp", { PartE::ARP } },
+        { "Uplifting", "pluck", { PartE::PLUCK, PartE::STAB } },
+        { "Uplifting", "drums", { PartE::PERC1, PartE::PERC2, PartE::PERC3, PartE::PERC4, PartE::PERC5, PartE::PERC6, PartE::PERC7, PartE::PERC8, PartE::PERC9, PartE::PERC10 } },
+        { "Uplifting", "fx", { PartE::FX } },
         { "Uplifting", "sounds", {} },
-        { "Acid", "acid", { Part::Acid } },
-        { "Dream House", "motif", { Part::Piano, Part::Counter, Part::Strings } },
+        { "Acid", "acid", { PartE::ACID } },
+        { "Dream House", "motif", { PartE::PIANO, PartE::COUNTER, PartE::STRINGS } },
     };
     int isolated = 0, changed = 0, total = 0;
     std::string bad;
     for (const Case& k : cases) {
         auto q = std::make_unique<ParamStore>();
-        q->parseText(std::string("compose.style=") + k.style);
+        q->parseText(std::string("compose.style=") + k.m_style);
         for (uint64_t seed : { 21ull, 22ull }) {
             const Score base = composeTrack(*q, seed);
             Curation cur;
-            cur.reroll(k.unit);
+            cur.reroll(k.m_unit);
             const Score re = composeTrack(*q, seed, TrackRequest{}, &cur);
             ++total;
-            const bool iso = notesOf(base, k.parts, false) == notesOf(re, k.parts, false) && sameForm(base, re);
+            const bool iso = notesOf(base, k.m_parts, false) == notesOf(re, k.m_parts, false) && sameForm(base, re);
             // (Its own: its notes, or its automation and knob sets -- the effects' throws, the sounds.)
-            bool automation = base.gestures.size() != re.gestures.size() || base.knobs.size() != re.knobs.size();
-            for (size_t i = 0; !automation && i < base.gestures.size(); ++i)
-                automation = base.gestures[i].param != re.gestures[i].param || base.gestures[i].beat != re.gestures[i].beat || base.gestures[i].to != re.gestures[i].to;
-            for (size_t i = 0; !automation && i < base.knobs.size(); ++i) automation = base.knobs[i].value != re.knobs[i].value;
-            const bool moved = automation || notesOf(base, k.parts, true) != notesOf(re, k.parts, true) || notesOf(base, k.parts, true).empty();
+            bool automation = base.m_gestures.size() != re.m_gestures.size() || base.m_knobs.size() != re.m_knobs.size();
+            for (size_t i = 0; !automation && i < base.m_gestures.size(); ++i)
+                automation = base.m_gestures[i].m_param != re.m_gestures[i].m_param || base.m_gestures[i].m_beat != re.m_gestures[i].m_beat || base.m_gestures[i].m_to != re.m_gestures[i].m_to;
+            for (size_t i = 0; !automation && i < base.m_knobs.size(); ++i) automation = base.m_knobs[i].m_value != re.m_knobs[i].m_value;
+            const bool moved = automation || notesOf(base, k.m_parts, true) != notesOf(re, k.m_parts, true) || notesOf(base, k.m_parts, true).empty();
             isolated += iso;
             changed += moved;
-            if (!iso || !moved) bad += std::string(" ") + k.style + "/" + k.unit;
+            if (!iso || !moved) bad += std::string(" ") + k.m_style + "/" + k.m_unit;
         }
     }
     check(isolated == total, "a rerolled unit leaves every other voice as it was, to the velocity", fmt("%d of %d%s", isolated, total, bad.c_str()));
@@ -665,8 +665,8 @@ void testComposer()
             cur.reroll(u);
             const Score re = composeTrack(*p, seed, TrackRequest{}, &cur);
             formKept += sameForm(base, re);
-            bool kept = base.layers.size() == re.layers.size();
-            for (size_t i = 0; kept && i < base.layers.size(); ++i) kept = base.layers[i].state == re.layers[i].state;
+            bool kept = base.m_layers.size() == re.m_layers.size();
+            for (size_t i = 0; kept && i < base.m_layers.size(); ++i) kept = base.m_layers[i].m_state == re.m_layers[i].m_state;
             matrixMoved += !kept;
         }
     }
@@ -676,18 +676,18 @@ void testComposer()
     // the kick on the last beat where the variant keeps it.
     int kinds[4] = {}, loud = 0;
     for (uint64_t seed = 1; seed <= 12; ++seed) {
-        const StyleProfile& prof = styleProfile(Style::Uplifting);
+        const StyleProfile& prof = styleProfile(StyleE::UPLIFTING);
         const Plan plan = planTrack(prof, 256, seed);
-        for (const Vacuum& v : plan.vacuums) ++kinds[v.kickOn4 ? 3 : v.from == 3.0 ? 0 : v.from == 2.0 ? 1 : 2];
+        for (const Vacuum& v : plan.m_vacuums) ++kinds[v.m_kickOn4 ? 3 : v.m_from == 3.0 ? 0 : v.m_from == 2.0 ? 1 : 2];
         TrackRequest req;
-        req.profile = &prof;
-        req.bars = 256;   // (the plan above)
+        req.m_profile = &prof;
+        req.m_bars = 256;   // (the plan above)
         const Score sc = composeTrack(*p, seed, req);
-        for (const NoteEvent& n : sc.notes) {
-            if (n.part == Part::Fx) continue;   // (the riser and the reverse crash run into the drop)
-            for (const Vacuum& v : plan.vacuums)
-                if (n.beat >= 4.0 * v.bar + v.from - 1e-9 && n.beat < 4.0 * (v.bar + 1)
-                    && !(v.kickOn4 && (n.part == Part::Kick || n.part == Part::Ghost) && n.beat == 4.0 * v.bar + 3.0))
+        for (const NoteEvent& n : sc.m_notes) {
+            if (n.m_part == PartE::FX) continue;   // (the riser and the reverse crash run into the drop)
+            for (const Vacuum& v : plan.m_vacuums)
+                if (n.m_beat >= 4.0 * v.m_bar + v.m_from - 1e-9 && n.m_beat < 4.0 * (v.m_bar + 1)
+                    && !(v.m_kickOn4 && (n.m_part == PartE::KICK || n.m_part == PartE::GHOST) && n.m_beat == 4.0 * v.m_bar + 3.0))
                     ++loud;
         }
     }
@@ -709,14 +709,14 @@ void testLeveler()
     const std::vector<LevelReading> r = levelScore(sc, *p);
     check(r.size() == 1, "one reading");
     if (r.empty()) return;
-    check(std::fabs(r[0].after + r[0].trim - r[0].measured - r[0].trim) >= 0.0f && std::fabs(r[0].after - r[0].target) < 0.8f,
-          "the drop at the style's target", fmt("%.1f LUFS after the correction, target %.1f", r[0].after, r[0].target));
-    check(!std::isnan(r[0].gapAfter) && std::fabs(r[0].gapAfter - sc.levels[0].gapLu) < 0.6f, "the breakdown under the drop by the style's gap",
-          fmt("%.1f LU (as composed %.1f), target %.1f, correction %+.1f dB", r[0].gapAfter, r[0].gapBefore, sc.levels[0].gapLu, r[0].breakDb));
+    check(std::fabs(r[0].m_after + r[0].m_trim - r[0].m_measured - r[0].m_trim) >= 0.0f && std::fabs(r[0].m_after - r[0].m_target) < 0.8f,
+          "the drop at the style's target", fmt("%.1f LUFS after the correction, target %.1f", r[0].m_after, r[0].m_target));
+    check(!std::isnan(r[0].m_gapAfter) && std::fabs(r[0].m_gapAfter - sc.m_levels[0].m_gapLu) < 0.6f, "the breakdown under the drop by the style's gap",
+          fmt("%.1f LU (as composed %.1f), target %.1f, correction %+.1f dB", r[0].m_gapAfter, r[0].m_gapBefore, sc.m_levels[0].m_gapLu, r[0].m_breakDb));
     float lo, hi;
-    balanceWindow(static_cast<int>(BalPart::Lead), -1, lo, hi);
-    const float lead = r[0].found[static_cast<size_t>(BalPart::Lead)] + r[0].bal[static_cast<size_t>(BalPart::Lead)];
-    check(std::isnan(r[0].found[static_cast<size_t>(BalPart::Lead)]) || (lead >= lo - 0.01f && lead <= hi + 0.01f), "the lead inside its window against the kick",
+    balanceWindow(static_cast<int>(BalPartE::LEAD), -1, lo, hi);
+    const float lead = r[0].m_found[static_cast<size_t>(BalPartE::LEAD)] + r[0].m_bal[static_cast<size_t>(BalPartE::LEAD)];
+    check(std::isnan(r[0].m_found[static_cast<size_t>(BalPartE::LEAD)]) || (lead >= lo - 0.01f && lead <= hi + 0.01f), "the lead inside its window against the kick",
           fmt("%.1f dB (window %.0f .. %.0f)", lead, lo, hi));
 }
 
@@ -729,27 +729,27 @@ void testCorpus()
 {
     section("the corpus model and the constrained sampler");
     double worst = 0.0;
-    for (int role = 0; role < kCorpusRoleCount; ++role) {
-        const StepModel& m = corpusModel(static_cast<CorpusRoleId>(role));
-        for (int a = -1; a < kCorpusAlpha; a += 3)
-            for (int b = -1; b < kCorpusAlpha; b += 4) {
+    for (int role = 0; role < CorpusRoleCount; ++role) {
+        const StepModel& m = corpusModel(static_cast<CorpusRoleIdE>(role));
+        for (int a = -1; a < CorpusAlpha; a += 3)
+            for (int b = -1; b < CorpusAlpha; b += 4) {
                 if (a >= 0 && b < 0) continue;
                 double s = 0.0;
-                for (int c = 0; c < kCorpusAlpha; ++c) s += m.p(a, b, c);
+                for (int c = 0; c < CorpusAlpha; ++c) s += m.p(a, b, c);
                 worst = std::max(worst, std::fabs(s - 1.0));
             }
     }
     check(worst < 1e-4, "every distribution of every role sums to one", fmt("worst deviation %.1e", worst));
 
-    const StepModel& lead = corpusModel(CorpusRoleId::Lead);
+    const StepModel& lead = corpusModel(CorpusRoleIdE::LEAD);
     Rng r;
     r.seed(99);
     int outside = 0, failed = 0;
     for (int t = 0; t < 200; ++t) {
-        std::vector<std::array<bool, kCorpusAlpha>> allowed(12);
+        std::vector<std::array<bool, CorpusAlpha>> allowed(12);
         for (auto& row : allowed) {
             row.fill(false);
-            for (int k = 0; k < 3; ++k) row[static_cast<size_t>(r.below(kCorpusAlpha))] = true;
+            for (int k = 0; k < 3; ++k) row[static_cast<size_t>(r.below(CorpusAlpha))] = true;
         }
         std::vector<int> out;
         if (!sampleConstrained(lead, 12, allowed, nullptr, r, out)) { ++failed; continue; }
@@ -757,7 +757,7 @@ void testCorpus()
     }
     check(outside == 0 && failed == 0, "200 lines under random constraints, every step allowed", fmt("%d outside, %d failed", outside, failed));
     {
-        std::vector<std::array<bool, kCorpusAlpha>> allowed(4);
+        std::vector<std::array<bool, CorpusAlpha>> allowed(4);
         for (auto& row : allowed) row.fill(true);
         allowed[2].fill(false);
         std::vector<int> out;
@@ -765,7 +765,7 @@ void testCorpus()
     }
     // Exactness: the tonic or the fifth at each of three positions.
     const int s0 = 7, s1 = 11;
-    std::vector<std::array<bool, kCorpusAlpha>> allowed(3);
+    std::vector<std::array<bool, CorpusAlpha>> allowed(3);
     for (auto& row : allowed) { row.fill(false); row[s0] = row[s1] = true; }
     double pExact[8], total = 0.0;
     for (int k = 0; k < 8; ++k) {
@@ -799,7 +799,7 @@ void testMemo()
     const bool ok = memoWindowHash(top, 0, h);
     for (int& p : top) if (p >= 0) p += 5;
     memoWindowHash(top, 0, h5);
-    check(ok && h == kMemoProbeHash, "the engine hashes a window as Tools/corpus/memorisation.py does", fmt("%016llx", static_cast<unsigned long long>(h)));
+    check(ok && h == MemoProbeHash, "the engine hashes a window as Tools/corpus/memorisation.py does", fmt("%016llx", static_cast<unsigned long long>(h)));
     check(h5 == h, "in any key");
     top[16] = -1;
     uint64_t h4 = 0;
@@ -823,7 +823,7 @@ void testMelody()
 {
     section("the lead: rules, register, memorisation");
     int notes = 0, offChord = 0, offScale = 0, register_ = 0, hits = 0, empty = 0;
-    for (Style st : { Style::Uplifting, Style::DreamHouse }) {
+    for (StyleE st : { StyleE::UPLIFTING, StyleE::DREAM_HOUSE }) {
         const StyleProfile& prof = styleProfile(st);
         for (uint64_t seed = 1; seed <= 6; ++seed) {
             Rng kr;
@@ -835,28 +835,28 @@ void testMelody()
             Score sc;
             sc.clear(138.0);
             MelodyContext mc;
-            mc.plan = &plan;
-            mc.harmony = &h;
-            mc.score = &sc;
-            mc.piano = prof.lead == LeadKind::Piano;
-            mc.anthemShare = mc.piano ? 1.0f : 0.7f;
+            mc.m_plan = &plan;
+            mc.m_harmony = &h;
+            mc.m_score = &sc;
+            mc.m_piano = prof.m_lead == LeadKindE::PIANO;
+            mc.m_anthemShare = mc.m_piano ? 1.0f : 0.7f;
             writeLead(mc, seed * 131, seed * 137);
-            std::vector<int> top(static_cast<size_t>(plan.bars) * 16, -1);
+            std::vector<int> top(static_cast<size_t>(plan.m_bars) * 16, -1);
             int n = 0;
-            for (const NoteEvent& e : sc.notes) {
-                if (e.part != Part::Lead && e.part != Part::Piano) continue;
+            for (const NoteEvent& e : sc.m_notes) {
+                if (e.m_part != PartE::LEAD && e.m_part != PartE::PIANO) continue;
                 ++n;
-                const int bar = std::min(static_cast<int>(e.beat / 4.0), plan.bars - 1);
-                const int pc = e.pitch % 12;
+                const int bar = std::min(static_cast<int>(e.m_beat / 4.0), plan.m_bars - 1);
+                const int pc = e.m_pitch % 12;
                 const bool chord = pc == h.pc(bar, 0) || pc == h.pc(bar, 1) || pc == h.pc(bar, 2);
-                if (std::fabs(e.beat - std::round(e.beat)) < 1e-9 && !chord) ++offChord;
-                const int rel = ((pc - key - h.shift[static_cast<size_t>(bar)]) % 12 + 12) % 12;
+                if (std::fabs(e.m_beat - std::round(e.m_beat)) < 1e-9 && !chord) ++offChord;
+                const int rel = ((pc - key - h.m_shift[static_cast<size_t>(bar)]) % 12 + 12) % 12;
                 bool ok = chord || inScale(scale, rel);
-                if (scale == static_cast<int>(Scale::HarmonicMinor) || scale == static_cast<int>(Scale::MinorPentatonic))
-                    ok = ok || inScale(static_cast<int>(Scale::Aeolian), rel);
+                if (scale == static_cast<int>(ScaleE::HARMONIC_MINOR) || scale == static_cast<int>(ScaleE::MINOR_PENTATONIC))
+                    ok = ok || inScale(static_cast<int>(ScaleE::AEOLIAN), rel);
                                 if (!ok) ++offScale;
-                if (e.pitch < 52 || e.pitch > 96) ++register_;
-                top[static_cast<size_t>(std::llround(e.beat * 4.0))] = std::max(top[static_cast<size_t>(std::llround(e.beat * 4.0))], e.pitch);
+                if (e.m_pitch < 52 || e.m_pitch > 96) ++register_;
+                top[static_cast<size_t>(std::llround(e.m_beat * 4.0))] = std::max(top[static_cast<size_t>(std::llround(e.m_beat * 4.0))], e.m_pitch);
             }
             notes += n;
             if (n == 0) ++empty;
@@ -875,20 +875,20 @@ std::vector<float> pianoNote(Piano& p, int midi, float vel, double hold, double 
                              float phantom = 1.0f)
 {
     ParamStore ps;
-    std::vector<float> v(static_cast<size_t>(piano::Count));
-    ps.readModule(Module::Piano, 0, v.data());
-    v[piano::Pedal] = pedal;
-    v[piano::Sympathetic] = sympathetic;
-    v[piano::Phantom] = phantom;
+    std::vector<float> v(static_cast<size_t>(piano::COUNT));
+    ps.readModule(ModuleE::PIANO, 0, v.data());
+    v[piano::PEDAL] = pedal;
+    v[piano::SYMPATHETIC] = sympathetic;
+    v[piano::PHANTOM] = phantom;
     p.update(v.data());
     p.reset();
     const int total = static_cast<int>(secs * 48000.0), off = static_cast<int>(hold * 48000.0);
     std::vector<float> out(static_cast<size_t>(total));
-    float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
+    float L[Piano::MaxBlock], R[Piano::MaxBlock];
     p.noteOn(midi, vel, 0.0);
-    for (int i = 0; i < total; i += Piano::kMaxBlock) {
-        if (i <= off && off < i + Piano::kMaxBlock) p.noteOff(midi);
-        const int n = std::min(Piano::kMaxBlock, total - i);
+    for (int i = 0; i < total; i += Piano::MaxBlock) {
+        if (i <= off && off < i + Piano::MaxBlock) p.noteOff(midi);
+        const int n = std::min(Piano::MaxBlock, total - i);
         p.process(L, R, n);
         for (int k = 0; k < n; ++k) out[static_cast<size_t>(i + k)] = 0.5f * (L[k] + R[k]);
     }
@@ -964,21 +964,21 @@ void testPiano()
     piano->prepare(48000.0);
     piano->setSpec(PianoSpec{});
     const PianoDesign& d = *piano->design();
-    const PianoKey& c4 = d.keys[static_cast<size_t>(60 - kPianoLowKey)];
-    check(d.board.freq[0] > 35.0 && d.board.freq[0] < 65.0 && d.board.freq.size() > 20, "the board: a first mode near 45 Hz, tens of modes to 1.2 kHz",
-          fmt("%.1f Hz, %zu modes", d.board.freq[0], d.board.freq.size()));
-    check(c4.B > 2e-4 && c4.B < 8e-4 && c4.strings == 3 && d.keys[0].strings == 1 && d.keys[static_cast<size_t>(36 - kPianoLowKey)].strings == 2,
-          "C4's inharmonicity, a course of three; one string in the lowest bass, two in the wound", fmt("B %.2e", c4.B));
+    const PianoKey& c4 = d.m_keys[static_cast<size_t>(60 - PianoLowKey)];
+    check(d.m_board.m_freq[0] > 35.0 && d.m_board.m_freq[0] < 65.0 && d.m_board.m_freq.size() > 20, "the board: a first mode near 45 Hz, tens of modes to 1.2 kHz",
+          fmt("%.1f Hz, %zu modes", d.m_board.m_freq[0], d.m_board.m_freq.size()));
+    check(c4.m_B > 2e-4 && c4.m_B < 8e-4 && c4.m_strings == 3 && d.m_keys[0].m_strings == 1 && d.m_keys[static_cast<size_t>(36 - PianoLowKey)].m_strings == 2,
+          "C4's inharmonicity, a course of three; one string in the lowest bass, two in the wound", fmt("B %.2e", c4.m_B));
     // The partials of C2: the stiff string's, not the harmonics.
     {
         const std::vector<float> x = pianoNote(*piano, 36, 0.7f, 3.0, 1.5);
-        const PianoKey& k = d.keys[static_cast<size_t>(36 - kPianoLowKey)];
+        const PianoKey& k = d.m_keys[static_cast<size_t>(36 - PianoLowKey)];
         double worst = 0.0;
         for (int p = 4; p <= 12; ++p) {
-            const double model = p * k.f0 * std::sqrt(1.0 + k.B * p * p);
+            const double model = p * k.m_f0 * std::sqrt(1.0 + k.m_B * p * p);
             worst = std::max(worst, std::fabs(1200.0 * std::log2(peakHz(x, 0.2, model) / model)));
         }
-        const double f12 = peakHz(x, 0.2, 12.0 * k.f0 * std::sqrt(1.0 + k.B * 144.0)), f1 = peakHz(x, 0.2, k.f0 * std::sqrt(1.0 + k.B));
+        const double f12 = peakHz(x, 0.2, 12.0 * k.m_f0 * std::sqrt(1.0 + k.m_B * 144.0)), f1 = peakHz(x, 0.2, k.m_f0 * std::sqrt(1.0 + k.m_B));
         const double stretch = 1200.0 * std::log2(f12 / (12.0 * f1));
         check(worst < 5.0 && stretch > 5.0, "C2's partials 4 .. 12 where the stiff string puts them, the twelfth sharp of the harmonic",
               fmt("within %.1f cents; the twelfth %+.1f cents", worst, stretch));
@@ -1010,8 +1010,8 @@ void testPiano()
     // The tension: a fortissimo A1 starts sharp and settles.
     {
         const std::vector<float> x = pianoNote(*piano, 33, 1.0f, 6.0, 4.0);
-        const PianoKey& k = d.keys[static_cast<size_t>(33 - kPianoLowKey)];
-        const double f2 = 2.0 * k.f0 * std::sqrt(1.0 + 4.0 * k.B);
+        const PianoKey& k = d.m_keys[static_cast<size_t>(33 - PianoLowKey)];
+        const double f2 = 2.0 * k.m_f0 * std::sqrt(1.0 + 4.0 * k.m_B);
         const double glide = 1200.0 * std::log2(peakHz(x, 0.0, f2) / peakHz(x, 3.0, f2));
         check(glide > 0.2 && glide < 10.0, "a fortissimo's pitch falls as it decays (Kirchhoff-Carrier)", fmt("%.2f cents", glide));
     }
@@ -1065,7 +1065,7 @@ void testPianoBlocks()
     const Score sc = composeTrack(*p, 11);
     double from = 0.0;
     int notes = 0;
-    for (const NoteEvent& n : sc.notes) if (n.part == Part::Piano) { if (notes == 0) from = std::floor(n.beat / 4.0) * 4.0; ++notes; }
+    for (const NoteEvent& n : sc.m_notes) if (n.m_part == PartE::PIANO) { if (notes == 0) from = std::floor(n.m_beat / 4.0) * 4.0; ++notes; }
     check(notes > 50, "Dream House writes its motif for the piano", fmt("%d notes", notes));
     auto render = [&](int block) {
         auto e = std::make_unique<Engine>();
@@ -1097,8 +1097,8 @@ void testPianoBlocks()
 }
 
 /** @brief One note of an orchestral instrument (held @p hold s) over @p secs s, the channels' mean. */
-template <class Instr>
-std::vector<float> orchNote(Instr& ins, int pitch, float vel, double hold, double secs)
+template <class InstrT>
+std::vector<float> orchNote(InstrT& ins, int pitch, float vel, double hold, double secs)
 {
     const int total = static_cast<int>(secs * 48000.0), off = static_cast<int>(hold * 48000.0);
     std::vector<float> out(static_cast<size_t>(total));
@@ -1165,14 +1165,14 @@ void testOrchestra()
         s->setPlayerLimit(3);
         c->setSingerLimit(3);
         b->setPlayerLimit(2);
-        ps.readModule(Module::Strings, 0, v.data());
-        v[strings::Players] = 6.0f;
+        ps.readModule(ModuleE::STRINGS, 0, v.data());
+        v[strings::PLAYERS] = 6.0f;
         s->update(v.data());
-        ps.readModule(Module::Choir, 0, v.data());
-        v[choir::Singers] = 6.0f;
+        ps.readModule(ModuleE::CHOIR, 0, v.data());
+        v[choir::SINGERS] = 6.0f;
         c->update(v.data());
-        ps.readModule(Module::Brass, 0, v.data());
-        v[brass::Players] = 4.0f;
+        ps.readModule(ModuleE::BRASS, 0, v.data());
+        v[brass::PLAYERS] = 4.0f;
         b->update(v.data());
         s->noteOn(60, 0.7f, false, 0.0);
         c->noteOn(60, 0.7f, false, 0.0);
@@ -1184,9 +1184,9 @@ void testOrchestra()
     {
         auto s = std::make_unique<StringSection>();
         s->prepare(48000.0, 7);
-        ps.readModule(Module::Strings, 0, v.data());
-        v[strings::Players] = 1.0f;
-        v[strings::Vibrato] = 0.0f;
+        ps.readModule(ModuleE::STRINGS, 0, v.data());
+        v[strings::PLAYERS] = 1.0f;
+        v[strings::VIBRATO] = 0.0f;
         s->update(v.data());
         double worst = 0.0;
         bool sounds = true;
@@ -1203,8 +1203,8 @@ void testOrchestra()
     {
         auto c = std::make_unique<Choir>();
         c->prepare(48000.0, 3);
-        ps.readModule(Module::Choir, 0, v.data());
-        v[choir::Vibrato] = 0.0f;
+        ps.readModule(ModuleE::CHOIR, 0, v.data());
+        v[choir::VIBRATO] = 0.0f;
         c->update(v.data());
         double area = 0.0;
         for (double rd : { 0.4, 1.0, 1.7, 2.6 }) {
@@ -1227,9 +1227,9 @@ void testOrchestra()
     {
         auto b = std::make_unique<Brass>();
         b->prepare(48000.0, 5);
-        ps.readModule(Module::Brass, 0, v.data());
-        v[brass::Players] = 1.0f;
-        v[brass::Vibrato] = 0.0f;
+        ps.readModule(ModuleE::BRASS, 0, v.data());
+        v[brass::PLAYERS] = 1.0f;
+        v[brass::VIBRATO] = 0.0f;
         b->update(v.data());
         double worst = 0.0;
         bool brighter = true;
@@ -1251,7 +1251,7 @@ void testOrchestra()
     {
         auto t = std::make_unique<Timpani>();
         t->prepare(48000.0, 9);
-        ps.readModule(Module::Timpani, 0, v.data());
+        ps.readModule(ModuleE::TIMPANI, 0, v.data());
         t->update(v.data());
         const std::vector<float> x = orchNote(*t, 45, 0.8f, 0.1, 2.5);
         const double f = midiToHz(45), p11 = peakHz(x, 0.3, f), p21 = peakHz(x, 0.3, 1.5 * f);
@@ -1270,7 +1270,7 @@ void testOrchestraBlocks()
     double from = -1.0;
     for (uint64_t seed = 1; seed < 12 && from < 0.0; ++seed) {
         sc = composeTrack(*p, seed);
-        for (const NoteEvent& n : sc.notes) if (n.part == Part::Choir) { from = std::floor(n.beat / 4.0) * 4.0; break; }
+        for (const NoteEvent& n : sc.m_notes) if (n.m_part == PartE::CHOIR) { from = std::floor(n.m_beat / 4.0) * 4.0; break; }
     }
     check(from >= 0.0, "a seed with the orchestra");
     if (from < 0.0) return;
@@ -1312,8 +1312,8 @@ void testModulation()
     section("the modulation of every voice");
     const DenormalGuard guard;
     auto p = std::make_unique<ParamStore>();
-    constexpr int kSr = 48000, kLen = 48000, kBlk = 64;
-    auto values = [&](Module m, int count) {
+    constexpr int Sr = 48000, Len = 48000, Blk = 64;
+    auto values = [&](ModuleE m, int count) {
         std::vector<float> v(static_cast<size_t>(count));
         for (int k = 0; k < count; ++k) v[static_cast<size_t>(k)] = p->get(p->id(m, 0, k));
         return v;
@@ -1344,104 +1344,104 @@ void testModulation()
     };
     // Renders one engine for a second from a note at its start; @p E: prepare/update/noteOn/process as the engine has them.
     auto run = [&](auto& engine, auto&& start) {
-        std::vector<float> out, L(kBlk), R(kBlk);
+        std::vector<float> out, L(Blk), R(Blk);
         start(engine);
-        for (int done = 0; done < kLen; done += kBlk) {
-            engine.process(L.data(), R.data(), kBlk);
-            for (int i = 0; i < kBlk; ++i) out.push_back(L[static_cast<size_t>(i)] + 0.5f * R[static_cast<size_t>(i)]);
+        for (int done = 0; done < Len; done += Blk) {
+            engine.process(L.data(), R.data(), Blk);
+            for (int i = 0; i < Blk; ++i) out.push_back(L[static_cast<size_t>(i)] + 0.5f * R[static_cast<size_t>(i)]);
         }
         return out;
     };
     {   // The mono synth (bass).
-        const std::vector<float> base = values(Module::Bass, synth::Count);
+        const std::vector<float> base = values(ModuleE::BASS, synth::COUNT);
         auto render = [&](const std::vector<float>& v) {
             auto s = std::make_unique<MonoSynth>();
-            s->prepare(kSr, 3);
+            s->prepare(Sr, 3);
             return run(*s, [&](MonoSynth& e) { e.update(v.data(), 0.0f); e.noteOn(45, 0.8f, 0.0, false, false); });
         };
         const std::vector<float> ref = render(base);
-        for (int d = 1; d < static_cast<int>(std::size(kSynthModDests)); ++d) {
+        for (int d = 1; d < static_cast<int>(std::size(SynthModDests)); ++d) {
             std::vector<float> v = base;
-            slots(v, synth::ModFirst, d);
+            slots(v, synth::MOD_FIRST, d);
             // (The pulse width needs the pulse: on the saw it has nothing to move.)
-            if (kSynthModDests[d] == static_cast<int>(ModDest::PulseWidth)) {
+            if (SynthModDests[d] == static_cast<int>(ModDestE::PULSE_WIDTH)) {
                 std::vector<float> w = base;
-                w[synth::Wave] = v[synth::Wave] = 1.0f;
-                compare("bass", kSynthModDestNames[d], render(w), render(v));
+                w[synth::WAVE] = v[synth::WAVE] = 1.0f;
+                compare("bass", SynthModDestNames[d], render(w), render(v));
                 continue;
             }
-            compare("bass", kSynthModDestNames[d], ref, render(v));
+            compare("bass", SynthModDestNames[d], ref, render(v));
         }
     }
     {   // The strings.
-        const std::vector<float> base = values(Module::Strings, strings::Count);
+        const std::vector<float> base = values(ModuleE::STRINGS, strings::COUNT);
         auto render = [&](const std::vector<float>& v) {
             auto s = std::make_unique<StringSection>();
-            s->prepare(kSr, 5);
+            s->prepare(Sr, 5);
             return run(*s, [&](StringSection& e) { e.update(v.data()); e.noteOn(60, 0.7f, false, 0.0); });
         };
         const std::vector<float> ref = render(base);
-        for (int d = 1; d < static_cast<int>(std::size(kStringsModDests)); ++d) {
+        for (int d = 1; d < static_cast<int>(std::size(StringsModDests)); ++d) {
             std::vector<float> v = base;
-            slots(v, strings::ModFirst, d);
-            compare("strings", kStringsModDestNames[d], ref, render(v));
+            slots(v, strings::MOD_FIRST, d);
+            compare("strings", StringsModDestNames[d], ref, render(v));
         }
     }
     {   // The choir.
-        const std::vector<float> base = values(Module::Choir, choir::Count);
+        const std::vector<float> base = values(ModuleE::CHOIR, choir::COUNT);
         auto render = [&](const std::vector<float>& v) {
             auto s = std::make_unique<Choir>();
-            s->prepare(kSr, 5);
+            s->prepare(Sr, 5);
             return run(*s, [&](Choir& e) { e.update(v.data()); e.noteOn(60, 0.7f, false, 0.0); });
         };
         const std::vector<float> ref = render(base);
-        for (int d = 1; d < static_cast<int>(std::size(kChoirModDests)); ++d) {
+        for (int d = 1; d < static_cast<int>(std::size(ChoirModDests)); ++d) {
             std::vector<float> v = base;
-            slots(v, choir::ModFirst, d);
-            compare("choir", kChoirModDestNames[d], ref, render(v));
+            slots(v, choir::MOD_FIRST, d);
+            compare("choir", ChoirModDestNames[d], ref, render(v));
         }
     }
     {   // The brass.
-        const std::vector<float> base = values(Module::Brass, brass::Count);
+        const std::vector<float> base = values(ModuleE::BRASS, brass::COUNT);
         auto render = [&](const std::vector<float>& v) {
             auto s = std::make_unique<Brass>();
-            s->prepare(kSr, 5);
+            s->prepare(Sr, 5);
             return run(*s, [&](Brass& e) { e.update(v.data()); e.noteOn(48, 0.8f, false, 0.0); });
         };
         const std::vector<float> ref = render(base);
-        for (int d = 1; d < static_cast<int>(std::size(kBrassModDests)); ++d) {
+        for (int d = 1; d < static_cast<int>(std::size(BrassModDests)); ++d) {
             std::vector<float> v = base;
-            slots(v, brass::ModFirst, d);
-            compare("brass", kBrassModDestNames[d], ref, render(v));
+            slots(v, brass::MOD_FIRST, d);
+            compare("brass", BrassModDestNames[d], ref, render(v));
         }
     }
     {   // The timpani.
-        const std::vector<float> base = values(Module::Timpani, timpani::Count);
+        const std::vector<float> base = values(ModuleE::TIMPANI, timpani::COUNT);
         auto render = [&](const std::vector<float>& v) {
             auto s = std::make_unique<Timpani>();
-            s->prepare(kSr, 5);
+            s->prepare(Sr, 5);
             return run(*s, [&](Timpani& e) { e.update(v.data()); e.noteOn(45, 0.8f, false, 0.0); });
         };
         const std::vector<float> ref = render(base);
-        for (int d = 1; d < static_cast<int>(std::size(kTimpaniModDests)); ++d) {
+        for (int d = 1; d < static_cast<int>(std::size(TimpaniModDests)); ++d) {
             std::vector<float> v = base;
-            slots(v, timpani::ModFirst, d);
-            compare("timpani", kTimpaniModDestNames[d], ref, render(v));
+            slots(v, timpani::MOD_FIRST, d);
+            compare("timpani", TimpaniModDestNames[d], ref, render(v));
         }
     }
     {   // The piano.
-        const std::vector<float> base = values(Module::Piano, piano::Count);
+        const std::vector<float> base = values(ModuleE::PIANO, piano::COUNT);
         auto render = [&](const std::vector<float>& v) {
             auto s = std::make_unique<Piano>();
-            s->prepare(kSr);
+            s->prepare(Sr);
             s->setSpec(PianoSpec{});
             return run(*s, [&](Piano& e) { e.update(v.data()); e.noteOn(60, 0.7f, 0.0); });
         };
         const std::vector<float> ref = render(base);
-        for (int d = 1; d < static_cast<int>(std::size(kPianoModDests)); ++d) {
+        for (int d = 1; d < static_cast<int>(std::size(PianoModDests)); ++d) {
             std::vector<float> v = base;
-            slots(v, piano::ModFirst, d);
-            compare("piano", kPianoModDestNames[d], ref, render(v));
+            slots(v, piano::MOD_FIRST, d);
+            compare("piano", PianoModDestNames[d], ref, render(v));
         }
     }
     check(reached == total && total == 40, "every target of every voice moves its sound", fmt("%d of %d targets%s", reached, total, missed.c_str()));
@@ -1465,12 +1465,12 @@ void testModulation()
         auto q = std::make_unique<ParamStore>();
         q->parseText(std::string("compose.style=") + style);
         q->parseText(busy);
-        const Part want = std::string(style) == "Uplifting" ? Part::Choir : Part::Piano;
+        const PartE want = std::string(style) == "Uplifting" ? PartE::CHOIR : PartE::PIANO;
         Score sc;
         double from = -1.0;
         for (uint64_t seed = 1; seed < 16 && from < 0.0; ++seed) {
             sc = composeTrack(*q, seed);
-            for (const NoteEvent& n : sc.notes) if (n.part == want) { from = std::floor(n.beat / 4.0) * 4.0; break; }
+            for (const NoteEvent& n : sc.m_notes) if (n.m_part == want) { from = std::floor(n.m_beat / 4.0) * 4.0; break; }
         }
         if (from < 0.0) { check(false, fmt("a %s track with its voice", style).c_str()); continue; }
         auto render = [&](int block) {
@@ -1508,55 +1508,55 @@ void testModulation()
  * less the preset's, in tenths of a dB) are written to <file>.
  */
 struct BankId {
-    Module module;   ///< the module
-    int instance;    ///< its instance
+    ModuleE m_module;   ///< the module
+    int m_instance;    ///< its instance
 };
 /** @brief Every bank, in the order of Presets.h. */
-const BankId kBanks[kPresetBanks] = {
-    { Module::Kick, 0 }, { Module::Sub, 0 }, { Module::Perc, 0 }, { Module::Bass, 0 }, { Module::Acid, 0 },
-    { Module::Poly, 0 }, { Module::Poly, 1 }, { Module::Poly, 2 }, { Module::Poly, 3 }, { Module::Poly, 4 }, { Module::Poly, 5 },
-    { Module::Piano, 0 }, { Module::Strings, 0 }, { Module::Choir, 0 }, { Module::Brass, 0 }, { Module::Timpani, 0 },
-    { Module::Sfx, 0 }, { Module::Cloud, 0 } };
+const BankId Banks[PresetBanks] = {
+    { ModuleE::KICK, 0 }, { ModuleE::SUB, 0 }, { ModuleE::PERC, 0 }, { ModuleE::BASS, 0 }, { ModuleE::ACID, 0 },
+    { ModuleE::POLY, 0 }, { ModuleE::POLY, 1 }, { ModuleE::POLY, 2 }, { ModuleE::POLY, 3 }, { ModuleE::POLY, 4 }, { ModuleE::POLY, 5 },
+    { ModuleE::PIANO, 0 }, { ModuleE::STRINGS, 0 }, { ModuleE::CHOIR, 0 }, { ModuleE::BRASS, 0 }, { ModuleE::TIMPANI, 0 },
+    { ModuleE::SFX, 0 }, { ModuleE::CLOUD, 0 } };
 
 /** @brief The loudest 3 s of a short phrase on @p b's voice, the preset @p sp applied (null: the default sound), LUFS. */
 double bankLoudness(const BankId& b, const SoundPreset* sp, bool quest = false)
 {
     auto p = std::make_unique<ParamStore>();
-    if (sp != nullptr) applyPreset(*p, b.module, b.instance, *sp);
+    if (sp != nullptr) applyPreset(*p, b.m_module, b.m_instance, *sp);
     Score sc;
     sc.clear(136.0);
-    sc.lengthBeats = 16.0;
-    auto note = [&](double beat, double len, Part part, int pitch, float v) { sc.notes.push_back(NoteEvent{ beat, len, part, pitch, v, 0, false, false }); };
-    switch (b.module) {
-    case Module::Kick: for (int q = 0; q < 12; ++q) note(q, 0.25, Part::Kick, 36, 1.0f); break;
-    case Module::Sub: for (int q = 0; q < 12; ++q) note(q + 0.5, 0.25, Part::Sub, 33, 1.0f); break;
-    case Module::Perc: for (int s = 0; s < 48; ++s) note(0.25 * s, 0.1, Part::Perc1, 42, s % 4 == 0 ? 0.9f : 0.6f); break;
-    case Module::Bass: case Module::Acid:
-        for (int s = 0; s < 24; ++s) note(0.5 * s, 0.4, b.module == Module::Bass ? Part::Bass : Part::Acid, s % 3 == 0 ? 45 : 57, 0.8f);
+    sc.m_lengthBeats = 16.0;
+    auto note = [&](double beat, double len, PartE part, int pitch, float v) { sc.m_notes.push_back(NoteEvent{ beat, len, part, pitch, v, 0, false, false }); };
+    switch (b.m_module) {
+    case ModuleE::KICK: for (int q = 0; q < 12; ++q) note(q, 0.25, PartE::KICK, 36, 1.0f); break;
+    case ModuleE::SUB: for (int q = 0; q < 12; ++q) note(q + 0.5, 0.25, PartE::SUB, 33, 1.0f); break;
+    case ModuleE::PERC: for (int s = 0; s < 48; ++s) note(0.25 * s, 0.1, PartE::PERC1, 42, s % 4 == 0 ? 0.9f : 0.6f); break;
+    case ModuleE::BASS: case ModuleE::ACID:
+        for (int s = 0; s < 24; ++s) note(0.5 * s, 0.4, b.m_module == ModuleE::BASS ? PartE::BASS : PartE::ACID, s % 3 == 0 ? 45 : 57, 0.8f);
         break;
-    case Module::Poly: {
-        const Part part = static_cast<Part>(static_cast<int>(Part::Lead) + b.instance);
-        if (b.instance == 4 || b.instance == 5) for (int k : { 57, 60, 64, 69 }) note(0.0, 11.5, part, k, 0.8f);   // the pad, the stab: a chord
+    case ModuleE::POLY: {
+        const PartE part = static_cast<PartE>(static_cast<int>(PartE::LEAD) + b.m_instance);
+        if (b.m_instance == 4 || b.m_instance == 5) for (int k : { 57, 60, 64, 69 }) note(0.0, 11.5, part, k, 0.8f);   // the pad, the stab: a chord
         else for (int s = 0; s < 24; ++s) note(0.5 * s, 0.45, part, 64 + (s % 4) * 3, 0.8f);
         break;
     }
-    case Module::Piano: for (int s = 0; s < 6; ++s) for (int k : { 48, 60, 64, 67 }) note(2.0 * s, 1.8, Part::Piano, k + (s % 2) * 2, 0.7f); break;
-    case Module::Strings: for (int k : { 43, 55, 59, 62 }) note(0.0, 11.5, Part::Strings, k, 0.7f); break;
-    case Module::Choir: for (int k : { 57, 60, 64 }) note(0.0, 11.5, Part::Choir, k, 0.7f); break;
-    case Module::Brass: for (int s = 0; s < 3; ++s) for (int k : { 48, 55, 60 }) note(4.0 * s, 3.5, Part::Brass, k, 0.8f); break;
-    case Module::Timpani: for (int s = 0; s < 6; ++s) note(2.0 * s, 1.0, Part::Timpani, 43 + (s % 2) * 7, 0.9f); break;
-    case Module::Sfx: note(0.0, 8.0, Part::Fx, kSfxBaseNote + static_cast<int>(SfxType::Riser), 0.9f);
-                      note(8.0, 4.0, Part::Fx, kSfxBaseNote + static_cast<int>(SfxType::Impact), 1.0f); break;
-    case Module::Cloud:
-        p->set(p->id(Module::Cloud, 0, cloud::Level), 0.0f);   // (the cloud grains the pad: the pad plays, the cloud is heard)
-        for (int k : { 57, 60, 64 }) note(0.0, 11.5, Part::Pad, k, 0.8f);
+    case ModuleE::PIANO: for (int s = 0; s < 6; ++s) for (int k : { 48, 60, 64, 67 }) note(2.0 * s, 1.8, PartE::PIANO, k + (s % 2) * 2, 0.7f); break;
+    case ModuleE::STRINGS: for (int k : { 43, 55, 59, 62 }) note(0.0, 11.5, PartE::STRINGS, k, 0.7f); break;
+    case ModuleE::CHOIR: for (int k : { 57, 60, 64 }) note(0.0, 11.5, PartE::CHOIR, k, 0.7f); break;
+    case ModuleE::BRASS: for (int s = 0; s < 3; ++s) for (int k : { 48, 55, 60 }) note(4.0 * s, 3.5, PartE::BRASS, k, 0.8f); break;
+    case ModuleE::TIMPANI: for (int s = 0; s < 6; ++s) note(2.0 * s, 1.0, PartE::TIMPANI, 43 + (s % 2) * 7, 0.9f); break;
+    case ModuleE::SFX: note(0.0, 8.0, PartE::FX, SfxBaseNote + static_cast<int>(SfxTypeE::RISER), 0.9f);
+                      note(8.0, 4.0, PartE::FX, SfxBaseNote + static_cast<int>(SfxTypeE::IMPACT), 1.0f); break;
+    case ModuleE::CLOUD:
+        p->set(p->id(ModuleE::CLOUD, 0, cloud::LEVEL), 0.0f);   // (the cloud grains the pad: the pad plays, the cloud is heard)
+        for (int k : { 57, 60, 64 }) note(0.0, 11.5, PartE::PAD, k, 0.8f);
         break;
     default: break;
     }
     sc.sort();
     auto e = std::make_unique<Engine>();
     e->params().copyValuesFrom(*p);
-    if (quest) e->setQuality(Engine::Quality::Quest);
+    if (quest) e->setQuality(Engine::QualityE::QUEST);
     e->prepare(48000.0, 512);
     e->load(sc);
     LoudnessMeter meter;
@@ -1568,7 +1568,7 @@ double bankLoudness(const BankId& b, const SoundPreset* sp, bool quest = false)
         for (int i = 0; i < 512; ++i) finite = finite && std::isfinite(L[static_cast<size_t>(i)]) && std::isfinite(R[static_cast<size_t>(i)]);
         meter.process(L.data(), R.data(), 512);
     }
-    return finite ? meter.report().shortTermMax : std::numeric_limits<double>::quiet_NaN();
+    return finite ? meter.report().m_shortTermMax : std::numeric_limits<double>::quiet_NaN();
 }
 
 /** @brief Every bank's presets through the engine against the default sound (see BankId). */
@@ -1577,52 +1577,52 @@ void testPresetBank()
     section("the factory banks");
     const DenormalGuard guard;
     int full = 0, unique = 0;
-    for (const BankId& b : kBanks) {
-        const std::vector<SoundPreset>& ps = factoryPresets(b.module, b.instance);
-        full += ps.size() == static_cast<size_t>(kPresetsPerBank);
+    for (const BankId& b : Banks) {
+        const std::vector<SoundPreset>& ps = factoryPresets(b.m_module, b.m_instance);
+        full += ps.size() == static_cast<size_t>(PresetsPerBank);
         std::set<std::string> names;
-        for (const SoundPreset& s : ps) names.insert(s.name);
+        for (const SoundPreset& s : ps) names.insert(s.m_name);
         unique += names.size() == ps.size();
     }
-    check(full == kPresetBanks, "eighteen banks of 1024 presets", fmt("%d of %d full", full, kPresetBanks));
-    check(unique == kPresetBanks, "every name unique within its bank", fmt("%d of %d", unique, kPresetBanks));
+    check(full == PresetBanks, "eighteen banks of 1024 presets", fmt("%d of %d full", full, PresetBanks));
+    check(unique == PresetBanks, "every name unique within its bank", fmt("%d of %d", unique, PresetBanks));
     std::string first;
     const int unknown = bankUnknownKeys(&first);
     check(unknown == 0, "every key a bank names is a knob of its module", fmt("%d unknown%s", unknown, unknown > 0 ? (": " + first).c_str() : ""));
     // A lane gets presets of its role only; every role has a group.
     int roleOk = 0;
-    for (int role = 0; role < kNumPercRoles; ++role) {
+    for (int role = 0; role < NumPercRoles; ++role) {
         Rng r;
         r.seed(static_cast<uint64_t>(role) + 11);
         const float style[5] = { 0.2f, 0.2f, 0.2f, 0.2f, 0.2f };
         bool ok = true;
         for (int k = 0; k < 20 && ok; ++k) {
-            const int i = pickPreset(Module::Perc, 0, style, role, r);
-            ok = i >= 0 && ((factoryPresets(Module::Perc, 0)[static_cast<size_t>(i)].roles >> role) & 1u) != 0u;
+            const int i = pickPreset(ModuleE::PERC, 0, style, role, r);
+            ok = i >= 0 && ((factoryPresets(ModuleE::PERC, 0)[static_cast<size_t>(i)].m_roles >> role) & 1u) != 0u;
         }
         roleOk += ok;
     }
-    check(roleOk == kNumPercRoles, "a kit lane is given presets of its role (every role has a group)", fmt("%d of %d roles", roleOk, kNumPercRoles));
+    check(roleOk == NumPercRoles, "a kit lane is given presets of its role (every role has a group)", fmt("%d of %d roles", roleOk, NumPercRoles));
 
     // The sample (or, with PARH_BANK_TRIMS, every preset): through the engine against the default sound.
     const char* trimsPath = std::getenv("PARH_BANK_TRIMS");
     const bool all = trimsPath != nullptr && trimsPath[0] != 0;
     // The jobs: every bank's default sound (-1) and its presets (all, or every 128th, a different one per bank), on
     // every core (each render its own engine).
-    struct Job { int bank, preset; double loud; };
+    struct Job { int m_bank, m_preset; double m_loud; };
     std::vector<Job> jobs;
-    for (int bi = 0; bi < kPresetBanks; ++bi) {
+    for (int bi = 0; bi < PresetBanks; ++bi) {
         jobs.push_back({ bi, -1, 0.0 });
-        for (int i = all ? 0 : (bi * 7) % 128; i < kPresetsPerBank; i += all ? 1 : 128) jobs.push_back({ bi, i, 0.0 });
+        for (int i = all ? 0 : (bi * 7) % 128; i < PresetsPerBank; i += all ? 1 : 128) jobs.push_back({ bi, i, 0.0 });
     }
-    for (const BankId& b : kBanks) (void)factoryPresets(b.module, b.instance);   // (built once, before the threads)
+    for (const BankId& b : Banks) (void)factoryPresets(b.m_module, b.m_instance);   // (built once, before the threads)
     std::atomic<size_t> next{ 0 };
     auto work = [&]() {
         const DenormalGuard g;
         for (size_t k = next++; k < jobs.size(); k = next++) {
             Job& j = jobs[k];
-            const BankId& b = kBanks[j.bank];
-            j.loud = bankLoudness(b, j.preset < 0 ? nullptr : &factoryPresets(b.module, b.instance)[static_cast<size_t>(j.preset)]);
+            const BankId& b = Banks[j.m_bank];
+            j.m_loud = bankLoudness(b, j.m_preset < 0 ? nullptr : &factoryPresets(b.m_module, b.m_instance)[static_cast<size_t>(j.m_preset)]);
         }
     };
     std::vector<std::thread> pool;
@@ -1632,20 +1632,20 @@ void testPresetBank()
     int played = 0, bad = 0;
     double worst = 0.0;
     std::string worstName;
-    std::vector<std::vector<short>> trims(kPresetBanks, std::vector<short>(kPresetsPerBank, 0));
-    std::vector<double> ref(kPresetBanks, 0.0);
-    for (const Job& j : jobs) if (j.preset < 0) ref[static_cast<size_t>(j.bank)] = j.loud;
+    std::vector<std::vector<short>> trims(PresetBanks, std::vector<short>(PresetsPerBank, 0));
+    std::vector<double> ref(PresetBanks, 0.0);
+    for (const Job& j : jobs) if (j.m_preset < 0) ref[static_cast<size_t>(j.m_bank)] = j.m_loud;
     for (const Job& j : jobs) {
-        if (j.preset < 0) continue;
-        const BankId& b = kBanks[j.bank];
-        const SoundPreset& sp = factoryPresets(b.module, b.instance)[static_cast<size_t>(j.preset)];
-        const double l = j.loud, d = l - ref[static_cast<size_t>(j.bank)];
+        if (j.m_preset < 0) continue;
+        const BankId& b = Banks[j.m_bank];
+        const SoundPreset& sp = factoryPresets(b.m_module, b.m_instance)[static_cast<size_t>(j.m_preset)];
+        const double l = j.m_loud, d = l - ref[static_cast<size_t>(j.m_bank)];
         ++played;
         if (!std::isfinite(l) || l < -70.0 || std::fabs(d) > 24.0) {
-            if (bad++ == 0) worstName = fmt("%s/%s: %.1f LUFS against %.1f", sp.group.c_str(), sp.name.c_str(), l, ref[static_cast<size_t>(j.bank)]);
+            if (bad++ == 0) worstName = fmt("%s/%s: %.1f LUFS against %.1f", sp.m_group.c_str(), sp.m_name.c_str(), l, ref[static_cast<size_t>(j.m_bank)]);
         }
         if (std::isfinite(d) && std::fabs(d) > worst) worst = std::fabs(d);
-        trims[static_cast<size_t>(j.bank)][static_cast<size_t>(j.preset)] = static_cast<short>(std::lround(std::clamp(std::isfinite(d) ? -d : 0.0, -24.0, 24.0) * 10.0));
+        trims[static_cast<size_t>(j.m_bank)][static_cast<size_t>(j.m_preset)] = static_cast<short>(std::lround(std::clamp(std::isfinite(d) ? -d : 0.0, -24.0, 24.0) * 10.0));
     }
     check(bad == 0, "every preset played is finite, audible and within 24 dB of its module's default sound",
           fmt("%d played, %d out, largest distance %.1f dB%s", played, bad, worst, bad > 0 ? ("; first: " + worstName).c_str() : ""));
@@ -1654,12 +1654,12 @@ void testPresetBank()
         if (f != nullptr) {
             std::fprintf(f, "// Generated by parh_selftest testPresetBank with PARH_BANK_TRIMS=<this file> (Tests/selftest.cpp).\n"
                             "/// Each preset's level correction in tenths of a dB, 18 banks of 1024 (Presets.h's order).\n"
-                            "static const short kPresetTrimTenths[18][1024] = {\n");
-            for (int bi = 0; bi < kPresetBanks; ++bi) {
+                            "static const short PresetTrimTenths[18][1024] = {\n");
+            for (int bi = 0; bi < PresetBanks; ++bi) {
                 std::fprintf(f, "{");
-                for (int i = 0; i < kPresetsPerBank; ++i) std::fprintf(f, "%d%s%s", trims[static_cast<size_t>(bi)][static_cast<size_t>(i)],
-                                                                         i + 1 < kPresetsPerBank ? "," : "", (i % 32 == 31 && i + 1 < kPresetsPerBank) ? "\n" : "");
-                std::fprintf(f, "}%s\n", bi + 1 < kPresetBanks ? "," : "");
+                for (int i = 0; i < PresetsPerBank; ++i) std::fprintf(f, "%d%s%s", trims[static_cast<size_t>(bi)][static_cast<size_t>(i)],
+                                                                         i + 1 < PresetsPerBank ? "," : "", (i % 32 == 31 && i + 1 < PresetsPerBank) ? "\n" : "");
+                std::fprintf(f, "}%s\n", bi + 1 < PresetBanks ? "," : "");
             }
             std::fprintf(f, "};\n");
             std::fclose(f);
@@ -1682,30 +1682,30 @@ void testUserPreset()
     auto b = std::make_unique<ParamStore>();
     int exact = 0, total = 0, leftAlone = 0, leaves = 0;
     std::string bad;
-    const struct { Module m; int from, to, preset; } cases[] = { { Module::Perc, 2, 7, 300 }, { Module::Poly, 0, 3, 77 }, { Module::Bass, 0, 0, 512 } };
+    const struct { ModuleE m_m; int m_from, m_to, m_preset; } cases[] = { { ModuleE::PERC, 2, 7, 300 }, { ModuleE::POLY, 0, 3, 77 }, { ModuleE::BASS, 0, 0, 512 } };
     for (const auto& c : cases) {
-        applyPreset(*a, c.m, c.from, factoryPresets(c.m, c.from)[static_cast<size_t>(c.preset)]);
-        const std::string text = userPresetText(*a, c.m, c.from);
+        applyPreset(*a, c.m_m, c.m_from, factoryPresets(c.m_m, c.m_from)[static_cast<size_t>(c.m_preset)]);
+        const std::string text = userPresetText(*a, c.m_m, c.m_from);
         // The target full of other values first: a knob the text leaves out must go back to its default.
-        applyPreset(*b, c.m, c.to, factoryPresets(c.m, c.to)[static_cast<size_t>((c.preset + 101) % kPresetsPerBank)]);
-        std::vector<float> before(static_cast<size_t>(ParamStore::moduleCount(c.m)));
-        for (int k = 0; k < ParamStore::moduleCount(c.m); ++k) {
+        applyPreset(*b, c.m_m, c.m_to, factoryPresets(c.m_m, c.m_to)[static_cast<size_t>((c.m_preset + 101) % PresetsPerBank)]);
+        std::vector<float> before(static_cast<size_t>(ParamStore::moduleCount(c.m_m)));
+        for (int k = 0; k < ParamStore::moduleCount(c.m_m); ++k) {
             // (A preset leaves these alone; set one to a value of its own, to see it kept.)
-            if (presetLeaves(c.m, k)) b->set(b->id(c.m, c.to, k), b->desc(b->id(c.m, c.to, k)).maxValue);
-            before[static_cast<size_t>(k)] = b->get(b->id(c.m, c.to, k));
+            if (presetLeaves(c.m_m, k)) b->set(b->id(c.m_m, c.m_to, k), b->desc(b->id(c.m_m, c.m_to, k)).m_maxValue);
+            before[static_cast<size_t>(k)] = b->get(b->id(c.m_m, c.m_to, k));
         }
-        for (const auto& [k, v] : userPresetKnobs(*b, c.m, c.to, text)) b->set(b->id(c.m, c.to, k), v);
-        for (int k = 0; k < ParamStore::moduleCount(c.m); ++k) {
-            const float got = b->get(b->id(c.m, c.to, k));
-            if (presetLeaves(c.m, k)) {
+        for (const auto& [k, v] : userPresetKnobs(*b, c.m_m, c.m_to, text)) b->set(b->id(c.m_m, c.m_to, k), v);
+        for (int k = 0; k < ParamStore::moduleCount(c.m_m); ++k) {
+            const float got = b->get(b->id(c.m_m, c.m_to, k));
+            if (presetLeaves(c.m_m, k)) {
                 ++leaves;
                 leftAlone += got == before[static_cast<size_t>(k)];
                 continue;
             }
             ++total;
-            const float want = a->get(a->id(c.m, c.from, k));
+            const float want = a->get(a->id(c.m_m, c.m_from, k));
             if (got == want) ++exact;
-            else if (bad.empty()) bad = fmt("; first: %s %g, not %g", b->key(b->id(c.m, c.to, k)).c_str(), got, want);
+            else if (bad.empty()) bad = fmt("; first: %s %g, not %g", b->key(b->id(c.m_m, c.m_to, k)).c_str(), got, want);
         }
     }
     check(exact == total, "a user preset saved from one lane or voice loads into another, knob for knob", fmt("%d of %d%s", exact, total, bad.c_str()));
@@ -1721,23 +1721,23 @@ void testQuestSounds()
 {
     section("the synths' presets at the Quest's quality");
     const DenormalGuard guard;
-    struct Job { int bank, preset; double desk, quest; };
+    struct Job { int m_bank, m_preset; double m_desk, m_quest; };
     std::vector<Job> jobs;
-    for (int bi = 0; bi < kPresetBanks; ++bi) {
-        const Module m = kBanks[bi].module;
-        if (m != Module::Poly && m != Module::Bass && m != Module::Acid) continue;
-        for (int i = bi % 32; i < kPresetsPerBank; i += 32) jobs.push_back({ bi, i, 0.0, 0.0 });
+    for (int bi = 0; bi < PresetBanks; ++bi) {
+        const ModuleE m = Banks[bi].m_module;
+        if (m != ModuleE::POLY && m != ModuleE::BASS && m != ModuleE::ACID) continue;
+        for (int i = bi % 32; i < PresetsPerBank; i += 32) jobs.push_back({ bi, i, 0.0, 0.0 });
     }
-    for (const BankId& b : kBanks) (void)factoryPresets(b.module, b.instance);
+    for (const BankId& b : Banks) (void)factoryPresets(b.m_module, b.m_instance);
     std::atomic<size_t> next{ 0 };
     auto work = [&]() {
         const DenormalGuard g;
         for (size_t k = next++; k < jobs.size(); k = next++) {
             Job& j = jobs[k];
-            const BankId& b = kBanks[j.bank];
-            const SoundPreset* sp = &factoryPresets(b.module, b.instance)[static_cast<size_t>(j.preset)];
-            j.desk = bankLoudness(b, sp, false);
-            j.quest = bankLoudness(b, sp, true);
+            const BankId& b = Banks[j.m_bank];
+            const SoundPreset* sp = &factoryPresets(b.m_module, b.m_instance)[static_cast<size_t>(j.m_preset)];
+            j.m_desk = bankLoudness(b, sp, false);
+            j.m_quest = bankLoudness(b, sp, true);
         }
     };
     std::vector<std::thread> pool;
@@ -1748,14 +1748,14 @@ void testQuestSounds()
     double worst = 0.0, sum = 0.0;
     std::string worstName;
     for (const Job& j : jobs) {
-        if (!std::isfinite(j.quest) || j.quest < -70.0) continue;
+        if (!std::isfinite(j.m_quest) || j.m_quest < -70.0) continue;
         ++finite;
-        const double d = j.quest - j.desk;
+        const double d = j.m_quest - j.m_desk;
         sum += std::fabs(d);
         if (std::fabs(d) > std::fabs(worst)) {
             worst = d;
-            const SoundPreset& sp = factoryPresets(kBanks[j.bank].module, kBanks[j.bank].instance)[static_cast<size_t>(j.preset)];
-            worstName = fmt("%s/%s", sp.group.c_str(), sp.name.c_str());
+            const SoundPreset& sp = factoryPresets(Banks[j.m_bank].m_module, Banks[j.m_bank].m_instance)[static_cast<size_t>(j.m_preset)];
+            worstName = fmt("%s/%s", sp.m_group.c_str(), sp.m_name.c_str());
         }
     }
     check(finite == static_cast<int>(jobs.size()), "every one finite and audible at the Quest's quality", fmt("%d of %zu", finite, jobs.size()));
@@ -1775,9 +1775,9 @@ void testOpening()
     auto p = std::make_unique<ParamStore>();
     // The first block of a deck's score (from @p from) with the kick on: does the closed hat play there too?
     auto kickWithHats = [](const Score& s, double from, double to) {
-        for (const LayerBlock& b : s.layers) {
-            if (b.beat < from - 1e-6 || b.beat >= to) continue;
-            if (b.at(Layer::Kick) == LayerState::On) return b.at(Layer::ClosedHat) != LayerState::Off;
+        for (const LayerBlock& b : s.m_layers) {
+            if (b.m_beat < from - 1e-6 || b.m_beat >= to) continue;
+            if (b.at(LayerE::KICK) == LayerStateE::ON) return b.at(LayerE::CLOSED_HAT) != LayerStateE::OFF;
         }
         return true;
     };
@@ -1787,7 +1787,7 @@ void testOpening()
         for (uint64_t seed = 1; seed <= 6; ++seed) {
             const Score s = composeTrack(*p, seed);
             ++tracks;
-            withHats += kickWithHats(s, 0.0, s.lengthBeats);
+            withHats += kickWithHats(s, 0.0, s.m_lengthBeats);
         }
     }
     check(withHats == tracks, "a track's kick enters with the closed hat", fmt("%d of %d tracks", withHats, tracks));
@@ -1798,14 +1798,14 @@ void testOpening()
         const SetScore set = composeSet(*p, seed, 12.0, nullptr, &si);
         ++mixes;
         bool ok = true;
-        for (size_t i = 0; i < si.tracks.size(); ++i) {
-            const SetTrack& tr = si.tracks[i];
-            const Score& deck = set.decks[static_cast<size_t>(tr.deck)];
-            ok = ok && kickWithHats(deck, tr.start, tr.end);
+        for (size_t i = 0; i < si.m_tracks.size(); ++i) {
+            const SetTrack& tr = si.m_tracks[i];
+            const Score& deck = set.m_decks[static_cast<size_t>(tr.m_deck)];
+            ok = ok && kickWithHats(deck, tr.m_start, tr.m_end);
             // Its first block: the kick there or not.
             bool kickFirst = false;
-            for (const LayerBlock& b : deck.layers)
-                if (std::fabs(b.beat - tr.start) < 1e-6) kickFirst = b.at(Layer::Kick) == LayerState::On;
+            for (const LayerBlock& b : deck.m_layers)
+                if (std::fabs(b.m_beat - tr.m_start) < 1e-6) kickFirst = b.at(LayerE::KICK) == LayerStateE::ON;
             if (i == 0) { ++openers; kickless += !kickFirst; }
             else { ++later; laterKick += kickFirst; }
         }
@@ -1832,41 +1832,41 @@ void testRewrite()
     std::string bad;
     for (uint64_t seed : { 3ull, 8ull }) {
         const Score base = composeTrack(*p, seed);
-        for (SectionKind kind : { SectionKind::Breakdown, SectionKind::Drop }) {
+        for (SectionKindE kind : { SectionKindE::BREAKDOWN, SectionKindE::DROP }) {
             const int bar = 64;
             TrackRequest req;
-            req.rewriteBar = bar;
-            req.rewriteKind = kind;
+            req.m_rewriteBar = bar;
+            req.m_rewriteKind = kind;
             const Score re = composeTrack(*p, seed, req);
             ++total;
             // The form from the line on.
             int at = -1;
-            for (size_t i = 0; i < re.sections.size(); ++i) if (re.sections[i].beat == 4.0 * bar) at = static_cast<int>(i);
-            bool ok = at >= 0 && re.sections[static_cast<size_t>(at)].kind == kind && static_cast<int>(re.lengthBeats / 4.0) % 32 == 0;
-            if (ok && kind == SectionKind::Breakdown)
-                ok = static_cast<size_t>(at) + 2 < re.sections.size() && re.sections[static_cast<size_t>(at) + 1].kind == SectionKind::Build
-                  && re.sections[static_cast<size_t>(at) + 2].kind == SectionKind::Drop;
-            if (ok && kind == SectionKind::Drop) {
+            for (size_t i = 0; i < re.m_sections.size(); ++i) if (re.m_sections[i].m_beat == 4.0 * bar) at = static_cast<int>(i);
+            bool ok = at >= 0 && re.m_sections[static_cast<size_t>(at)].m_kind == kind && static_cast<int>(re.m_lengthBeats / 4.0) % 32 == 0;
+            if (ok && kind == SectionKindE::BREAKDOWN)
+                ok = static_cast<size_t>(at) + 2 < re.m_sections.size() && re.m_sections[static_cast<size_t>(at) + 1].m_kind == SectionKindE::BUILD
+                  && re.m_sections[static_cast<size_t>(at) + 2].m_kind == SectionKindE::DROP;
+            if (ok && kind == SectionKindE::DROP) {
                 bool quiet = true;   // the vacuum: no kick on the bar's last beat before the drop
-                for (const NoteEvent& n : re.notes) if (n.part == Part::Kick && n.beat >= 4.0 * bar - 1.0 && n.beat < 4.0 * bar) quiet = false;
+                for (const NoteEvent& n : re.m_notes) if (n.m_part == PartE::KICK && n.m_beat >= 4.0 * bar - 1.0 && n.m_beat < 4.0 * bar) quiet = false;
                 ok = quiet;
             }
             shaped += ok;
             // The notes before the line (and its last beat, the vacuum's).
-            const double upTo = kind == SectionKind::Drop ? 4.0 * (bar - 8) : 4.0 * bar - 4.0;
+            const double upTo = kind == SectionKindE::DROP ? 4.0 * (bar - 8) : 4.0 * bar - 4.0;
             auto before = [&](const Score& s) {
                 std::vector<std::tuple<double, int, int, float>> out;
-                for (const NoteEvent& n : s.notes) {
-                    if (n.beat >= upTo) continue;
-                    if (n.part == Part::Lead || n.part == Part::Counter || n.part == Part::Piano || n.part == Part::Strings
-                        || n.part == Part::Choir || n.part == Part::Brass || n.part == Part::Timpani || n.part == Part::Fx) continue;
-                    out.push_back({ n.beat, static_cast<int>(n.part), n.pitch, n.velocity });
+                for (const NoteEvent& n : s.m_notes) {
+                    if (n.m_beat >= upTo) continue;
+                    if (n.m_part == PartE::LEAD || n.m_part == PartE::COUNTER || n.m_part == PartE::PIANO || n.m_part == PartE::STRINGS
+                        || n.m_part == PartE::CHOIR || n.m_part == PartE::BRASS || n.m_part == PartE::TIMPANI || n.m_part == PartE::FX) continue;
+                    out.push_back({ n.m_beat, static_cast<int>(n.m_part), n.m_pitch, n.m_velocity });
                 }
                 return out;
             };
             const bool same = before(base) == before(re);
             kept += same;
-            if (!ok || !same) bad += fmt(" seed %llu %s:%s%s", static_cast<unsigned long long>(seed), kind == SectionKind::Drop ? "drop" : "breakdown",
+            if (!ok || !same) bad += fmt(" seed %llu %s:%s%s", static_cast<unsigned long long>(seed), kind == SectionKindE::DROP ? "drop" : "breakdown",
                                          ok ? "" : " form", same ? "" : " notes");
         }
     }
@@ -1880,30 +1880,30 @@ void testRewrite()
     std::string chainBad;
     for (uint64_t seed : { 3ull, 8ull }) {
         TrackRequest one;
-        one.rewriteBar = 48;
-        one.rewriteKind = SectionKind::Breakdown;
+        one.m_rewriteBar = 48;
+        one.m_rewriteKind = SectionKindE::BREAKDOWN;
         const Score first = composeTrack(*p, seed, one);
         TrackRequest two;
-        two.rewriteBar = 96;
-        two.rewriteKind = SectionKind::Breakdown;
-        two.earlier = { { 48, SectionKind::Breakdown } };
+        two.m_rewriteBar = 96;
+        two.m_rewriteKind = SectionKindE::BREAKDOWN;
+        two.m_earlier = { { 48, SectionKindE::BREAKDOWN } };
         const Score second = composeTrack(*p, seed, two);
         auto kindAt = [](const Score& s, int bar) {
-            for (const Section& x : s.sections) if (x.beat == 4.0 * bar) return static_cast<int>(x.kind);
+            for (const Section& x : s.m_sections) if (x.m_beat == 4.0 * bar) return static_cast<int>(x.m_kind);
             return -1;
         };
         const int k48 = kindAt(second, 48), k96 = kindAt(second, 96);
-        const bool shape = k48 == static_cast<int>(SectionKind::Breakdown)
-                        && (k96 == static_cast<int>(SectionKind::Breakdown) || k96 == static_cast<int>(SectionKind::Break))
-                        && kindAt(first, 88) == static_cast<int>(SectionKind::Drop);
+        const bool shape = k48 == static_cast<int>(SectionKindE::BREAKDOWN)
+                        && (k96 == static_cast<int>(SectionKindE::BREAKDOWN) || k96 == static_cast<int>(SectionKindE::BREAK))
+                        && kindAt(first, 88) == static_cast<int>(SectionKindE::DROP);
         chained += shape;
         auto upTo = [](const Score& s) {
             std::vector<std::tuple<double, int, int, float>> out;
-            for (const NoteEvent& n : s.notes) {
-                if (n.beat >= 4.0 * 96 - 4.0) continue;
-                if (n.part == Part::Lead || n.part == Part::Counter || n.part == Part::Piano || n.part == Part::Strings
-                    || n.part == Part::Choir || n.part == Part::Brass || n.part == Part::Timpani || n.part == Part::Fx) continue;
-                out.push_back({ n.beat, static_cast<int>(n.part), n.pitch, n.velocity });
+            for (const NoteEvent& n : s.m_notes) {
+                if (n.m_beat >= 4.0 * 96 - 4.0) continue;
+                if (n.m_part == PartE::LEAD || n.m_part == PartE::COUNTER || n.m_part == PartE::PIANO || n.m_part == PartE::STRINGS
+                    || n.m_part == PartE::CHOIR || n.m_part == PartE::BRASS || n.m_part == PartE::TIMPANI || n.m_part == PartE::FX) continue;
+                out.push_back({ n.m_beat, static_cast<int>(n.m_part), n.m_pitch, n.m_velocity });
             }
             return out;
         };
@@ -1933,8 +1933,8 @@ void testHandover()
     const int bar = 72;
     const Score base = composeTrack(*p, seed);
     TrackRequest req;
-    req.rewriteBar = bar;
-    req.rewriteKind = SectionKind::Breakdown;
+    req.m_rewriteBar = bar;
+    req.m_rewriteKind = SectionKindE::BREAKDOWN;
     const Score re = composeTrack(*p, seed, req);
     const double fs = 48000.0;
     const int block = 256;
@@ -1951,7 +1951,7 @@ void testHandover()
     h.prepare(block);
     std::vector<float> L(block), R(block);
     // The first engine plays to bar 60; the second is sought four bars back from there.
-    const int64_t bar60 = static_cast<int64_t>(std::llround(base.tempo.secondsAt(4.0 * 60) * fs));
+    const int64_t bar60 = static_cast<int64_t>(std::llround(base.m_tempo.secondsAt(4.0 * 60) * fs));
     while (a->samplePosition() < bar60) {
         h.process(*a, *b, L.data(), R.data(), block);
         alone->process(L.data(), R.data(), block);
@@ -1961,11 +1961,11 @@ void testHandover()
     b->seek(seekBeat);
     ref->seek(seekBeat);
     const double diff = firstDifference(base, re, seekBeat);
-    const int64_t deadline = static_cast<int64_t>(std::llround(base.tempo.secondsAt(std::min(diff, 4.0 * bar)) * fs)) - Handover::kFade;
+    const int64_t deadline = static_cast<int64_t>(std::llround(base.m_tempo.secondsAt(std::min(diff, 4.0 * bar)) * fs)) - Handover::Fade;
     std::atomic<bool> done{ false }, ok{ false };
     const auto nextBeat = [&](int64_t s) {
-        const double beat = std::ceil(base.tempo.beatAt(static_cast<double>(s) / fs) - 1e-9);
-        return static_cast<int64_t>(std::llround(base.tempo.secondsAt(beat) * fs));
+        const double beat = std::ceil(base.m_tempo.beatAt(static_cast<double>(s) / fs) - 1e-9);
+        return static_cast<int64_t>(std::llround(base.m_tempo.secondsAt(beat) * fs));
     };
     std::thread worker([&] { ok = h.handOver(*b, deadline, {}, nextBeat); done = true; });
     // The audio thread's part, paced: its blocks and those of the first engine alone, which it should match until the fade.
@@ -1987,15 +1987,15 @@ void testHandover()
     worker.join();
     const int64_t switchedAt = switched ? h.lastTaken() : -1;
     check(ok && switchedAt >= 0 && switchedAt <= deadline
-              && std::fabs(base.tempo.beatAt(switchedAt / fs) - std::round(base.tempo.beatAt(switchedAt / fs))) < 1e-4,
+              && std::fabs(base.m_tempo.beatAt(switchedAt / fs) - std::round(base.m_tempo.beatAt(switchedAt / fs))) < 1e-4,
           "the second engine took over on a beat, before the scores differ",
           fmt("at %.3f s of the track (beat %.3f), the first difference at bar %.2f, deadline %.2f s", switchedAt / fs,
-              base.tempo.beatAt(switchedAt / fs), diff / 4.0, deadline / fs));
+              base.m_tempo.beatAt(switchedAt / fs), diff / 4.0, deadline / fs));
     if (switchedAt < 0) return;
     // After the fade: the second engine's own render from its seek, bit for bit.
     std::vector<float> want;
     while (ref->samplePosition() < start) ref->process(L.data(), R.data(), std::min<int>(block, static_cast<int>(start - ref->samplePosition())));
-    const size_t fadeEnd = static_cast<size_t>(switchedAt - start) + Handover::kFade;
+    const size_t fadeEnd = static_cast<size_t>(switchedAt - start) + Handover::Fade;
     int64_t pos = start;
     while (pos < end) {
         ref->process(L.data(), R.data(), block);
@@ -2009,7 +2009,7 @@ void testHandover()
     // During the fade and before it: the first engine's music. The largest step from one sample to the next round the
     // fade against the largest the first engine alone makes there, and the difference to it.
     const size_t f0 = static_cast<size_t>(switchedAt - start);
-    const size_t w0 = f0 > 4800 ? f0 - 4800 : 0, w1 = std::min(out.size(), f0 + 4800 + Handover::kFade);
+    const size_t w0 = f0 > 4800 ? f0 - 4800 : 0, w1 = std::min(out.size(), f0 + 4800 + Handover::Fade);
     float stepOut = 0.0f, stepLone = 0.0f;
     for (size_t i = w0 + 1; i < w1; ++i) {
         stepOut = std::max(stepOut, std::fabs(out[i] - out[i - 1]));
@@ -2024,11 +2024,11 @@ void testHandover()
         return std::sqrt(s / static_cast<double>(n)) + 1e-12;
     };
     double dip = 0.0;
-    for (size_t i = f0; i + 128 <= f0 + Handover::kFade && i + 128 <= out.size(); i += 128)
+    for (size_t i = f0; i + 128 <= f0 + Handover::Fade && i + 128 <= out.size(); i += 128)
         dip = std::min(dip, 20.0 * std::log10(rms(out, i, 128) / std::min(rms(lone, i, 128), rms(want, i, 128))));
     check(dip > -3.0, "no hole: through the fade the level stays with the two engines'", fmt("at most %.2f dB under the quieter", dip));
     // After it, until the rewrite: the same music, as loud (what the second lacks: notes held from before its seek).
-    const size_t after = f0 + Handover::kFade;
+    const size_t after = f0 + Handover::Fade;
     const size_t span = std::min<size_t>(static_cast<size_t>(2.0 * fs), out.size() - after);
     const double lvl = 20.0 * std::log10(rms(out, after, span) / rms(lone, after, span));
     check(std::fabs(lvl) < 0.5, "after it as loud as the first engine would have been", fmt("%+.2f dB over 2 s", lvl));
@@ -2047,40 +2047,40 @@ void testSubGenres()
 {
     section("the sub-genres");
     auto p = std::make_unique<ParamStore>();
-    auto gesturesOn = [&](const Score& sc, Module m, int param) {
+    auto gesturesOn = [&](const Score& sc, ModuleE m, int param) {
         const int id = p->id(m, 0, param);
         int n = 0;
-        for (const Gesture& g : sc.gestures) n += g.param == id;
+        for (const Gesture& g : sc.m_gestures) n += g.m_param == id;
         return n;
     };
-    auto knobOf = [&](const Score& sc, Module m, int param, float& value) {
+    auto knobOf = [&](const Score& sc, ModuleE m, int param, float& value) {
         const int id = p->id(m, 0, param);
-        for (const KnobSet& k : sc.knobs) if (k.param == id) { value = k.value; return true; }
+        for (const KnobSet& k : sc.m_knobs) if (k.m_param == id) { value = k.m_value; return true; }
         return false;
     };
     {
         p->parseText("compose.style=Acid");
         const Score sc = composeTrack(*p, 3);
         int acid = 0;
-        for (const NoteEvent& n : sc.notes) acid += n.part == Part::Acid;
-        const int curves = std::min({ gesturesOn(sc, Module::Acid, synth::Cutoff), gesturesOn(sc, Module::Acid, synth::Resonance),
-                                      gesturesOn(sc, Module::Acid, synth::EnvAmount), gesturesOn(sc, Module::Acid, synth::Decay) });
+        for (const NoteEvent& n : sc.m_notes) acid += n.m_part == PartE::ACID;
+        const int curves = std::min({ gesturesOn(sc, ModuleE::ACID, synth::CUTOFF), gesturesOn(sc, ModuleE::ACID, synth::RESONANCE),
+                                      gesturesOn(sc, ModuleE::ACID, synth::ENV_AMOUNT), gesturesOn(sc, ModuleE::ACID, synth::DECAY) });
         check(acid > 500 && curves >= 4, "Acid: the 303 plays, its cutoff, resonance, envelope and decay in curves", fmt("%d notes, %d curves each at least", acid, curves));
     }
     {
         p->parseText("compose.style=Deep");
         const Score sc = composeTrack(*p, 3);
         float cloud = -60.0f;
-        const bool has = knobOf(sc, Module::Cloud, cloud::Level, cloud);
+        const bool has = knobOf(sc, ModuleE::CLOUD, cloud::LEVEL, cloud);
         int drift = 0;
-        for (const Gesture& g : sc.gestures) drift += g.param == p->id(Module::Poly, static_cast<int>(PolyInstance::Pad), poly::Pan);
+        for (const Gesture& g : sc.m_gestures) drift += g.m_param == p->id(ModuleE::POLY, static_cast<int>(PolyInstanceE::PAD), poly::PAN);
         check(has && cloud > -30.0f && drift > 4, "Deep: the granular cloud and the pad drifting", fmt("cloud %.0f dB, %d pan waves", cloud, drift));
     }
     {
         p->parseText("compose.style=Dream House");
         const Score sc = composeTrack(*p, 3);
         int piano = 0, lead = 0;
-        for (const NoteEvent& n : sc.notes) { piano += n.part == Part::Piano; lead += n.part == Part::Lead; }
+        for (const NoteEvent& n : sc.m_notes) { piano += n.m_part == PartE::PIANO; lead += n.m_part == PartE::LEAD; }
         check(piano > 50 && lead == 0, "Dream House: the motif on the piano", fmt("%d piano notes", piano));
     }
     {
@@ -2089,18 +2089,18 @@ void testSubGenres()
         for (uint64_t seed = 1; seed <= 8; ++seed) {
             const Score sc = composeTrack(*p, seed);
             bool o = false;
-            for (const NoteEvent& n : sc.notes) o = o || n.part == Part::Strings;
+            for (const NoteEvent& n : sc.m_notes) o = o || n.m_part == PartE::STRINGS;
             with += o;
         }
         check(with >= 2 && with <= 7, "Uplifting: the orchestra in some tracks (Cinematic), not in all", fmt("%d of 8", with));
     }
     {
-        const StyleProfile m = morphProfile(styleProfile(Style::Uplifting), styleProfile(Style::Deep), 0.5f);
-        const StyleProfile& a = styleProfile(Style::Uplifting);
-        const StyleProfile& b = styleProfile(Style::Deep);
-        const bool between = (m.bpmLow - a.bpmLow) * (m.bpmLow - b.bpmLow) <= 0.0f && (m.gapLu - a.gapLu) * (m.gapLu - b.gapLu) <= 0.0f
-                          && (m.orchestra - a.orchestra) * (m.orchestra - b.orchestra) <= 0.0f;
-        check(between, "a morph lands between its two profiles", fmt("tempo from %.0f, gap %.1f LU", m.bpmLow, m.gapLu));
+        const StyleProfile m = morphProfile(styleProfile(StyleE::UPLIFTING), styleProfile(StyleE::DEEP), 0.5f);
+        const StyleProfile& a = styleProfile(StyleE::UPLIFTING);
+        const StyleProfile& b = styleProfile(StyleE::DEEP);
+        const bool between = (m.m_bpmLow - a.m_bpmLow) * (m.m_bpmLow - b.m_bpmLow) <= 0.0f && (m.m_gapLu - a.m_gapLu) * (m.m_gapLu - b.m_gapLu) <= 0.0f
+                          && (m.m_orchestra - a.m_orchestra) * (m.m_orchestra - b.m_orchestra) <= 0.0f;
+        check(between, "a morph lands between its two profiles", fmt("tempo from %.0f, gap %.1f LU", m.m_bpmLow, m.m_gapLu));
     }
     p->parseText("compose.style=Uplifting");
 }
@@ -2118,24 +2118,24 @@ void testSet()
     p->parseText("set.dramaturgy=Peak; set.journey=Wander");
     SetInfo si;
     const SetScore set = composeSet(*p, 5, 70.0, nullptr, &si);
-    const size_t n = si.tracks.size();
+    const size_t n = si.m_tracks.size();
     check(n >= 8, "a set of seventy minutes has its tracks", fmt("%zu tracks", n));
     int alternate = 0, tempoOk = 0, wheel = 0, swapOk = 0, clean = 0, styles = 0;
     std::set<std::string> seen;
     for (size_t i = 0; i < n; ++i) {
-        const SetTrack& t = si.tracks[i];
-        seen.insert(t.info.style);
+        const SetTrack& t = si.m_tracks[i];
+        seen.insert(t.m_info.m_style);
         if (i == 0) continue;
-        const SetTrack& a = si.tracks[i - 1];
-        alternate += t.deck != a.deck;
-        tempoOk += std::fabs(t.info.bpm - a.info.bpm) <= 2.0f;
-        const int d = ((t.info.key - a.info.key) % 12 + 12) % 12;
-        const bool am = a.info.scale != static_cast<int>(Scale::Ionian), tm = t.info.scale != static_cast<int>(Scale::Ionian);
+        const SetTrack& a = si.m_tracks[i - 1];
+        alternate += t.m_deck != a.m_deck;
+        tempoOk += std::fabs(t.m_info.m_bpm - a.m_info.m_bpm) <= 2.0f;
+        const int d = ((t.m_info.m_key - a.m_info.m_key) % 12 + 12) % 12;
+        const bool am = a.m_info.m_scale != static_cast<int>(ScaleE::IONIAN), tm = t.m_info.m_scale != static_cast<int>(ScaleE::IONIAN);
         const bool camelot = (am == tm && (d == 0 || d == 5 || d == 7)) || (am && !tm && d == 3) || (!am && tm && d == 9);
         wheel += camelot;
-        swapOk += std::fabs(a.swapOut - t.swapIn) < 1e-9 && t.swapIn > t.start && t.swapIn < a.end && t.start + t.info.introBars * 4.0 <= a.end + 1e-9;
+        swapOk += std::fabs(a.m_swapOut - t.m_swapIn) < 1e-9 && t.m_swapIn > t.m_start && t.m_swapIn < a.m_end && t.m_start + t.m_info.m_introBars * 4.0 <= a.m_end + 1e-9;
         bool breakdownBefore = false;
-        for (const auto& b : t.info.breakdowns) breakdownBefore = breakdownBefore || t.start + b.first * 4.0 < t.swapIn;
+        for (const auto& b : t.m_info.m_breakdowns) breakdownBefore = breakdownBefore || t.m_start + b.first * 4.0 < t.m_swapIn;
         clean += !breakdownBefore;
     }
     styles = static_cast<int>(seen.size());
@@ -2146,13 +2146,13 @@ void testSet()
           fmt("%d and %d of %d", swapOk, clean, k));
     check(styles >= 2, "with Wander the styles follow the arc", fmt("%d styles", styles));
     // A blend at any block size.
-    const double at = set.decks[0].tempo.secondsAt(si.tracks[1].swapIn) - 3.0;
+    const double at = set.m_decks[0].m_tempo.secondsAt(si.m_tracks[1].m_swapIn) - 3.0;
     auto render = [&](int block) {
         auto e = std::make_unique<Engine>();
         e->params().copyValuesFrom(*p);
         e->prepare(48000.0, block);
         e->loadSet(set);
-        e->seek(set.decks[0].tempo.beatAt(at));
+        e->seek(set.m_decks[0].m_tempo.beatAt(at));
         std::vector<float> out, L(static_cast<size_t>(block)), R(static_cast<size_t>(block));
         const int total = static_cast<int>(6.0 * 48000.0);
         for (int done = 0; done < total; done += block) {
@@ -2171,8 +2171,8 @@ void testSet()
 
 /** @brief A section of the tests, as main() can run it alone. */
 struct TestSection {
-    const char* name;   ///< its name, as the command line names it
-    std::function<void()> fn;   ///< the section
+    const char* m_name;   ///< its name, as the command line names it
+    std::function<void()> m_fn;   ///< the section
 };
 
 /** The keyboard (01.10.2026, Engine::queueLive): with the composer off nothing generated sounds; a played key sounds on
@@ -2220,7 +2220,7 @@ void testNoteTap()
     section("MIDI out (note tap)");
     auto p = std::make_unique<ParamStore>();
     const Score score = composeTrack(*p, 21);
-    struct Count { int ons = 0, kicks = 0, polyOffs = 0, polyOns = 0; bool inBlock = true, offsAfter = true; };
+    struct Count { int m_ons = 0, m_kicks = 0, m_polyOffs = 0, m_polyOns = 0; bool m_inBlock = true, m_offsAfter = true; };
     auto run = [&](const char* knobs) {
         auto e = std::make_unique<Engine>();
         e->params().parseText(knobs);
@@ -2236,17 +2236,17 @@ void testNoteTap()
             tap->clear();
             const int64_t s0 = e->samplePosition();
             e->process(L.data(), R.data(), 256);
-            for (int i = 0; i < tap->count; ++i) {
-                const NoteTap::Note& nt = tap->notes[i];
-                if (nt.sample < s0 || nt.sample >= s0 + 256) c.inBlock = false;
-                if (nt.velocity == 0) continue;
-                ++c.ons;
-                if (nt.part == static_cast<uint8_t>(Part::Kick)) ++c.kicks;
-                if (polyOf(static_cast<Part>(nt.part)) >= 0) {
-                    ++c.polyOns;
-                    if (nt.offSample > nt.sample) ++c.polyOffs;
+            for (int i = 0; i < tap->m_count; ++i) {
+                const NoteTap::Note& nt = tap->m_notes[i];
+                if (nt.m_sample < s0 || nt.m_sample >= s0 + 256) c.m_inBlock = false;
+                if (nt.m_velocity == 0) continue;
+                ++c.m_ons;
+                if (nt.m_part == static_cast<uint8_t>(PartE::KICK)) ++c.m_kicks;
+                if (polyOf(static_cast<PartE>(nt.m_part)) >= 0) {
+                    ++c.m_polyOns;
+                    if (nt.m_offSample > nt.m_sample) ++c.m_polyOffs;
                 }
-                if (nt.offSample >= 0 && nt.offSample <= nt.sample) c.offsAfter = false;
+                if (nt.m_offSample >= 0 && nt.m_offSample <= nt.m_sample) c.m_offsAfter = false;
             }
         }
         return c;
@@ -2254,13 +2254,13 @@ void testNoteTap()
     const Count all = run("");
     const Count noKick = run("perform.mute_kick=1");
     const Count off = run("perform.composer=0");
-    check(all.kicks >= 8 && all.ons > all.kicks, "the composer's notes are tapped, the kick among them",
-          fmt("%d notes, %d kicks, %d of the poly voices", all.ons, all.kicks, all.polyOns));
-    check(all.inBlock && noKick.inBlock, "every tapped note lies in the block it was played in");
-    check(all.offsAfter && all.polyOffs == all.polyOns, "a note without an off of its own carries one after it (a poly voice: its gate)",
-          fmt("%d of %d", all.polyOffs, all.polyOns));
-    check(noKick.kicks == 0 && noKick.ons > 0, "a muted group's notes are not tapped", fmt("%d kicks of %d", noKick.kicks, noKick.ons));
-    check(off.ons == 0, "the composer off: nothing tapped", fmt("%d notes", off.ons));
+    check(all.m_kicks >= 8 && all.m_ons > all.m_kicks, "the composer's notes are tapped, the kick among them",
+          fmt("%d notes, %d kicks, %d of the poly voices", all.m_ons, all.m_kicks, all.m_polyOns));
+    check(all.m_inBlock && noKick.m_inBlock, "every tapped note lies in the block it was played in");
+    check(all.m_offsAfter && all.m_polyOffs == all.m_polyOns, "a note without an off of its own carries one after it (a poly voice: its gate)",
+          fmt("%d of %d", all.m_polyOffs, all.m_polyOns));
+    check(noKick.m_kicks == 0 && noKick.m_ons > 0, "a muted group's notes are not tapped", fmt("%d kicks of %d", noKick.m_kicks, noKick.m_ons));
+    check(off.m_ons == 0, "the composer off: nothing tapped", fmt("%d notes", off.m_ons));
 }
 
 /** The family jam (02.10.2026, the plugin's Jam.h): a follower's engine plays its pitched parts the jam's transposition
@@ -2271,12 +2271,12 @@ void testJam()
     auto p = std::make_unique<ParamStore>();
     const Score score = composeTrack(*p, 21);
     struct Got {
-        std::vector<std::pair<int, int>> pitched;   ///< (part, pitch) of every pitched note-on, in order
-        std::vector<int> kit;                       ///< the kit's note-on pitches, in order
-        int out = 0;                                ///< note-ons of the parts a break takes out
+        std::vector<std::pair<int, int>> m_pitched;   ///< (part, pitch) of every pitched note-on, in order
+        std::vector<int> m_kit;                       ///< the kit's note-on pitches, in order
+        int m_out = 0;                                ///< note-ons of the parts a break takes out
     };
-    auto isPitched = [](Part part) { return part == Part::Sub || part == Part::Bass || part == Part::Acid || part == Part::Lead || part == Part::Counter || part == Part::Pluck || part == Part::Arp || part == Part::Pad || part == Part::Stab || part == Part::Piano || part == Part::Strings || part == Part::Choir || part == Part::Brass || part == Part::Timpani; };
-    auto isOut = [](Part part) { return part == Part::Kick || part == Part::Sub || part == Part::Bass || part == Part::Acid; };
+    auto isPitched = [](PartE part) { return part == PartE::SUB || part == PartE::BASS || part == PartE::ACID || part == PartE::LEAD || part == PartE::COUNTER || part == PartE::PLUCK || part == PartE::ARP || part == PartE::PAD || part == PartE::STAB || part == PartE::PIANO || part == PartE::STRINGS || part == PartE::CHOIR || part == PartE::BRASS || part == PartE::TIMPANI; };
+    auto isOut = [](PartE part) { return part == PartE::KICK || part == PartE::SUB || part == PartE::BASS || part == PartE::ACID; };
     auto run = [&](int transpose, bool rhythmOut) {
         auto e = std::make_unique<Engine>();
         e->setLive(true);
@@ -2291,27 +2291,27 @@ void testJam()
         for (int b = 0; b < 48000 * 8 / 256; ++b) {
             tap->clear();
             e->process(L.data(), R.data(), 256);
-            for (int i = 0; i < tap->count; ++i) {
-                const NoteTap::Note& nt = tap->notes[i];
-                if (nt.velocity == 0) continue;
-                const Part part = static_cast<Part>(nt.part);
-                if (isOut(part)) ++g.out;
-                if (isPitched(part)) g.pitched.emplace_back(nt.part, nt.pitch);
-                else g.kit.push_back(nt.pitch);
+            for (int i = 0; i < tap->m_count; ++i) {
+                const NoteTap::Note& nt = tap->m_notes[i];
+                if (nt.m_velocity == 0) continue;
+                const PartE part = static_cast<PartE>(nt.m_part);
+                if (isOut(part)) ++g.m_out;
+                if (isPitched(part)) g.m_pitched.emplace_back(nt.m_part, nt.m_pitch);
+                else g.m_kit.push_back(nt.m_pitch);
             }
         }
         return g;
     };
     const Got plain = run(0, false), up = run(3, false), down = run(-5, false), brk = run(0, true);
-    bool shifted = !plain.pitched.empty() && up.pitched.size() == plain.pitched.size() && down.pitched.size() == plain.pitched.size();
-    for (size_t i = 0; shifted && i < plain.pitched.size(); ++i)
-        shifted = up.pitched[i].first == plain.pitched[i].first && up.pitched[i].second == std::min(127, plain.pitched[i].second + 3)
-               && down.pitched[i].second == std::max(0, plain.pitched[i].second - 5);
+    bool shifted = !plain.m_pitched.empty() && up.m_pitched.size() == plain.m_pitched.size() && down.m_pitched.size() == plain.m_pitched.size();
+    for (size_t i = 0; shifted && i < plain.m_pitched.size(); ++i)
+        shifted = up.m_pitched[i].first == plain.m_pitched[i].first && up.m_pitched[i].second == std::min(127, plain.m_pitched[i].second + 3)
+               && down.m_pitched[i].second == std::max(0, plain.m_pitched[i].second - 5);
     check(shifted, "the pitched parts play the jam's transposition, note for note (+3 and -5)",
-          fmt("%d pitched notes", static_cast<int>(plain.pitched.size())));
-    check(up.kit == plain.kit && !plain.kit.empty(), "the kit plays as written", fmt("%d hits", static_cast<int>(plain.kit.size())));
-    check(plain.out > 0 && brk.out == 0, "in the leader's break the rhythm's foundation is out",
-          fmt("%d notes as written, %d in the break", plain.out, brk.out));
+          fmt("%d pitched notes", static_cast<int>(plain.m_pitched.size())));
+    check(up.m_kit == plain.m_kit && !plain.m_kit.empty(), "the kit plays as written", fmt("%d hits", static_cast<int>(plain.m_kit.size())));
+    check(plain.m_out > 0 && brk.m_out == 0, "in the leader's break the rhythm's foundation is out",
+          fmt("%d notes as written, %d in the break", plain.m_out, brk.m_out));
 }
 
 /** The keyboard's split (02.10.2026): a key that names its target plays that voice, whatever Keyboard Plays says --
@@ -2342,14 +2342,14 @@ void testKeySplit()
         return std::pair<double, double>(held, after);
     };
     const auto plain = run(-1);
-    const auto named = run(perform::keys::Lead);
+    const auto named = run(perform::keys::LEAD);
     check(plain.first < 1e-9, "Keyboard Plays off: a plain key is silent", fmt("%.3g", plain.first));
     check(named.first > 1e-3, "a key naming its voice plays it", fmt("%.3g", named.first));
     check(named.second < 0.05 * named.first, "and its release ends it", fmt("%.3g after, %.3g held", named.second, named.first));
 }
 
 /** @brief Every section, in the order they run. */
-const TestSection kSections[] = {
+const TestSection Sections[] = {
     { "testTempoMap", testTempoMap },
     { "testParams", testParams },
     { "testKickPhase", testKickPhase },
@@ -2396,12 +2396,12 @@ int main(int argc, char** argv)
     std::string only;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--list") == 0) {
-            for (const TestSection& s : kSections) std::printf("%s\n", s.name);
+            for (const TestSection& s : Sections) std::printf("%s\n", s.m_name);
             return 0;
         }
         if (std::strcmp(argv[i], "--only") == 0 && i + 1 < argc) only = std::string(",") + argv[++i] + ",";
     }
-    for (const TestSection& s : kSections)
-        if (only.empty() || only.find(std::string(",") + s.name + ",") != std::string::npos) s.fn();
+    for (const TestSection& s : Sections)
+        if (only.empty() || only.find(std::string(",") + s.m_name + ",") != std::string::npos) s.m_fn();
     return finish();
 }

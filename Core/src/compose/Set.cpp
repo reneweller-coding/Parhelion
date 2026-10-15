@@ -16,12 +16,12 @@
 
 namespace parh {
 
-const char* const kDramaturgyNames[] = { "Warm-up", "Peak", "Closing", "Sunrise", "Journey" };
+const char* const DramaturgyNames[] = { "Warm-up", "Peak", "Closing", "Sunrise", "Journey" };
 
 namespace {
 
-constexpr double kBar = 4.0;   ///< beats per bar
-constexpr double kPiD = 3.14159265358979323846;   ///< pi
+constexpr double Bar = 4.0;   ///< beats per bar
+constexpr double PiD = 3.14159265358979323846;   ///< pi
 
 /** @brief The FNV-1a hash of @p s. */
 uint64_t hashName(const std::string& s)
@@ -34,59 +34,59 @@ uint64_t hashName(const std::string& s)
 /** @brief The style ladder (Set.h), a place on it morphed between neighbours. */
 StyleProfile ladderProfile(float x)
 {
-    static const Style kLadder[5] = { Style::Deep, Style::Progressive, Style::DreamHouse, Style::Uplifting, Style::Acid };
+    static const StyleE Ladder[5] = { StyleE::DEEP, StyleE::PROGRESSIVE, StyleE::DREAM_HOUSE, StyleE::UPLIFTING, StyleE::ACID };
     x = std::clamp(x, 0.0f, 4.0f);
     const int i = std::min(3, static_cast<int>(x));
-    return morphProfile(styleProfile(kLadder[i]), styleProfile(kLadder[i + 1]), x - static_cast<float>(i));
+    return morphProfile(styleProfile(Ladder[i]), styleProfile(Ladder[i + 1]), x - static_cast<float>(i));
 }
 
 /** @brief A minor mode after the profile's weights (Ionian left out), or Ionian for a major key. */
 int scaleFor(const StyleProfile& prof, bool minor, float u)
 {
-    if (!minor) return static_cast<int>(Scale::Ionian);
-    std::array<float, 6> w = prof.scales;
-    w[static_cast<size_t>(Scale::Ionian)] = 0.0f;
+    if (!minor) return static_cast<int>(ScaleE::IONIAN);
+    std::array<float, 6> w = prof.m_scales;
+    w[static_cast<size_t>(ScaleE::IONIAN)] = 0.0f;
     float sum = 0.0f;
     for (float x : w) sum += x;
-    if (sum <= 0.0f) return static_cast<int>(Scale::Aeolian);
+    if (sum <= 0.0f) return static_cast<int>(ScaleE::AEOLIAN);
     return drawWeighted(w.data(), 6, u);
 }
 
 /** @brief Appends @p src, moved @p offset beats later, to @p dst (tempo and length are the caller's). */
 void appendShifted(Score& dst, const Score& src, double offset)
 {
-    for (NoteEvent n : src.notes) { n.beat += offset; dst.notes.push_back(n); }
-    for (Gesture g : src.gestures) { g.beat += offset; dst.gestures.push_back(g); }
-    for (Marker m : src.markers) { m.beat += offset; dst.markers.push_back(m); }
-    for (LevelMark l : src.levels) { l.beat += offset; l.peakBeat += offset; dst.levels.push_back(l); }
-    for (KnobSet k : src.knobs) { k.beat += offset; dst.knobs.push_back(k); }
-    for (SoundPick s : src.sounds) { s.beat += offset; dst.sounds.push_back(s); }
-    for (Section s : src.sections) { s.beat += offset; dst.sections.push_back(s); }
-    for (LayerBlock b : src.layers) { b.beat += offset; dst.layers.push_back(b); }
+    for (NoteEvent n : src.m_notes) { n.m_beat += offset; dst.m_notes.push_back(n); }
+    for (Gesture g : src.m_gestures) { g.m_beat += offset; dst.m_gestures.push_back(g); }
+    for (Marker m : src.m_markers) { m.m_beat += offset; dst.m_markers.push_back(m); }
+    for (LevelMark l : src.m_levels) { l.m_beat += offset; l.m_peakBeat += offset; dst.m_levels.push_back(l); }
+    for (KnobSet k : src.m_knobs) { k.m_beat += offset; dst.m_knobs.push_back(k); }
+    for (SoundPick s : src.m_sounds) { s.m_beat += offset; dst.m_sounds.push_back(s); }
+    for (Section s : src.m_sections) { s.m_beat += offset; dst.m_sections.push_back(s); }
+    for (LayerBlock b : src.m_layers) { b.m_beat += offset; dst.m_layers.push_back(b); }
 }
 
 /** @brief A step of knob @p id to @p value at @p beat, as an offset from the knob in @p p. */
 Gesture stepOf(const ParamStore& p, int id, double beat, float value)
 {
     Gesture g;
-    g.param = id;
-    g.beat = beat;
-    g.length = 0.0;
-    g.from = g.to = p.toNormalised(id, value) - p.toNormalised(id, p.get(id));
-    g.shape = GestureShape::Step;
+    g.m_param = id;
+    g.m_beat = beat;
+    g.m_length = 0.0;
+    g.m_from = g.m_to = p.toNormalised(id, value) - p.toNormalised(id, p.get(id));
+    g.m_shape = GestureShapeE::STEP;
     return g;
 }
 
 /** @brief A ramp of knob @p id from @p beat over @p length beats, @p from to @p to in @p shape, as offsets from the knob. */
-Gesture rampOf(const ParamStore& p, int id, double beat, double length, float from, float to, GestureShape shape)
+Gesture rampOf(const ParamStore& p, int id, double beat, double length, float from, float to, GestureShapeE shape)
 {
     Gesture g;
-    g.param = id;
-    g.beat = beat;
-    g.length = length;
-    g.from = p.toNormalised(id, from) - p.toNormalised(id, p.get(id));
-    g.to = p.toNormalised(id, to) - p.toNormalised(id, p.get(id));
-    g.shape = shape;
+    g.m_param = id;
+    g.m_beat = beat;
+    g.m_length = length;
+    g.m_from = p.toNormalised(id, from) - p.toNormalised(id, p.get(id));
+    g.m_to = p.toNormalised(id, to) - p.toNormalised(id, p.get(id));
+    g.m_shape = shape;
     return g;
 }
 
@@ -97,57 +97,57 @@ Gesture rampOf(const ParamStore& p, int id, double beat, double length, float fr
 void homeBetween(Score& deck, const std::vector<std::pair<double, std::vector<Gesture>>>& pieces, int mixFirst, int mixEnd)
 {
     std::set<int> moved;
-    for (const auto& piece : pieces) for (const Gesture& g : piece.second) if (g.param < mixFirst || g.param >= mixEnd) moved.insert(g.param);
+    for (const auto& piece : pieces) for (const Gesture& g : piece.second) if (g.m_param < mixFirst || g.m_param >= mixEnd) moved.insert(g.m_param);
     for (const auto& piece : pieces) {
         for (int id : moved) {
             Gesture g;
-            g.param = id;
-            g.beat = piece.first;
-            g.length = 0.0;
-            g.shape = GestureShape::Step;
-            deck.gestures.push_back(g);
+            g.m_param = id;
+            g.m_beat = piece.first;
+            g.m_length = 0.0;
+            g.m_shape = GestureShapeE::STEP;
+            deck.m_gestures.push_back(g);
         }
-        for (const Gesture& g : piece.second) deck.gestures.push_back(g);
+        for (const Gesture& g : piece.second) deck.m_gestures.push_back(g);
     }
 }
 
 /** @brief Whether scale @p scale is a minor one (all but Ionian). */
-bool minorScale(int scale) { return scale != static_cast<int>(Scale::Ionian); }
+bool minorScale(int scale) { return scale != static_cast<int>(ScaleE::IONIAN); }
 
 } // namespace
 
-float setEnergy(Dramaturgy d, float t)
+float setEnergy(DramaturgyE d, float t)
 {
     t = std::clamp(t, 0.0f, 1.0f);
     switch (d) {
-    case Dramaturgy::WarmUp: return 0.3f + 0.4f * t;
-    case Dramaturgy::Closing: return 0.85f - 0.45f * t;
-    case Dramaturgy::Sunrise: return 0.45f + 0.55f * t;
-    case Dramaturgy::Journey: return 0.45f + 0.15f * t + 0.3f * static_cast<float>(std::sin(2.0 * kPiD * 1.5 * t));
+    case DramaturgyE::WARM_UP: return 0.3f + 0.4f * t;
+    case DramaturgyE::CLOSING: return 0.85f - 0.45f * t;
+    case DramaturgyE::SUNRISE: return 0.45f + 0.55f * t;
+    case DramaturgyE::JOURNEY: return 0.45f + 0.15f * t + 0.3f * static_cast<float>(std::sin(2.0 * PiD * 1.5 * t));
     default: return t < 0.7f ? 0.55f + 0.45f * t / 0.7f : 1.0f - 0.25f * (t - 0.7f) / 0.3f;   // Peak
     }
 }
 
-float setTempo(Dramaturgy d, float t)
+float setTempo(DramaturgyE d, float t)
 {
     t = std::clamp(t, 0.0f, 1.0f);
     switch (d) {
-    case Dramaturgy::WarmUp: return 130.0f + 6.0f * t;
-    case Dramaturgy::Closing: return 139.0f - 7.0f * t;
-    case Dramaturgy::Sunrise: return 134.0f + 4.0f * t;
-    case Dramaturgy::Journey: return 132.0f + 6.0f * t;
+    case DramaturgyE::WARM_UP: return 130.0f + 6.0f * t;
+    case DramaturgyE::CLOSING: return 139.0f - 7.0f * t;
+    case DramaturgyE::SUNRISE: return 134.0f + 4.0f * t;
+    case DramaturgyE::JOURNEY: return 132.0f + 6.0f * t;
     default: return t < 0.7f ? 136.0f + 4.0f * t / 0.7f : 140.0f;   // Peak
     }
 }
 
-float setLadder(Dramaturgy d, float t, float e)
+float setLadder(DramaturgyE d, float t, float e)
 {
     t = std::clamp(t, 0.0f, 1.0f);
     switch (d) {
-    case Dramaturgy::WarmUp: return 1.2f * t;                 // Deep -> Progressive
-    case Dramaturgy::Closing: return 3.0f - 2.0f * t;         // Uplifting -> Progressive
-    case Dramaturgy::Sunrise: return 1.0f + 2.0f * t;         // Progressive -> Uplifting
-    case Dramaturgy::Journey: return 4.0f * std::clamp(e, 0.0f, 1.0f);
+    case DramaturgyE::WARM_UP: return 1.2f * t;                 // Deep -> Progressive
+    case DramaturgyE::CLOSING: return 3.0f - 2.0f * t;         // Uplifting -> Progressive
+    case DramaturgyE::SUNRISE: return 1.0f + 2.0f * t;         // Progressive -> Uplifting
+    case DramaturgyE::JOURNEY: return 4.0f * std::clamp(e, 0.0f, 1.0f);
     default: return 2.6f + 1.4f * std::clamp(e, 0.0f, 1.0f); // Peak: Uplifting and Acid
     }
 }
@@ -155,17 +155,17 @@ float setLadder(Dramaturgy d, float t, float e)
 SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Curation* cur, SetInfo* info, const Preferences* prefs,
                     const std::function<void(Score&)>& prepare, const std::function<bool()>& stop)
 {
-    const Dramaturgy dram = static_cast<Dramaturgy>(p.getInt(p.id(Module::Set, 0, set::Dramaturgy)));
-    const bool wander = p.getInt(p.id(Module::Set, 0, set::Journey)) != 0;
-    const int blendBars = p.getInt(p.id(Module::Set, 0, set::BlendBars)) == 0 ? 32 : 64;
-    const float trackMinutes = p.get(p.id(Module::Set, 0, set::TrackMinutes));
+    const DramaturgyE dram = static_cast<DramaturgyE>(p.getInt(p.id(ModuleE::SET, 0, set::DRAMATURGY)));
+    const bool wander = p.getInt(p.id(ModuleE::SET, 0, set::JOURNEY)) != 0;
+    const int blendBars = p.getInt(p.id(ModuleE::SET, 0, set::BLEND_BARS)) == 0 ? 32 : 64;
+    const float trackMinutes = p.get(p.id(ModuleE::SET, 0, set::TRACK_MINUTES));
     const double totalSeconds = std::max(1.0, minutes) * 60.0;
     Rng sr;
     sr.seed(mixSeed(mixSeed(seed, hashName("set")), static_cast<uint64_t>(cur != nullptr ? cur->count("set") : 0)));
     const StyleProfile fixed = profileOf(p);
 
     SetInfo si;
-    si.dramaturgy = dram;
+    si.m_dramaturgy = dram;
     std::vector<Score> scores;
     TempoMap tempo;
     double seconds = 0.0;
@@ -179,14 +179,14 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
         StyleProfile prof = wander ? ladderProfile(setLadder(dram, t, e)) : fixed;
         // Sunrise: the last track (the one that will end the set) the most euphoric -- Uplifting with its orchestra.
         const bool last = seconds + 0.85 * trackMinutes * 60.0 >= totalSeconds;
-        if (dram == Dramaturgy::Sunrise && last) { prof = styleProfile(Style::Uplifting); prof.orchestra = 1.0f; }
+        if (dram == DramaturgyE::SUNRISE && last) { prof = styleProfile(StyleE::UPLIFTING); prof.m_orchestra = 1.0f; }
         float bpm = std::round(2.0f * setTempo(dram, t)) * 0.5f;
         if (i > 0) bpm = std::clamp(bpm, bpmPrev - 2.0f, bpmPrev + 2.0f);
         // The key round the Camelot wheel (drawn every time, so the stream stays put).
         const float uk = sr.uniform(), ud = sr.uniform(), um = sr.uniform(), us = sr.uniform();
         const int anyKey = sr.below(12);
         int key = anyKey;
-        bool minor = um < prof.minor;
+        bool minor = um < prof.m_minor;
         if (i > 0) {
             minor = minorPrev;
             if (uk < 0.3f) key = keyPrev;                                                   // the same
@@ -200,161 +200,161 @@ SetScore composeSet(const ParamStore& p, uint64_t seed, double minutes, const Cu
         const uint64_t trackSeed = mixSeed(mixSeed(seed, 0x545241434Bull + static_cast<uint64_t>(i)),
                                            static_cast<uint64_t>(cur != nullptr ? cur->count("track" + std::to_string(i + 1)) : 0));
         TrackRequest req;
-        req.profile = &prof;
-        req.bpm = bpm;
-        req.key = key;
-        req.scale = scale;
-        req.bars = std::max(96, static_cast<int>(std::lround(trackMinutes * bpm / 4.0 / 32.0)) * 32);
-        req.energy = e;
-        req.mixable = true;
-        req.opener = i == 0;   // (nothing is mixed into the first: it may open on its atmosphere)
-        req.prefs = prefs;
+        req.m_profile = &prof;
+        req.m_bpm = bpm;
+        req.m_key = key;
+        req.m_scale = scale;
+        req.m_bars = std::max(96, static_cast<int>(std::lround(trackMinutes * bpm / 4.0 / 32.0)) * 32);
+        req.m_energy = e;
+        req.m_mixable = true;
+        req.m_opener = i == 0;   // (nothing is mixed into the first: it may open on its atmosphere)
+        req.m_prefs = prefs;
         SetTrack st;
-        st.energy = e;
-        st.seed = trackSeed;
-        Score sc = composeTrack(p, trackSeed, req, cur, unit, &st.info);
+        st.m_energy = e;
+        st.m_seed = trackSeed;
+        Score sc = composeTrack(p, trackSeed, req, cur, unit, &st.m_info);
         if (prepare) prepare(sc);
         if (i == 0) {
-            st.deck = 0;
-            st.start = 0.0;
-            st.swapIn = 0.0;
+            st.m_deck = 0;
+            st.m_start = 0.0;
+            st.m_swapIn = 0.0;
             tempo.setConstant(bpm);
         } else {
-            SetTrack& prev = si.tracks.back();
-            st.deck = 1 - prev.deck;
+            SetTrack& prev = si.m_tracks.back();
+            st.m_deck = 1 - prev.m_deck;
             // The incoming intro over the outgoing end; the swap 16 bars before the incoming groove.
-            st.start = prev.end - st.info.introBars * kBar;
-            const double swap = st.start + std::max(st.info.bassBar, st.info.introBars - 16) * kBar;
-            prev.swapOut = swap;
-            st.swapIn = swap;
-            const double open = std::max(st.start, swap - blendBars * kBar);
+            st.m_start = prev.m_end - st.m_info.m_introBars * Bar;
+            const double swap = st.m_start + std::max(st.m_info.m_bassBar, st.m_info.m_introBars - 16) * Bar;
+            prev.m_swapOut = swap;
+            st.m_swapIn = swap;
+            const double open = std::max(st.m_start, swap - blendBars * Bar);
             tempo.add(open, bpmPrev, true);
             tempo.add(swap, bpm, false);
         }
-        st.end = st.start + st.info.bars * kBar;
-        st.swapOut = st.end;
-        seconds = tempo.secondsAt(st.start + st.info.outroBar * kBar);
-        si.tracks.push_back(st);
+        st.m_end = st.m_start + st.m_info.m_bars * Bar;
+        st.m_swapOut = st.m_end;
+        seconds = tempo.secondsAt(st.m_start + st.m_info.m_outroBar * Bar);
+        si.m_tracks.push_back(st);
         scores.push_back(std::move(sc));
         bpmPrev = bpm;
         keyPrev = key;
         minorPrev = minor;
         if (seconds >= totalSeconds) break;
     }
-    const size_t n = si.tracks.size();
+    const size_t n = si.m_tracks.size();
 
     SetScore out;
-    out.lengthBeats = si.tracks.back().end;
-    for (Score& d : out.decks) { d.clear(130.0); d.tempo = tempo; d.lengthBeats = out.lengthBeats; }
-    std::vector<std::pair<double, std::vector<Gesture>>> pieces[kDecks];
-    const int mixFirst = p.base(Module::Deck, 0), mixEnd = mixFirst + kDecks * deck::Count;
+    out.m_lengthBeats = si.m_tracks.back().m_end;
+    for (Score& d : out.m_decks) { d.clear(130.0); d.m_tempo = tempo; d.m_lengthBeats = out.m_lengthBeats; }
+    std::vector<std::pair<double, std::vector<Gesture>>> pieces[Decks];
+    const int mixFirst = p.base(ModuleE::DECK, 0), mixEnd = mixFirst + Decks * deck::COUNT;
     for (size_t i = 0; i < n; ++i) {
-        const SetTrack& st = si.tracks[i];
-        Score& deckScore = out.decks[st.deck];
+        const SetTrack& st = si.m_tracks[i];
+        Score& deckScore = out.m_decks[st.m_deck];
         Score shifted;
-        appendShifted(shifted, scores[i], st.start);
-        deckScore.notes.insert(deckScore.notes.end(), shifted.notes.begin(), shifted.notes.end());
-        deckScore.markers.insert(deckScore.markers.end(), shifted.markers.begin(), shifted.markers.end());
-        deckScore.levels.insert(deckScore.levels.end(), shifted.levels.begin(), shifted.levels.end());
-        deckScore.knobs.insert(deckScore.knobs.end(), shifted.knobs.begin(), shifted.knobs.end());
-        deckScore.sounds.insert(deckScore.sounds.end(), shifted.sounds.begin(), shifted.sounds.end());
-        deckScore.sections.insert(deckScore.sections.end(), shifted.sections.begin(), shifted.sections.end());
-        deckScore.layers.insert(deckScore.layers.end(), shifted.layers.begin(), shifted.layers.end());   // (the plugin's arrange view)
-        deckScore.keyRoot = scores[i].keyRoot;
-        deckScore.scale = scores[i].scale;
-        std::vector<Gesture> g = shifted.gestures;
-        const int d = st.deck;
-        const int fader = p.id(Module::Deck, d, deck::Fader), low = p.id(Module::Deck, d, deck::Low);
-        const int mid = p.id(Module::Deck, d, deck::Mid), high = p.id(Module::Deck, d, deck::High);
-        const int filter = p.id(Module::Deck, d, deck::Filter), send = p.id(Module::Deck, d, deck::FxSend);
-        g.push_back(stepOf(p, filter, st.start, 0.0f));
-        g.push_back(stepOf(p, send, st.start, 0.0f));
+        appendShifted(shifted, scores[i], st.m_start);
+        deckScore.m_notes.insert(deckScore.m_notes.end(), shifted.m_notes.begin(), shifted.m_notes.end());
+        deckScore.m_markers.insert(deckScore.m_markers.end(), shifted.m_markers.begin(), shifted.m_markers.end());
+        deckScore.m_levels.insert(deckScore.m_levels.end(), shifted.m_levels.begin(), shifted.m_levels.end());
+        deckScore.m_knobs.insert(deckScore.m_knobs.end(), shifted.m_knobs.begin(), shifted.m_knobs.end());
+        deckScore.m_sounds.insert(deckScore.m_sounds.end(), shifted.m_sounds.begin(), shifted.m_sounds.end());
+        deckScore.m_sections.insert(deckScore.m_sections.end(), shifted.m_sections.begin(), shifted.m_sections.end());
+        deckScore.m_layers.insert(deckScore.m_layers.end(), shifted.m_layers.begin(), shifted.m_layers.end());   // (the plugin's arrange view)
+        deckScore.m_keyRoot = scores[i].m_keyRoot;
+        deckScore.m_scale = scores[i].m_scale;
+        std::vector<Gesture> g = shifted.m_gestures;
+        const int d = st.m_deck;
+        const int fader = p.id(ModuleE::DECK, d, deck::FADER), low = p.id(ModuleE::DECK, d, deck::LOW);
+        const int mid = p.id(ModuleE::DECK, d, deck::MID), high = p.id(ModuleE::DECK, d, deck::HIGH);
+        const int filter = p.id(ModuleE::DECK, d, deck::FILTER), send = p.id(ModuleE::DECK, d, deck::FX_SEND);
+        g.push_back(stepOf(p, filter, st.m_start, 0.0f));
+        g.push_back(stepOf(p, send, st.m_start, 0.0f));
         if (i > 0) {
             // In: the low band killed until the swap; the fader opens the blend's bars before it (or at the start) with the
             // highs 8 dB and the mids 10 dB down, back over the blend.
-            const double open = std::max(st.start, st.swapIn - blendBars * kBar);
-            g.push_back(stepOf(p, low, st.start, -60.0f));
-            g.push_back(stepOf(p, fader, st.start, -60.0f));
-            g.push_back(stepOf(p, high, st.start, -8.0f));
-            g.push_back(stepOf(p, mid, st.start, -10.0f));
-            g.push_back(rampOf(p, fader, open, 8.0 * kBar, -60.0f, 0.0f, GestureShape::EaseOut));
-            g.push_back(rampOf(p, high, open, st.swapIn - open, -8.0f, 0.0f, GestureShape::Linear));
-            g.push_back(rampOf(p, mid, open, st.swapIn - open, -10.0f, 0.0f, GestureShape::EaseIn));
-            g.push_back(stepOf(p, low, st.swapIn, 0.0f));
+            const double open = std::max(st.m_start, st.m_swapIn - blendBars * Bar);
+            g.push_back(stepOf(p, low, st.m_start, -60.0f));
+            g.push_back(stepOf(p, fader, st.m_start, -60.0f));
+            g.push_back(stepOf(p, high, st.m_start, -8.0f));
+            g.push_back(stepOf(p, mid, st.m_start, -10.0f));
+            g.push_back(rampOf(p, fader, open, 8.0 * Bar, -60.0f, 0.0f, GestureShapeE::EASE_OUT));
+            g.push_back(rampOf(p, high, open, st.m_swapIn - open, -8.0f, 0.0f, GestureShapeE::LINEAR));
+            g.push_back(rampOf(p, mid, open, st.m_swapIn - open, -10.0f, 0.0f, GestureShapeE::EASE_IN));
+            g.push_back(stepOf(p, low, st.m_swapIn, 0.0f));
         } else {
-            for (int id : { low, fader, mid, high }) g.push_back(stepOf(p, id, st.start, 0.0f));
+            for (int id : { low, fader, mid, high }) g.push_back(stepOf(p, id, st.m_start, 0.0f));
         }
         if (i + 1 < n) {
             // Out: the low band closed at the swap; the highs and hats play on, the mids down 6 dB over 8 bars, the fader
             // falling through the track's last 8 bars.
-            g.push_back(stepOf(p, low, st.swapOut, -60.0f));
-            g.push_back(rampOf(p, mid, st.swapOut, 8.0 * kBar, 0.0f, -6.0f, GestureShape::EaseOut));
-            if (st.end - st.swapOut > 8.0 * kBar)
-                g.push_back(rampOf(p, fader, st.end - 8.0 * kBar, 8.0 * kBar, 0.0f, -60.0f, GestureShape::EaseIn));
+            g.push_back(stepOf(p, low, st.m_swapOut, -60.0f));
+            g.push_back(rampOf(p, mid, st.m_swapOut, 8.0 * Bar, 0.0f, -6.0f, GestureShapeE::EASE_OUT));
+            if (st.m_end - st.m_swapOut > 8.0 * Bar)
+                g.push_back(rampOf(p, fader, st.m_end - 8.0 * Bar, 8.0 * Bar, 0.0f, -60.0f, GestureShapeE::EASE_IN));
         }
-        pieces[d].push_back({ st.start, g });
-        out.markers.push_back(Marker{ st.start, "T" + std::to_string(i + 1) + " " + st.info.style + " " + st.info.camelot });
-        if (i > 0) out.markers.push_back(Marker{ st.swapIn, "Swap T" + std::to_string(i) + " > T" + std::to_string(i + 1) });
+        pieces[d].push_back({ st.m_start, g });
+        out.m_markers.push_back(Marker{ st.m_start, "T" + std::to_string(i + 1) + " " + st.m_info.m_style + " " + st.m_info.m_camelot });
+        if (i > 0) out.m_markers.push_back(Marker{ st.m_swapIn, "Swap T" + std::to_string(i) + " > T" + std::to_string(i + 1) });
     }
     // The teases on deck C: the next track's hook before its blend, where the keys agree.
-    Score& c = out.decks[2];
+    Score& c = out.m_decks[2];
     for (size_t i = 1; i < n; ++i) {
-        const SetTrack& in = si.tracks[i];
-        const SetTrack& prev = si.tracks[i - 1];
-        const int diff = ((in.info.key - prev.info.key) % 12 + 12) % 12;
-        const bool agree = in.info.scale == prev.info.scale || minorScale(in.info.scale) == minorScale(prev.info.scale);
-        if (!(agree && (diff == 0 || diff == 5 || diff == 7)) || in.info.mainDropBar < 0 || sr.uniform() > 0.6f) continue;
-        const double open = std::max(in.start, in.swapIn - blendBars * kBar);
-        const double from = open - 16.0 * kBar;
-        if (from < prev.start + prev.info.introBars * kBar) continue;
-        const double hook = in.info.mainDropBar * kBar;
+        const SetTrack& in = si.m_tracks[i];
+        const SetTrack& prev = si.m_tracks[i - 1];
+        const int diff = ((in.m_info.m_key - prev.m_info.m_key) % 12 + 12) % 12;
+        const bool agree = in.m_info.m_scale == prev.m_info.m_scale || minorScale(in.m_info.m_scale) == minorScale(prev.m_info.m_scale);
+        if (!(agree && (diff == 0 || diff == 5 || diff == 7)) || in.m_info.m_mainDropBar < 0 || sr.uniform() > 0.6f) continue;
+        const double open = std::max(in.m_start, in.m_swapIn - blendBars * Bar);
+        const double from = open - 16.0 * Bar;
+        if (from < prev.m_start + prev.m_info.m_introBars * Bar) continue;
+        const double hook = in.m_info.m_mainDropBar * Bar;
         std::vector<NoteEvent> notes;
-        for (Part part : { Part::Lead, Part::Piano, Part::Pluck }) {
-            for (const NoteEvent& note : scores[i].notes)
-                if (note.part == part && note.beat >= hook && note.beat < hook + 8.0 * kBar) notes.push_back(note);
+        for (PartE part : { PartE::LEAD, PartE::PIANO, PartE::PLUCK }) {
+            for (const NoteEvent& note : scores[i].m_notes)
+                if (note.m_part == part && note.m_beat >= hook && note.m_beat < hook + 8.0 * Bar) notes.push_back(note);
             if (!notes.empty()) break;
         }
         if (notes.empty()) continue;
         for (int pass = 0; pass < 2; ++pass)
-            for (NoteEvent note : notes) { note.beat = note.beat - hook + from + pass * 8.0 * kBar; c.notes.push_back(note); }
-        for (KnobSet k : scores[i].knobs) { k.beat = from; c.knobs.push_back(k); }
-        for (SoundPick s : scores[i].sounds) { s.beat = from; c.sounds.push_back(s); }
-        if (!scores[i].levels.empty()) {
+            for (NoteEvent note : notes) { note.m_beat = note.m_beat - hook + from + pass * 8.0 * Bar; c.m_notes.push_back(note); }
+        for (KnobSet k : scores[i].m_knobs) { k.m_beat = from; c.m_knobs.push_back(k); }
+        for (SoundPick s : scores[i].m_sounds) { s.m_beat = from; c.m_sounds.push_back(s); }
+        if (!scores[i].m_levels.empty()) {
             LevelMark m;
-            m.beat = from;
-            m.peakBeat = in.start + scores[i].levels.front().peakBeat;   // (the source's mark on its deck, levelSet finds it)
-            m.targetLufs = std::numeric_limits<float>::quiet_NaN();
-            c.levels.push_back(m);
+            m.m_beat = from;
+            m.m_peakBeat = in.m_start + scores[i].m_levels.front().m_peakBeat;   // (the source's mark on its deck, levelSet finds it)
+            m.m_targetLufs = std::numeric_limits<float>::quiet_NaN();
+            c.m_levels.push_back(m);
         }
         std::vector<Gesture> g;
-        const int fader = p.id(Module::Deck, 2, deck::Fader), low = p.id(Module::Deck, 2, deck::Low);
-        const int filter = p.id(Module::Deck, 2, deck::Filter);
+        const int fader = p.id(ModuleE::DECK, 2, deck::FADER), low = p.id(ModuleE::DECK, 2, deck::LOW);
+        const int filter = p.id(ModuleE::DECK, 2, deck::FILTER);
         g.push_back(stepOf(p, low, from, -60.0f));
         g.push_back(stepOf(p, fader, from, -8.0f));
-        g.push_back(rampOf(p, filter, from, 16.0 * kBar, 0.6f, 0.15f, GestureShape::EaseIn));
-        g.push_back(stepOf(p, fader, from + 16.0 * kBar, -60.0f));
+        g.push_back(rampOf(p, filter, from, 16.0 * Bar, 0.6f, 0.15f, GestureShapeE::EASE_IN));
+        g.push_back(stepOf(p, fader, from + 16.0 * Bar, -60.0f));
         pieces[2].push_back({ from, g });
-        si.teases.push_back(SetTease{ static_cast<int>(i), from, from + 16.0 * kBar });
-        out.markers.push_back(Marker{ from, "Tease T" + std::to_string(i + 1) });
+        si.m_teases.push_back(SetTease{ static_cast<int>(i), from, from + 16.0 * Bar });
+        out.m_markers.push_back(Marker{ from, "Tease T" + std::to_string(i + 1) });
     }
-    for (int d = 0; d < kDecks; ++d) homeBetween(out.decks[d], pieces[d], mixFirst, mixEnd);
-    for (Score& d : out.decks) d.sort();
-    std::sort(out.markers.begin(), out.markers.end(), [](const Marker& a, const Marker& b) { return a.beat < b.beat; });
+    for (int d = 0; d < Decks; ++d) homeBetween(out.m_decks[d], pieces[d], mixFirst, mixEnd);
+    for (Score& d : out.m_decks) d.sort();
+    std::sort(out.m_markers.begin(), out.m_markers.end(), [](const Marker& a, const Marker& b) { return a.m_beat < b.m_beat; });
     if (info != nullptr) *info = si;
     return out;
 }
 
 Score flattenSet(const SetScore& set)
 {
-    Score s = set.decks[0];
-    for (int d = 1; d < kDecks; ++d) {
-        const Score& x = set.decks[d];
-        s.notes.insert(s.notes.end(), x.notes.begin(), x.notes.end());
-        s.markers.insert(s.markers.end(), x.markers.begin(), x.markers.end());
+    Score s = set.m_decks[0];
+    for (int d = 1; d < Decks; ++d) {
+        const Score& x = set.m_decks[d];
+        s.m_notes.insert(s.m_notes.end(), x.m_notes.begin(), x.m_notes.end());
+        s.m_markers.insert(s.m_markers.end(), x.m_markers.begin(), x.m_markers.end());
     }
-    s.markers.insert(s.markers.end(), set.markers.begin(), set.markers.end());
-    s.gestures.clear();
-    s.lengthBeats = set.lengthBeats;
+    s.m_markers.insert(s.m_markers.end(), set.m_markers.begin(), set.m_markers.end());
+    s.m_gestures.clear();
+    s.m_lengthBeats = set.m_lengthBeats;
     s.sort();
     return s;
 }

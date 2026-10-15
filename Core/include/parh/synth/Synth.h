@@ -63,74 +63,74 @@ public:
     /** @brief Releases the note (unless a slid note has taken over). */
     void noteOff();
     /** @brief A kick starts: the duck. */
-    void kick(double late) { duck_.trigger(late); }
+    void kick(double late) { m_duck.trigger(late); }
     /** @brief Renders @p n samples into @p L and @p R (replaced). */
     void process(float* L, float* R, int n);
     /** @brief Whether anything sounds. */
-    bool active() const { return amp_.isActive(); }
+    bool active() const { return m_amp.isActive(); }
     /** @brief The deck's shared modulation sources (Modulation.h). */
-    void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
+    void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
     /** @brief The beat now and the beats per sample (the synced LFOs). */
-    void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
+    void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
 
 private:
     /** @brief The matrix's sums at this sample (every 16th), onto the voice's settings. */
     void applyModulation();
 
-    double sr_ = 48000.0;   ///< the sample rate, Hz
-    VaOscillator osc_;                 ///< at twice the rate
-    double subPhase_ = 0.0;            ///< the square sub's phase, cycles
-    FilterLane filt_;   ///< the filter, at twice the rate
-    HalfbandDesign hb_;   ///< the half-band filter back down to the rate
-    HalfbandDown<float> down_;   ///< its state
-    Envelope amp_;   ///< the amp envelope
-    double fenv_ = 0.0;   ///< the filter envelope (at the high rate)
-    double fenvDecay_ = 0.999;   ///< its per-sample factor
-    double hz_ = 110.0;   ///< the pitch, Hz
-    double targetHz_ = 110.0;   ///< its target (a glide), Hz
-    double glideCoef_ = 1.0;   ///< the glide's per-sample step
-    bool slidePending_ = false;        ///< the last note slides into the next
-    bool noteAccent_ = false;   ///< the note sounding is accented
-    float velocity_ = 1.0f;   ///< the note's velocity
-    Ducker duck_;   ///< the duck under the kick
-    Svf hp_;   ///< the strip's low cut
-    Svf lp_;   ///< the strip's high cut
+    double m_sr = 48000.0;   ///< the sample rate, Hz
+    VaOscillator m_osc;                 ///< at twice the rate
+    double m_subPhase = 0.0;            ///< the square sub's phase, cycles
+    FilterLane m_filt;   ///< the filter, at twice the rate
+    HalfbandDesign m_hb;   ///< the half-band filter back down to the rate
+    HalfbandDown<float> m_down;   ///< its state
+    Envelope m_amp;   ///< the amp envelope
+    double m_fenv = 0.0;   ///< the filter envelope (at the high rate)
+    double m_fenvDecay = 0.999;   ///< its per-sample factor
+    double m_hz = 110.0;   ///< the pitch, Hz
+    double m_targetHz = 110.0;   ///< its target (a glide), Hz
+    double m_glideCoef = 1.0;   ///< the glide's per-sample step
+    bool m_slidePending = false;        ///< the last note slides into the next
+    bool m_noteAccent = false;   ///< the note sounding is accented
+    float m_velocity = 1.0f;   ///< the note's velocity
+    Ducker m_duck;   ///< the duck under the kick
+    Svf m_hp;   ///< the strip's low cut
+    Svf m_lp;   ///< the strip's high cut
     /// Settings.
-    FilterModel model_ = FilterModel::Juno;
-    float wave_ = 0.0f;   ///< the wave: 0 saw .. 1 pulse
-    float pw_ = 0.5f;   ///< the pulse's width
-    float sub_ = 0.3f;   ///< the square sub's level
-    float cutoff_ = 350.0f;   ///< the filter's cutoff, Hz
-    float res_ = 0.2f;   ///< the filter's resonance
-    float envAmt_ = 2.0f;   ///< how far the filter envelope opens it, octaves
-    float accent_ = 0.3f;   ///< the accent's amount
-    float drive_ = 1.0f;   ///< the drive into the filter
-    float driveNorm_ = 1.0f;   ///< the gain that keeps the level after it
-    float keyTrack_ = 0.5f;   ///< the cutoff's key tracking, 0..1
-    float level_ = 0.3f;   ///< the level, linear
-    float gl_ = 0.7f;   ///< the pan's gain, left
-    float gr_ = 0.7f;   ///< the pan's gain, right
-    float glideMs_ = 0.0f;   ///< the glide, ms
-    float attack_ = 0.003f;   ///< the amp envelope's attack, seconds
-    float decay_ = 0.25f;   ///< its decay, seconds
-    float sustain_ = 0.6f;   ///< its sustain, 0..1
-    float release_ = 0.3f;   ///< its release, seconds
-    double filtDecayS_ = 0.18;   ///< the filter envelope's decay, seconds
+    FilterModelE m_model = FilterModelE::JUNO;
+    float m_wave = 0.0f;   ///< the wave: 0 saw .. 1 pulse
+    float m_pw = 0.5f;   ///< the pulse's width
+    float m_sub = 0.3f;   ///< the square sub's level
+    float m_cutoff = 350.0f;   ///< the filter's cutoff, Hz
+    float m_res = 0.2f;   ///< the filter's resonance
+    float m_envAmt = 2.0f;   ///< how far the filter envelope opens it, octaves
+    float m_accent = 0.3f;   ///< the accent's amount
+    float m_drive = 1.0f;   ///< the drive into the filter
+    float m_driveNorm = 1.0f;   ///< the gain that keeps the level after it
+    float m_keyTrack = 0.5f;   ///< the cutoff's key tracking, 0..1
+    float m_level = 0.3f;   ///< the level, linear
+    float m_gl = 0.7f;   ///< the pan's gain, left
+    float m_gr = 0.7f;   ///< the pan's gain, right
+    float m_glideMs = 0.0f;   ///< the glide, ms
+    float m_attack = 0.003f;   ///< the amp envelope's attack, seconds
+    float m_decay = 0.25f;   ///< its decay, seconds
+    float m_sustain = 0.6f;   ///< its sustain, 0..1
+    float m_release = 0.3f;   ///< its release, seconds
+    double m_filtDecayS = 0.18;   ///< the filter envelope's decay, seconds
     /// The modulation (Phase 5b): the knobs' values and what the matrix makes of them now.
-    NoteModulation<1> mod_;
-    int64_t pos_ = 0;                  ///< the voice's absolute sample count (the control grid)
-    float driveKnob_ = 0.25f;   ///< the drive's knob (the matrix moves from it)
-    float panKnob_ = 0.0f;   ///< the pan's knob
-    float levelKnob_ = 0.3f;   ///< the level's knob
-    float pwNow_ = 0.5f;   ///< the pulse width as the matrix leaves it
-    float resNow_ = 0.2f;   ///< the resonance as the matrix leaves it
-    float kNow_ = 0.0f;   ///< the filter's damping now
-    float cutOct_ = 0.0f;   ///< the cutoff's offset from the matrix, octaves
-    float envAdd_ = 0.0f;   ///< the filter envelope's depth added by the matrix
-    double pitchMul_ = 1.0;   ///< the pitch's factor from the matrix
-    double trackHz_ = -1.0;   ///< the pitch the key tracking was taken for (kept while the pitch stands)
-    double track_ = 1.0;   ///< the key tracking's factor for that pitch
-    float trackKt_ = -1.0f;                 ///< and the key tracking it was taken at
+    NoteModulation<1> m_mod;
+    int64_t m_pos = 0;                  ///< the voice's absolute sample count (the control grid)
+    float m_driveKnob = 0.25f;   ///< the drive's knob (the matrix moves from it)
+    float m_panKnob = 0.0f;   ///< the pan's knob
+    float m_levelKnob = 0.3f;   ///< the level's knob
+    float m_pwNow = 0.5f;   ///< the pulse width as the matrix leaves it
+    float m_resNow = 0.2f;   ///< the resonance as the matrix leaves it
+    float m_kNow = 0.0f;   ///< the filter's damping now
+    float m_cutOct = 0.0f;   ///< the cutoff's offset from the matrix, octaves
+    float m_envAdd = 0.0f;   ///< the filter envelope's depth added by the matrix
+    double m_pitchMul = 1.0;   ///< the pitch's factor from the matrix
+    double m_trackHz = -1.0;   ///< the pitch the key tracking was taken for (kept while the pitch stands)
+    double m_track = 1.0;   ///< the key tracking's factor for that pitch
+    float m_trackKt = -1.0f;                 ///< and the key tracking it was taken at
 };
 
 } // namespace parh

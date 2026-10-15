@@ -27,40 +27,40 @@
 
 namespace parh {
 
-constexpr int kCorpusStepMin = -7;      ///< the lowest scale step (an octave under the tonic)
-constexpr int kCorpusAlpha = 22;        ///< steps -7 .. +14
-constexpr int kCorpusRoleCount = 4;        ///< lead, piano, acid, bass
+constexpr int CorpusStepMin = -7;      ///< the lowest scale step (an octave under the tonic)
+constexpr int CorpusAlpha = 22;        ///< steps -7 .. +14
+constexpr int CorpusRoleCount = 4;        ///< lead, piano, acid, bass
 
 /** @brief The roles the corpus has counts for. */
-enum class CorpusRoleId : int { Lead = 0, Piano, Acid, Bass };
+enum class CorpusRoleIdE : int { LEAD = 0, PIANO, ACID, BASS };
 
 /** @brief One order-2 count. */
 struct CorpusTriple {
-    uint8_t a;    ///< the first step
-    uint8_t b;    ///< the second
-    uint8_t c;    ///< the step that follows them
-    uint16_t n;   ///< how often
+    uint8_t m_a;    ///< the first step
+    uint8_t m_b;    ///< the second
+    uint8_t m_c;    ///< the step that follows them
+    uint16_t m_n;   ///< how often
 };
 
 /** @brief The counts of one role. */
 struct CorpusRole {
-    const uint16_t* t0;                                  ///< [kCorpusAlpha]
-    const uint16_t (*t1)[kCorpusAlpha];                  ///< [kCorpusAlpha][kCorpusAlpha]
-    const CorpusTriple* t2;                              ///< sparse order-2 counts, sorted by (a, b, c)
-    int t2Count;   ///< how many order-2 counts there are
-    const uint16_t (*onset)[2];                          ///< [64][2]: step (0..31) + 32 if the step before had an onset: (no, yes)
-    const uint16_t* length;                              ///< [17]: note lengths in sixteenths (16: longer)
-    const uint16_t (*accent)[2];                         ///< [16][2]
-    const uint16_t (*slide)[2];                          ///< [16][2]
+    const uint16_t* m_t0;                                  ///< [CorpusAlpha]
+    const uint16_t (*m_t1)[CorpusAlpha];                  ///< [CorpusAlpha][CorpusAlpha]
+    const CorpusTriple* m_t2;                              ///< sparse order-2 counts, sorted by (a, b, c)
+    int m_t2Count;   ///< how many order-2 counts there are
+    const uint16_t (*m_onset)[2];                          ///< [64][2]: step (0..31) + 32 if the step before had an onset: (no, yes)
+    const uint16_t* m_length;                              ///< [17]: note lengths in sixteenths (16: longer)
+    const uint16_t (*m_accent)[2];                         ///< [16][2]
+    const uint16_t (*m_slide)[2];                          ///< [16][2]
 };
-extern const CorpusRole kCorpusRoles[kCorpusRoleCount];
+extern const CorpusRole CorpusRoles[CorpusRoleCount];
 
 /** @brief The variable-order model of one role: P(next step | two steps before). */
 class StepModel {
 public:
     /** @brief The model of role @p role, built from its counts. */
-    explicit StepModel(CorpusRoleId role);
-    /** @brief The probability of step @p c after @p a, @p b (indices 0 .. kCorpusAlpha-1; @p a < 0: no second context). */
+    explicit StepModel(CorpusRoleIdE role);
+    /** @brief The probability of step @p c after @p a, @p b (indices 0 .. CorpusAlpha-1; @p a < 0: no second context). */
     double p(int a, int b, int c) const;
     /** @brief The chance of an onset on sixteenth @p step (0 .. 31) given whether the step before had one. */
     double onset(int step, bool prev) const;
@@ -68,23 +68,23 @@ public:
     double accent(int step) const;
     double slide(int step) const;   ///< @copydoc accent
 private:
-    const CorpusRole& r_;   ///< the role's counts
-    std::vector<float> p1_;                    ///< order 1 with Witten-Bell back-off to order 0, [a][c]
-    std::vector<float> p2_;                    ///< order 2 interpolated, [a][b][c]
+    const CorpusRole& m_r;   ///< the role's counts
+    std::vector<float> m_p1;                    ///< order 1 with Witten-Bell back-off to order 0, [a][c]
+    std::vector<float> m_p2;                    ///< order 2 interpolated, [a][b][c]
 };
 
 /** @brief The model of @p role, built once (thread-safe). */
-const StepModel& corpusModel(CorpusRoleId role);
+const StepModel& corpusModel(CorpusRoleIdE role);
 
 /**
  * @brief Draws a line of @p n steps exactly under constraints (Pachet and Roy 2011) from @p model.
  * @param allowed  allowed[i][s]: whether step index s may stand at position i
  * @param shape    an extra weight on the transition (i, a, b, c) -> c at position i (1: none); may be empty
  * @param r        the stream
- * @param out      receives the step indices (0 .. kCorpusAlpha-1)
+ * @param out      receives the step indices (0 .. CorpusAlpha-1)
  * @return false if no line satisfies the constraints
  */
-bool sampleConstrained(const StepModel& model, int n, const std::vector<std::array<bool, kCorpusAlpha>>& allowed,
+bool sampleConstrained(const StepModel& model, int n, const std::vector<std::array<bool, CorpusAlpha>>& allowed,
                        const std::function<double(int, int, int, int)>& shape, Rng& r, std::vector<int>& out);
 
 } // namespace parh

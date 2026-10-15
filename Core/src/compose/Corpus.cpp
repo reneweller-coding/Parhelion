@@ -9,82 +9,82 @@
 namespace parh {
 
 namespace {
-constexpr int A = kCorpusAlpha;   ///< the steps of the alphabet, shortly
+constexpr int A = CorpusAlpha;   ///< the steps of the alphabet, shortly
 }
 
-StepModel::StepModel(CorpusRoleId role) : r_(kCorpusRoles[static_cast<int>(role)])
+StepModel::StepModel(CorpusRoleIdE role) : m_r(CorpusRoles[static_cast<int>(role)])
 {
     // Order 0, smoothed (every step at least a little likely).
     double p0[A];
     double n0 = 0.0;
-    for (int c = 0; c < A; ++c) n0 += r_.t0[c] + 0.5;
-    for (int c = 0; c < A; ++c) p0[c] = (r_.t0[c] + 0.5) / n0;
+    for (int c = 0; c < A; ++c) n0 += m_r.m_t0[c] + 0.5;
+    for (int c = 0; c < A; ++c) p0[c] = (m_r.m_t0[c] + 0.5) / n0;
     // Order 1 with Witten-Bell back-off: lambda = N / (N + T), T the distinct continuations.
-    p1_.assign(static_cast<size_t>(A * A), 0.0f);
+    m_p1.assign(static_cast<size_t>(A * A), 0.0f);
     for (int a = 0; a < A; ++a) {
         double n = 0.0, t = 0.0;
-        for (int c = 0; c < A; ++c) { n += r_.t1[a][c]; if (r_.t1[a][c] > 0) t += 1.0; }
+        for (int c = 0; c < A; ++c) { n += m_r.m_t1[a][c]; if (m_r.m_t1[a][c] > 0) t += 1.0; }
         const double lam = n > 0.0 ? n / (n + t) : 0.0;
         for (int c = 0; c < A; ++c)
-            p1_[static_cast<size_t>(a * A + c)] = static_cast<float>((n > 0.0 ? lam * r_.t1[a][c] / n : 0.0) + (1.0 - lam) * p0[c]);
+            m_p1[static_cast<size_t>(a * A + c)] = static_cast<float>((n > 0.0 ? lam * m_r.m_t1[a][c] / n : 0.0) + (1.0 - lam) * p0[c]);
     }
     // Order 2, from the sparse counts, backed off to order 1.
-    p2_.assign(static_cast<size_t>(A * A * A), 0.0f);
+    m_p2.assign(static_cast<size_t>(A * A * A), 0.0f);
     std::vector<double> n2(static_cast<size_t>(A * A), 0.0), t2(static_cast<size_t>(A * A), 0.0);
-    for (int i = 0; i < r_.t2Count; ++i) {
-        const CorpusTriple& x = r_.t2[i];
-        n2[static_cast<size_t>(x.a * A + x.b)] += x.n;
-        t2[static_cast<size_t>(x.a * A + x.b)] += 1.0;
+    for (int i = 0; i < m_r.m_t2Count; ++i) {
+        const CorpusTriple& x = m_r.m_t2[i];
+        n2[static_cast<size_t>(x.m_a * A + x.m_b)] += x.m_n;
+        t2[static_cast<size_t>(x.m_a * A + x.m_b)] += 1.0;
     }
     for (int a = 0; a < A; ++a)
         for (int b = 0; b < A; ++b) {
             const size_t ab = static_cast<size_t>(a * A + b);
             const double lam = n2[ab] > 0.0 ? n2[ab] / (n2[ab] + t2[ab]) : 0.0;
-            for (int c = 0; c < A; ++c) p2_[ab * A + static_cast<size_t>(c)] = static_cast<float>((1.0 - lam) * p1_[static_cast<size_t>(b * A + c)]);
+            for (int c = 0; c < A; ++c) m_p2[ab * A + static_cast<size_t>(c)] = static_cast<float>((1.0 - lam) * m_p1[static_cast<size_t>(b * A + c)]);
         }
-    for (int i = 0; i < r_.t2Count; ++i) {
-        const CorpusTriple& x = r_.t2[i];
-        const size_t ab = static_cast<size_t>(x.a * A + x.b);
+    for (int i = 0; i < m_r.m_t2Count; ++i) {
+        const CorpusTriple& x = m_r.m_t2[i];
+        const size_t ab = static_cast<size_t>(x.m_a * A + x.m_b);
         const double lam = n2[ab] / (n2[ab] + t2[ab]);
-        p2_[ab * A + x.c] += static_cast<float>(lam * x.n / n2[ab]);
+        m_p2[ab * A + x.m_c] += static_cast<float>(lam * x.m_n / n2[ab]);
     }
 }
 
-const StepModel& corpusModel(CorpusRoleId role)
+const StepModel& corpusModel(CorpusRoleIdE role)
 {
-    static const StepModel kModels[kCorpusRoleCount] = { StepModel(CorpusRoleId::Lead), StepModel(CorpusRoleId::Piano),
-                                                      StepModel(CorpusRoleId::Acid), StepModel(CorpusRoleId::Bass) };
-    return kModels[static_cast<int>(role)];
+    static const StepModel Models[CorpusRoleCount] = { StepModel(CorpusRoleIdE::LEAD), StepModel(CorpusRoleIdE::PIANO),
+                                                      StepModel(CorpusRoleIdE::ACID), StepModel(CorpusRoleIdE::BASS) };
+    return Models[static_cast<int>(role)];
 }
 
 double StepModel::p(int a, int b, int c) const
 {
     if (b < 0) {
         double n = 0.0;
-        for (int k = 0; k < A; ++k) n += r_.t0[k] + 0.5;
-        return (r_.t0[c] + 0.5) / n;
+        for (int k = 0; k < A; ++k) n += m_r.m_t0[k] + 0.5;
+        return (m_r.m_t0[c] + 0.5) / n;
     }
-    if (a < 0) return p1_[static_cast<size_t>(b * A + c)];
-    return p2_[static_cast<size_t>((a * A + b) * A + c)];
+    if (a < 0) return m_p1[static_cast<size_t>(b * A + c)];
+    return m_p2[static_cast<size_t>((a * A + b) * A + c)];
 }
 
 double StepModel::onset(int step, bool prev) const
 {
-    const uint16_t* row = r_.onset[(step & 31) + (prev ? 32 : 0)];
+    const uint16_t* row = m_r.m_onset[(step & 31) + (prev ? 32 : 0)];
     return (row[1] + 0.5) / (row[0] + row[1] + 1.0);
 }
 double StepModel::accent(int step) const
 {
-    const uint16_t* row = r_.accent[step & 15];
+    const uint16_t* row = m_r.m_accent[step & 15];
     return (row[1] + 0.5) / (row[0] + row[1] + 1.0);
 }
 double StepModel::slide(int step) const
 {
-    const uint16_t* row = r_.slide[step & 15];
+    const uint16_t* row = m_r.m_slide[step & 15];
     return (row[1] + 0.5) / (row[0] + row[1] + 1.0);
 }
 
-bool sampleConstrained(const StepModel& model, int n, const std::vector<std::array<bool, kCorpusAlpha>>& allowed,
+bool sampleConstrained(const StepModel& model, int n, const std::vector<std::array<bool, CorpusAlpha>>& allowed,
                        const std::function<double(int, int, int, int)>& shape, Rng& r, std::vector<int>& out)
 {
     out.clear();

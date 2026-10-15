@@ -27,8 +27,8 @@
 
 namespace parh {
 
-constexpr int kTimpaniDrums = 4;   ///< drums in the set
-constexpr int kTimpaniModes = 32;   ///< modes of a drum's membrane
+constexpr int TimpaniDrums = 4;   ///< drums in the set
+constexpr int TimpaniModes = 32;   ///< modes of a drum's membrane
 
 /** @brief The timpani: four kettle drums, modal membranes struck by a felt mallet (see the file comment). */
 class Timpani {
@@ -48,59 +48,59 @@ public:
     /** @brief The frequency ratio of mode @p i to the note (the tests). */
     static double ratio(int i);
     /** @brief The deck's shared modulation sources (Modulation.h). */
-    void setModGlobals(const ModGlobals& g) { mod_.setGlobals(g); }
+    void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
     /** @brief The beat now and the beats per sample (the synced LFOs). */
-    void setClock(double beat, double beatsPerSample) { mod_.setClock(pos_, beat, beatsPerSample); }
+    void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
 
 private:
     /** @brief One drum: its membrane's modes, its mallet, its modulation. */
     struct Drum {
-        bool on = false;   ///< it rings
-        int pitch = 45;   ///< the note it is tuned to
-        double zr[kTimpaniModes] = {};   ///< the modes' states: real part
-        double zi[kTimpaniModes] = {};   ///< ... imaginary part
-        double pr[kTimpaniModes] = {};   ///< their poles per sample: real part
-        double pi[kTimpaniModes] = {};   ///< ... imaginary part
-        double gr[kTimpaniModes] = {};   ///< their input gains per sample: real part
-        double gi[kTimpaniModes] = {};   ///< ... imaginary part
-        double spr[kTimpaniModes] = {};   ///< their poles per sub-step of the contact: real part
-        double spi[kTimpaniModes] = {};   ///< ... imaginary part
-        double sgr[kTimpaniModes] = {};   ///< their input gains per sub-step: real part
-        double sgi[kTimpaniModes] = {};   ///< ... imaginary part
-        double shape[kTimpaniModes] = {};   ///< the modes' shapes at the strike point
-        double outL[kTimpaniModes] = {};   ///< the modes' radiation, left
-        double outR[kTimpaniModes] = {};   ///< the modes' radiation, right
-        bool contact = false;   ///< the mallet touches the membrane
-        double yh = 0.0;   ///< the mallet's displacement
-        double vh = 0.0;   ///< the mallet's velocity
-        int steps = 0;   ///< sub-steps since the contact began
-        int apart = 0;   ///< sub-steps the felt has been apart in a row
-        double age = 0.0;   ///< seconds since the stroke
-        int quiet = 0;   ///< cells it has been silent (it stops after a few)
+        bool m_on = false;   ///< it rings
+        int m_pitch = 45;   ///< the note it is tuned to
+        double m_zr[TimpaniModes] = {};   ///< the modes' states: real part
+        double m_zi[TimpaniModes] = {};   ///< ... imaginary part
+        double m_pr[TimpaniModes] = {};   ///< their poles per sample: real part
+        double m_pi[TimpaniModes] = {};   ///< ... imaginary part
+        double m_gr[TimpaniModes] = {};   ///< their input gains per sample: real part
+        double m_gi[TimpaniModes] = {};   ///< ... imaginary part
+        double m_spr[TimpaniModes] = {};   ///< their poles per sub-step of the contact: real part
+        double m_spi[TimpaniModes] = {};   ///< ... imaginary part
+        double m_sgr[TimpaniModes] = {};   ///< their input gains per sub-step: real part
+        double m_sgi[TimpaniModes] = {};   ///< ... imaginary part
+        double m_shape[TimpaniModes] = {};   ///< the modes' shapes at the strike point
+        double m_outL[TimpaniModes] = {};   ///< the modes' radiation, left
+        double m_outR[TimpaniModes] = {};   ///< the modes' radiation, right
+        bool m_contact = false;   ///< the mallet touches the membrane
+        double m_yh = 0.0;   ///< the mallet's displacement
+        double m_vh = 0.0;   ///< the mallet's velocity
+        int m_steps = 0;   ///< sub-steps since the contact began
+        int m_apart = 0;   ///< sub-steps the felt has been apart in a row
+        double m_age = 0.0;   ///< seconds since the stroke
+        int m_quiet = 0;   ///< cells it has been silent (it stops after a few)
         // The modulation's values (Phase 5b): the pedal's bend, the decay's factor, the felt, the drum's place.
-        double bend = 1.0;   ///< the pedal's bend, a factor on the pitch
-        double decayMul = 1.0;   ///< the decay's factor
-        double K = 8e7;   ///< the felt's stiffness
-        double f0 = 110.0;   ///< the pitch, Hz
-        double gainL = 1.0;   ///< the drum's place: gain left
-        double gainR = 1.0;   ///< ... gain right
+        double m_bend = 1.0;   ///< the pedal's bend, a factor on the pitch
+        double m_decayMul = 1.0;   ///< the decay's factor
+        double m_K = 8e7;   ///< the felt's stiffness
+        double m_f0 = 110.0;   ///< the pitch, Hz
+        double m_gainL = 1.0;   ///< the drum's place: gain left
+        double m_gainR = 1.0;   ///< ... gain right
     };
     /** @brief Tunes drum @p d to @p pitch, times @p bend, its decays times @p decayMul: the poles, the gains, the shapes. */
     void tune(Drum& d, int pitch, double bend = 1.0, double decayMul = 1.0);
     /** @brief Drum @p k's modulation now; @p strike: the mallet is about to meet it (the felt and the place). */
     void modDrum(int k, bool strike);
-    double sr_ = 48000.0;   ///< the sample rate, Hz
-    uint64_t seed_ = 1;   ///< the seed
-    float level_ = 1.0f;   ///< timpani.level, linear
-    float hardness_ = 1.0f;   ///< the felt's hardness
-    float decay_ = 1.0f;   ///< the decay's factor
-    float strike_ = 0.68f;   ///< the strike point, r / a
-    float width_ = 0.5f;   ///< the width
-    float lowCutHz_ = 35.0f;   ///< the low cut, Hz
-    Svf lowCut_[2];   ///< the low cut, per channel
-    Drum drum_[kTimpaniDrums];   ///< the drums
-    NoteModulation<kTimpaniDrums> mod_;   ///< the modulation, a Modulator per drum (Phase 5b)
-    int64_t pos_ = 0;                     ///< the timpani's absolute sample count
+    double m_sr = 48000.0;   ///< the sample rate, Hz
+    uint64_t m_seed = 1;   ///< the seed
+    float m_level = 1.0f;   ///< timpani.level, linear
+    float m_hardness = 1.0f;   ///< the felt's hardness
+    float m_decay = 1.0f;   ///< the decay's factor
+    float m_strike = 0.68f;   ///< the strike point, r / a
+    float m_width = 0.5f;   ///< the width
+    float m_lowCutHz = 35.0f;   ///< the low cut, Hz
+    Svf m_lowCut[2];   ///< the low cut, per channel
+    Drum m_drum[TimpaniDrums];   ///< the drums
+    NoteModulation<TimpaniDrums> m_mod;   ///< the modulation, a Modulator per drum (Phase 5b)
+    int64_t m_pos = 0;                     ///< the timpani's absolute sample count
 };
 
 } // namespace parh

@@ -28,20 +28,20 @@ namespace parh {
 
 /** @brief A chord: its three tones in semitones above the key's root (root, third, fifth; they may pass 12). */
 struct Chord {
-    int degree = 0;       ///< scale degree of the root (0-based)
-    int tones[3] = {};    ///< semitones above the key's root
+    int m_degree = 0;       ///< scale degree of the root (0-based)
+    int m_tones[3] = {};    ///< semitones above the key's root
     /** @brief The root, semitones above the key's root. */
-    int root() const { return tones[0]; }
+    int root() const { return m_tones[0]; }
 };
 
 /** @brief The harmony of a whole track. */
 struct Harmony {
-    int key = 9;                       ///< pitch class of the tonic
-    int scale = 0;                     ///< compose.scale
-    int progression = 0;               ///< Progression
-    std::vector<Chord> bars;           ///< the chord of every bar
-    std::vector<int> shift;            ///< the key change in semitones from each bar on (0, or 3 after the Cinematic change)
-    int changeBar = -1;                ///< where the key changes (-1: never)
+    int m_key = 9;                       ///< pitch class of the tonic
+    int m_scale = 0;                     ///< compose.scale
+    int m_progression = 0;               ///< Progression
+    std::vector<Chord> m_bars;           ///< the chord of every bar
+    std::vector<int> m_shift;            ///< the key change in semitones from each bar on (0, or 3 after the Cinematic change)
+    int m_changeBar = -1;                ///< where the key changes (-1: never)
     /** @brief The absolute pitch class of the chord's tone @p i at @p bar. */
     int pc(int bar, int i) const;
 };

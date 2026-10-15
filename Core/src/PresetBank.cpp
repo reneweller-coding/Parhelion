@@ -22,33 +22,33 @@ namespace bank {
 
 /** @brief One knob of a group: its key inside the module, its range, its axis; or a list of values to draw from. */
 struct Knob {
-    const char* key;     ///< e.g. "cutoff", "lfo@_rate", "mx#_amount"
-    float lo;   ///< the low end of the range (the constant for an axis of C)
-    float hi;   ///< the high end of the range
-    char axis;           ///< 'A' the row, 'B' the column, 'R' drawn, 'C' constant
-    const char* list;    ///< "list:2,6,7": one of these (by the axis: the row's, the column's or drawn); else null
+    const char* m_key;     ///< e.g. "cutoff", "lfo@_rate", "mx#_amount"
+    float m_lo;   ///< the low end of the range (the constant for an axis of C)
+    float m_hi;   ///< the high end of the range
+    char m_axis;           ///< 'A' the row, 'B' the column, 'R' drawn, 'C' constant
+    const char* m_list;    ///< "list:2,6,7": one of these (by the axis: the row's, the column's or drawn); else null
 };
 /** @brief A modulation recipe: its chance and its knobs. */
 struct Mod {
-    float chance;              ///< how often a preset of the group gets it, 0..1
-    std::vector<Knob> knobs;   ///< the knobs it sets
+    float m_chance;              ///< how often a preset of the group gets it, 0..1
+    std::vector<Knob> m_knobs;   ///< the knobs it sets
 };
 /** @brief A group: its name, its eight nouns, its weight in each style, the kit roles it is for, its knobs, its recipes. */
 struct Group {
-    const char* name;   ///< the group's name
-    const char* nouns[8];   ///< its eight nouns
-    float style[5];      ///< Uplifting, Progressive, Dream House, Acid, Deep
-    uint32_t roles;      ///< bit PercRole (the kit), 0: any
-    std::vector<Knob> knobs;   ///< its knobs
-    std::vector<Mod> mods;   ///< its modulation recipes
+    const char* m_name;   ///< the group's name
+    const char* m_nouns[8];   ///< its eight nouns
+    float m_style[5];      ///< Uplifting, Progressive, Dream House, Acid, Deep
+    uint32_t m_roles;      ///< bit PercRole (the kit), 0: any
+    std::vector<Knob> m_knobs;   ///< its knobs
+    std::vector<Mod> m_mods;   ///< its modulation recipes
 };
 /** @brief A bank: its label (the module's key prefix), module and instance, its eight adjectives, its sixteen groups. */
 struct Bank {
-    const char* label;   ///< the bank's label: the module's key prefix
-    Module module;   ///< the module
-    int instance;   ///< the instance
-    const char* adj[8];   ///< its eight adjectives
-    std::vector<Group> groups;   ///< its sixteen groups
+    const char* m_label;   ///< the bank's label: the module's key prefix
+    ModuleE m_module;   ///< the module
+    int m_instance;   ///< the instance
+    const char* m_adj[8];   ///< its eight adjectives
+    std::vector<Group> m_groups;   ///< its sixteen groups
 };
 
 #include "PresetBankData.inl"
@@ -88,9 +88,9 @@ std::vector<float> listOf(const char* spec)
 /** @brief The key prefix of a bank's knobs ("lead.", "perc1.", "bass."). */
 std::string prefixOf(const Bank& b)
 {
-    if (b.module == Module::Poly) return std::string(kPolyInstanceNames[b.instance]) + ".";
-    if (b.module == Module::Perc) return "perc1.";
-    return std::string(b.label) + ".";
+    if (b.m_module == ModuleE::POLY) return std::string(PolyInstanceNames[b.m_instance]) + ".";
+    if (b.m_module == ModuleE::PERC) return "perc1.";
+    return std::string(b.m_label) + ".";
 }
 
 /** @brief Sets knob @p key to what its range (or list) and axis give at row @p row, column @p col. */
@@ -99,26 +99,26 @@ bool setKnob(ParamStore& p, const std::string& prefix, const std::string& key, c
     const int id = p.find(prefix + key);
     if (id < 0) return false;
     float t = 0.0f;
-    switch (k.axis) {
+    switch (k.m_axis) {
     case 'A': t = static_cast<float>(row) / 7.0f; break;
     case 'B': t = static_cast<float>(col) / 7.0f; break;
     case 'R': t = rng.uniform(); break;
     default: t = 0.0f; break;
     }
-    if (k.list != nullptr) {
-        const std::vector<float> l = listOf(k.list);
+    if (k.m_list != nullptr) {
+        const std::vector<float> l = listOf(k.m_list);
         const int n = static_cast<int>(l.size());
-        const int i = k.axis == 'R' ? std::min(n - 1, static_cast<int>(t * n)) : k.axis == 'C' ? 0 : std::min(n - 1, static_cast<int>(std::lround(t * (n - 1))));
+        const int i = k.m_axis == 'R' ? std::min(n - 1, static_cast<int>(t * n)) : k.m_axis == 'C' ? 0 : std::min(n - 1, static_cast<int>(std::lround(t * (n - 1))));
         p.set(id, l[static_cast<size_t>(i)]);
         return true;
     }
     const ParamDesc& d = p.desc(id);
-    if (d.curve == Curve::Choice || d.curve == Curve::Int || d.curve == Curve::Toggle) {
-        p.set(id, std::round(k.lo + t * (k.hi - k.lo)));
-    } else if (k.axis == 'C' || k.lo == k.hi) {
-        p.set(id, k.lo);
+    if (d.m_curve == CurveE::CHOICE || d.m_curve == CurveE::INT || d.m_curve == CurveE::TOGGLE) {
+        p.set(id, std::round(k.m_lo + t * (k.m_hi - k.m_lo)));
+    } else if (k.m_axis == 'C' || k.m_lo == k.m_hi) {
+        p.set(id, k.m_lo);
     } else {
-        const float a = p.toNormalised(id, k.lo), b = p.toNormalised(id, k.hi);
+        const float a = p.toNormalised(id, k.m_lo), b = p.toNormalised(id, k.m_hi);
         p.setNormalised(id, a + t * (b - a));
     }
     return true;
@@ -129,32 +129,32 @@ std::vector<SoundPreset> build(const Bank& b, int index)
 {
     std::vector<SoundPreset> out;
     auto p = std::make_unique<ParamStore>();
-    const int base = p->base(b.module, b.module == Module::Perc ? 0 : b.instance);
-    const int count = ParamStore::moduleCount(b.module);
+    const int base = p->base(b.m_module, b.m_module == ModuleE::PERC ? 0 : b.m_instance);
+    const int count = ParamStore::moduleCount(b.m_module);
     const std::string prefix = prefixOf(b);
     uint64_t salt = 0x50415248'42414E4Bull;   // "PARHBANK"
-    for (const char* c = b.label; *c != 0; ++c) salt = mixSeed(salt, static_cast<uint64_t>(*c));
-    out.reserve(b.groups.size() * 64);
-    for (size_t g = 0; g < b.groups.size(); ++g) {
-        const Group& grp = b.groups[g];
+    for (const char* c = b.m_label; *c != 0; ++c) salt = mixSeed(salt, static_cast<uint64_t>(*c));
+    out.reserve(b.m_groups.size() * 64);
+    for (size_t g = 0; g < b.m_groups.size(); ++g) {
+        const Group& grp = b.m_groups[g];
         for (int row = 0; row < 8; ++row)
             for (int col = 0; col < 8; ++col) {
                 for (int k = 0; k < count; ++k) p->set(base + k, p->defaultValue(base + k));
                 Rng rng;
                 rng.seed(mixSeed(salt, static_cast<uint64_t>(g * 64 + row * 8 + col)));
-                for (const Knob& k : grp.knobs) setKnob(*p, prefix, k.key, k, row, col, rng);
+                for (const Knob& k : grp.m_knobs) setKnob(*p, prefix, k.m_key, k, row, col, rng);
                 int lfoNext = 1, slotNext = 1;
-                for (const Mod& m : grp.mods) {
+                for (const Mod& m : grp.m_mods) {
                     const float roll = rng.uniform();
-                    if (roll >= m.chance || slotNext > kModSlots) continue;
+                    if (roll >= m.m_chance || slotNext > ModSlots) continue;
                     bool usesLfo = false;
-                    for (const Knob& k : m.knobs) usesLfo = usesLfo || std::string(k.key).find('@') != std::string::npos;
-                    if (usesLfo && lfoNext > kLfos) continue;
-                    for (const Knob& k : m.knobs) {
-                        const std::string key = replaceAll(replaceAll(k.key, '@', lfoNext), '#', slotNext);
+                    for (const Knob& k : m.m_knobs) usesLfo = usesLfo || std::string(k.m_key).find('@') != std::string::npos;
+                    if (usesLfo && lfoNext > Lfos) continue;
+                    for (const Knob& k : m.m_knobs) {
+                        const std::string key = replaceAll(replaceAll(k.m_key, '@', lfoNext), '#', slotNext);
                         // A source of -1 is the LFO this recipe took (ModSource: LFO n is n).
-                        if (key.find("_src") != std::string::npos && k.lo < 0.0f) {
-                            const Knob c{ k.key, static_cast<float>(lfoNext), static_cast<float>(lfoNext), 'C', nullptr };
+                        if (key.find("_src") != std::string::npos && k.m_lo < 0.0f) {
+                            const Knob c{ k.m_key, static_cast<float>(lfoNext), static_cast<float>(lfoNext), 'C', nullptr };
                             setKnob(*p, prefix, key, c, row, col, rng);
                         } else {
                             setKnob(*p, prefix, key, k, row, col, rng);
@@ -164,15 +164,15 @@ std::vector<SoundPreset> build(const Bank& b, int index)
                     ++slotNext;
                 }
                 SoundPreset sp;
-                sp.group = grp.name;
-                sp.name = std::string(b.adj[row]) + " " + grp.nouns[col];
-                sp.groupIndex = static_cast<int>(g);
-                for (int k = 0; k < 5; ++k) sp.style[k] = grp.style[k];
-                sp.roles = grp.roles;
-                if (index >= 0 && out.size() < static_cast<size_t>(kPresetsPerBank))
-                    sp.trimDb = 0.1f * static_cast<float>(kPresetTrimTenths[index][out.size()]);
+                sp.m_group = grp.m_name;
+                sp.m_name = std::string(b.m_adj[row]) + " " + grp.m_nouns[col];
+                sp.m_groupIndex = static_cast<int>(g);
+                for (int k = 0; k < 5; ++k) sp.m_style[k] = grp.m_style[k];
+                sp.m_roles = grp.m_roles;
+                if (index >= 0 && out.size() < static_cast<size_t>(PresetsPerBank))
+                    sp.m_trimDb = 0.1f * static_cast<float>(PresetTrimTenths[index][out.size()]);
                 for (int k = 0; k < count; ++k)
-                    if (!presetLeaves(b.module, k)) sp.values.emplace_back(k, p->get(base + k));
+                    if (!presetLeaves(b.m_module, k)) sp.m_values.emplace_back(k, p->get(base + k));
                 out.push_back(std::move(sp));
             }
     }
@@ -180,10 +180,10 @@ std::vector<SoundPreset> build(const Bank& b, int index)
 }
 
 /** @brief The bank of instance @p instance of module @p m, null for one without presets. */
-const Bank* bankOf(Module m, int instance)
+const Bank* bankOf(ModuleE m, int instance)
 {
     for (const Bank& b : banks())
-        if (b.module == m && (m != Module::Poly || b.instance == instance)) return &b;
+        if (b.m_module == m && (m != ModuleE::POLY || b.m_instance == instance)) return &b;
     return nullptr;
 }
 
@@ -191,24 +191,24 @@ const Bank* bankOf(Module m, int instance)
 
 } // namespace bank
 
-bool hasPresets(Module module) { return bank::bankOf(module, 0) != nullptr; }
+bool hasPresets(ModuleE module) { return bank::bankOf(module, 0) != nullptr; }
 
-int bankIndex(Module module, int instance)
+int bankIndex(ModuleE module, int instance)
 {
     const std::vector<bank::Bank>& all = bank::banks();
     for (size_t i = 0; i < all.size(); ++i)
-        if (all[i].module == module && (module != Module::Poly || all[i].instance == instance)) return static_cast<int>(i);
+        if (all[i].m_module == module && (module != ModuleE::POLY || all[i].m_instance == instance)) return static_cast<int>(i);
     return -1;
 }
 
-const std::vector<SoundPreset>& factoryPresets(Module module, int instance)
+const std::vector<SoundPreset>& factoryPresets(ModuleE module, int instance)
 {
     static std::mutex lock;
-    static std::vector<std::vector<SoundPreset>> built(kPresetBanks);
-    static std::vector<bool> done(kPresetBanks, false);
+    static std::vector<std::vector<SoundPreset>> built(PresetBanks);
+    static std::vector<bool> done(PresetBanks, false);
     static const std::vector<SoundPreset> none;
     const int i = bankIndex(module, instance);
-    if (i < 0 || i >= kPresetBanks) return none;
+    if (i < 0 || i >= PresetBanks) return none;
     std::lock_guard<std::mutex> g(lock);
     if (!done[static_cast<size_t>(i)]) {
         built[static_cast<size_t>(i)] = bank::build(bank::banks()[static_cast<size_t>(i)], i);
@@ -217,43 +217,43 @@ const std::vector<SoundPreset>& factoryPresets(Module module, int instance)
     return built[static_cast<size_t>(i)];
 }
 
-bool presetLeaves(Module module, int k)
+bool presetLeaves(ModuleE module, int k)
 {
     switch (module) {
-    case Module::Kick: return k == kick::Level || k == kick::Tune || k == kick::LowCut;
-    case Module::Sub: return k == sub::Level || k == sub::Lock || k == sub::Duck || k == sub::DuckHold || k == sub::DuckRelease;
-    case Module::Perc:
-        return k == perc::Active || k == perc::Role || k == perc::Level || k == perc::Pan || k == perc::Choke || k == perc::Shift
-            || k == perc::Density || k == perc::PanDepth || k == perc::PanBars || k == perc::CutTrack;
-    case Module::Bass: case Module::Acid:
-        return k == synth::Level || k == synth::Pan || k == synth::PlateSend || k == synth::RoomSend || k == synth::Duck
-            || k == synth::DuckRelease || k == synth::LowCut;
-    case Module::Poly:
-        return k == poly::Level || k == poly::Pan || k == poly::Duck || (k >= poly::Gate && k <= poly::GateTone) || k == poly::RoomSend
-            || k == poly::HallSend || k == poly::PlateSend || k == poly::HpFloor || k == poly::HpTrack;
-    case Module::Piano:
-        return k == piano::Level || k == piano::Pedal || k == piano::Width || k == piano::LowCut || k == piano::Duck
-            || k == piano::RoomSend || k == piano::PlateSend || k == piano::HallSend;
-    case Module::Strings:
-        return k == strings::Level || k == strings::Width || k == strings::LowCut || k == strings::Duck || k == strings::RoomSend
-            || k == strings::PlateSend || k == strings::HallSend;
-    case Module::Choir:
-        return k == choir::Level || k == choir::Width || k == choir::LowCut || k == choir::Duck || k == choir::RoomSend
-            || k == choir::PlateSend || k == choir::HallSend;
-    case Module::Brass:
-        return k == brass::Level || k == brass::Width || k == brass::LowCut || k == brass::Duck || k == brass::RoomSend
-            || k == brass::PlateSend || k == brass::HallSend;
-    case Module::Timpani:
-        return k == timpani::Level || k == timpani::Width || k == timpani::LowCut || k == timpani::Duck || k == timpani::RoomSend
-            || k == timpani::PlateSend || k == timpani::HallSend;
-    case Module::Sfx:
-        return k == sfx::Level || k == sfx::Duck || k == sfx::RoomSend || k == sfx::HallSend || k == sfx::PlateSend || k == sfx::SubDuck;
-    case Module::Cloud: return k == cloud::Level || k == cloud::PadSend || k == cloud::KeysSend || k == cloud::PlateSend;
+    case ModuleE::KICK: return k == kick::LEVEL || k == kick::TUNE || k == kick::LOW_CUT;
+    case ModuleE::SUB: return k == sub::LEVEL || k == sub::LOCK || k == sub::DUCK || k == sub::DUCK_HOLD || k == sub::DUCK_RELEASE;
+    case ModuleE::PERC:
+        return k == perc::ACTIVE || k == perc::ROLE || k == perc::LEVEL || k == perc::PAN || k == perc::CHOKE || k == perc::SHIFT
+            || k == perc::DENSITY || k == perc::PAN_DEPTH || k == perc::PAN_BARS || k == perc::CUT_TRACK;
+    case ModuleE::BASS: case ModuleE::ACID:
+        return k == synth::LEVEL || k == synth::PAN || k == synth::PLATE_SEND || k == synth::ROOM_SEND || k == synth::DUCK
+            || k == synth::DUCK_RELEASE || k == synth::LOW_CUT;
+    case ModuleE::POLY:
+        return k == poly::LEVEL || k == poly::PAN || k == poly::DUCK || (k >= poly::GATE && k <= poly::GATE_TONE) || k == poly::ROOM_SEND
+            || k == poly::HALL_SEND || k == poly::PLATE_SEND || k == poly::HP_FLOOR || k == poly::HP_TRACK;
+    case ModuleE::PIANO:
+        return k == piano::LEVEL || k == piano::PEDAL || k == piano::WIDTH || k == piano::LOW_CUT || k == piano::DUCK
+            || k == piano::ROOM_SEND || k == piano::PLATE_SEND || k == piano::HALL_SEND;
+    case ModuleE::STRINGS:
+        return k == strings::LEVEL || k == strings::WIDTH || k == strings::LOW_CUT || k == strings::DUCK || k == strings::ROOM_SEND
+            || k == strings::PLATE_SEND || k == strings::HALL_SEND;
+    case ModuleE::CHOIR:
+        return k == choir::LEVEL || k == choir::WIDTH || k == choir::LOW_CUT || k == choir::DUCK || k == choir::ROOM_SEND
+            || k == choir::PLATE_SEND || k == choir::HALL_SEND;
+    case ModuleE::BRASS:
+        return k == brass::LEVEL || k == brass::WIDTH || k == brass::LOW_CUT || k == brass::DUCK || k == brass::ROOM_SEND
+            || k == brass::PLATE_SEND || k == brass::HALL_SEND;
+    case ModuleE::TIMPANI:
+        return k == timpani::LEVEL || k == timpani::WIDTH || k == timpani::LOW_CUT || k == timpani::DUCK || k == timpani::ROOM_SEND
+            || k == timpani::PLATE_SEND || k == timpani::HALL_SEND;
+    case ModuleE::SFX:
+        return k == sfx::LEVEL || k == sfx::DUCK || k == sfx::ROOM_SEND || k == sfx::HALL_SEND || k == sfx::PLATE_SEND || k == sfx::SUB_DUCK;
+    case ModuleE::CLOUD: return k == cloud::LEVEL || k == cloud::PAD_SEND || k == cloud::KEYS_SEND || k == cloud::PLATE_SEND;
     default: return true;
     }
 }
 
-std::vector<std::pair<int, float>> presetKnobs(Module module, int instance, const SoundPreset& preset)
+std::vector<std::pair<int, float>> presetKnobs(ModuleE module, int instance, const SoundPreset& preset)
 {
     std::vector<std::pair<int, float>> out;
     ParamStore defaults;
@@ -261,19 +261,19 @@ std::vector<std::pair<int, float>> presetKnobs(Module module, int instance, cons
     const int count = ParamStore::moduleCount(module);
     std::vector<float> v(static_cast<size_t>(count));
     for (int k = 0; k < count; ++k) v[static_cast<size_t>(k)] = defaults.defaultValue(base + k);
-    for (const auto& [k, value] : preset.values) if (k >= 0 && k < count) v[static_cast<size_t>(k)] = value;
+    for (const auto& [k, value] : preset.m_values) if (k >= 0 && k < count) v[static_cast<size_t>(k)] = value;
     for (int k = 0; k < count; ++k) if (!presetLeaves(module, k)) out.emplace_back(k, v[static_cast<size_t>(k)]);
     return out;
 }
 
-void applyPreset(ParamStore& params, Module module, int instance, const SoundPreset& preset)
+void applyPreset(ParamStore& params, ModuleE module, int instance, const SoundPreset& preset)
 {
     const int base = params.base(module, instance);
     if (base < 0) return;
     for (const auto& [k, value] : presetKnobs(module, instance, preset)) params.set(base + k, value);
 }
 
-std::string moduleText(const ParamStore& params, Module module, int instance)
+std::string moduleText(const ParamStore& params, ModuleE module, int instance)
 {
     std::string out;
     const int base = params.base(module, instance);
@@ -287,7 +287,7 @@ std::string moduleText(const ParamStore& params, Module module, int instance)
     return out;
 }
 
-std::string userPresetText(const ParamStore& params, Module module, int instance)
+std::string userPresetText(const ParamStore& params, ModuleE module, int instance)
 {
     std::string out;
     const int base = params.base(module, instance);
@@ -303,7 +303,7 @@ std::string userPresetText(const ParamStore& params, Module module, int instance
     return out;
 }
 
-std::vector<std::pair<int, float>> userPresetKnobs(const ParamStore& params, Module module, int instance, std::string_view text)
+std::vector<std::pair<int, float>> userPresetKnobs(const ParamStore& params, ModuleE module, int instance, std::string_view text)
 {
     std::vector<std::pair<int, float>> out;
     const int base = params.base(module, instance);
@@ -336,22 +336,22 @@ std::vector<std::pair<int, float>> userPresetKnobs(const ParamStore& params, Mod
     return out;
 }
 
-int pickPreset(Module module, int instance, const float* style, int role, Rng& rng, const Preferences* prefs)
+int pickPreset(ModuleE module, int instance, const float* style, int role, Rng& rng, const Preferences* prefs)
 {
     const std::vector<SoundPreset>& all = factoryPresets(module, instance);
     if (all.empty()) return -1;
     // The groups by their weight in the track's styles, cubed (among those made for the lane's role): with the plain
     // weights an Uplifting lead was its anthem supersaw one time in eight (sixteen groups, most of them half at home
     // in every style); cubed, a style's own groups carry it and the others come now and then.
-    const int groups = all.back().groupIndex + 1;
+    const int groups = all.back().m_groupIndex + 1;
     std::vector<float> w(static_cast<size_t>(groups), 0.0f);
     for (int g = 0; g < groups; ++g) {
         const SoundPreset& first = all[static_cast<size_t>(g * 64)];
-        if (role >= 0 && first.roles != 0u && ((first.roles >> role) & 1u) == 0u) continue;
+        if (role >= 0 && first.m_roles != 0u && ((first.m_roles >> role) & 1u) == 0u) continue;
         float s = 0.0f;
-        for (int k = 0; k < 5; ++k) s += first.style[k] * style[k];
+        for (int k = 0; k < 5; ++k) s += first.m_style[k] * style[k];
         s = std::max(0.0f, s);
-        w[static_cast<size_t>(g)] = s * s * s * (prefs != nullptr ? prefs->group(first.group) : 1.0f);
+        w[static_cast<size_t>(g)] = s * s * s * (prefs != nullptr ? prefs->group(first.m_group) : 1.0f);
     }
     float total = 0.0f;
     for (float x : w) total += x;
@@ -385,9 +385,9 @@ int pickPreset(Module module, int instance, const float* style, int role, Rng& r
 
 float styleBrightness(const float* style)
 {
-    static const float kBright[5] = { 0.65f, 0.55f, 0.45f, 0.6f, 0.4f };   // Uplifting, Progressive, Dream House, Acid, Deep
+    static const float Bright[5] = { 0.65f, 0.55f, 0.45f, 0.6f, 0.4f };   // Uplifting, Progressive, Dream House, Acid, Deep
     float sw = 0.0f, b = 0.0f;
-    for (int k = 0; k < 5; ++k) { sw += std::max(0.0f, style[k]); b += std::max(0.0f, style[k]) * kBright[k]; }
+    for (int k = 0; k < 5; ++k) { sw += std::max(0.0f, style[k]); b += std::max(0.0f, style[k]) * Bright[k]; }
     return sw > 0.0f ? b / sw : 0.5f;
 }
 
@@ -401,11 +401,11 @@ int bankUnknownKeys(std::string* first)
             if (p.find(prefix + key) >= 0) return;
             if (bad++ == 0 && first != nullptr) *first = prefix + key;
         };
-        for (const bank::Group& g : b.groups) {
-            for (const bank::Knob& k : g.knobs) check(k.key);
-            for (const bank::Mod& m : g.mods)
-                for (const bank::Knob& k : m.knobs) {
-                    std::string key = k.key;
+        for (const bank::Group& g : b.m_groups) {
+            for (const bank::Knob& k : g.m_knobs) check(k.m_key);
+            for (const bank::Mod& m : g.m_mods)
+                for (const bank::Knob& k : m.m_knobs) {
+                    std::string key = k.m_key;
                     for (char& c : key) if (c == '@' || c == '#') c = '1';
                     check(key);
                 }

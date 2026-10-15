@@ -14,316 +14,316 @@
 namespace parh {
 
 namespace {
-constexpr float kClipCeiling = 0.97f;   ///< where the soft clipper's curve flattens (-0.26 dBFS)
-constexpr float kSqrt2 = 1.41421356f;   ///< sqrt 2
+constexpr float ClipCeiling = 0.97f;   ///< where the soft clipper's curve flattens (-0.26 dBFS)
+constexpr float Sqrt2 = 1.41421356f;   ///< sqrt 2
 }
 
 const char* Engine::stemName(int s)
 {
-    static const char* const kNames[kStems] = { "kick", "sub", "bass", "acid", "hats", "perc", "lead", "counter", "pluck",
+    static const char* const Names[STEMS] = { "kick", "sub", "bass", "acid", "hats", "perc", "lead", "counter", "pluck",
                                                 "arp", "pad", "stab", "piano", "strings", "choir", "brass", "timpani", "room", "plate", "hall", "cloud", "fx", "djfx" };
-    return s >= 0 && s < kStems ? kNames[s] : "";
+    return s >= 0 && s < STEMS ? Names[s] : "";
 }
 
 void Engine::ThreeBand::set(float fs)
 {
-    for (Svf* f : { &split1, &low2, &high2 }) f->setK(200.0f, kSqrt2, fs);
-    for (Svf* f : { &split2, &mid2, &top2, &ap }) f->setK(2500.0f, kSqrt2, fs);
+    for (Svf* f : { &m_split1, &m_low2, &m_high2 }) f->setK(200.0f, Sqrt2, fs);
+    for (Svf* f : { &m_split2, &m_mid2, &m_top2, &m_ap }) f->setK(2500.0f, Sqrt2, fs);
 }
 
 void Engine::ThreeBand::reset()
 {
-    for (Svf* f : { &split1, &low2, &high2, &split2, &mid2, &top2, &ap }) f->reset();
+    for (Svf* f : { &m_split1, &m_low2, &m_high2, &m_split2, &m_mid2, &m_top2, &m_ap }) f->reset();
 }
 
 void Engine::ThreeBand::process(float x, float& low, float& mid, float& top)
 {
     float lp, bp, hp, l1, h1;
-    split1.tick(x, l1, bp, h1);
-    const float lo = low2.lp(l1);
-    high2.tick(h1, lp, bp, hp);
+    m_split1.tick(x, l1, bp, h1);
+    const float lo = m_low2.lp(l1);
+    m_high2.tick(h1, lp, bp, hp);
     const float high = hp;
-    split2.tick(high, l1, bp, h1);
-    mid = mid2.lp(l1);
-    top2.tick(h1, lp, bp, hp);
+    m_split2.tick(high, l1, bp, h1);
+    mid = m_mid2.lp(l1);
+    m_top2.tick(h1, lp, bp, hp);
     top = hp;
-    ap.tick(lo, lp, bp, hp);
-    low = lo - 2.0f * kSqrt2 * bp;   // through the upper crossover's allpass, in phase with the others
+    m_ap.tick(lo, lp, bp, hp);
+    low = lo - 2.0f * Sqrt2 * bp;   // through the upper crossover's allpass, in phase with the others
 }
 
 void Engine::prepare(double sampleRate, int maxBlock)
 {
-    sampleRate_ = sampleRate;
-    maxBlock_ = std::max(1, maxBlock);
-    shown_.assign(static_cast<size_t>(params_.count()), std::numeric_limits<float>::quiet_NaN());
-    for (int d = 0; d < kDecks; ++d) { decks_[d].prepare(&params_, sampleRate, d); decks_[d].setShown(shown_.data()); }
+    m_sampleRate = sampleRate;
+    m_maxBlock = std::max(1, maxBlock);
+    m_shown.assign(static_cast<size_t>(m_params.count()), std::numeric_limits<float>::quiet_NaN());
+    for (int d = 0; d < Decks; ++d) { m_decks[d].prepare(&m_params, sampleRate, d); m_decks[d].setShown(m_shown.data()); }
     const float fs = static_cast<float>(sampleRate);
-    for (Channel& c : ch_) for (ThreeBand& b : c.bands) b.set(fs);
-    for (auto& deck : stemBands_) for (auto& stem : deck) for (ThreeBand& b : stem) b.set(fs);
-    deckStems_.assign(static_cast<size_t>(kDecks * Deck::kStems * 2 * kRaster), 0.0f);
-    for (int d = 0; d < kDecks; ++d)
-        for (int s = 0; s < Deck::kStems; ++s) {
-            float* base = deckStems_.data() + static_cast<size_t>(((d * Deck::kStems + s) * 2) * kRaster);
-            deckStemL_[d][s] = base;
-            deckStemR_[d][s] = base + kRaster;
+    for (Channel& c : m_ch) for (ThreeBand& b : c.m_bands) b.set(fs);
+    for (auto& deck : m_stemBands) for (auto& stem : deck) for (ThreeBand& b : stem) b.set(fs);
+    m_deckStems.assign(static_cast<size_t>(Decks * Deck::STEMS * 2 * Raster), 0.0f);
+    for (int d = 0; d < Decks; ++d)
+        for (int s = 0; s < Deck::STEMS; ++s) {
+            float* base = m_deckStems.data() + static_cast<size_t>(((d * Deck::STEMS + s) * 2) * Raster);
+            m_deckStemL[d][s] = base;
+            m_deckStemR[d][s] = base + Raster;
         }
-    smooth_ = 1.0f - std::exp(-1.0f / (0.001f * fs));
-    djEcho_.prepare(sampleRate, 3.0, 0x444A4543484Full);   // "DJECHO"
-    djHall_.prepare(sampleRate);
-    limiter_.prepare(sampleRate);
-    for (BandLimit& b : cutLp_) b.prepare(sampleRate, 16000.0f);
-    for (int c = 0; c < 2; ++c) { cutHp1_[c].setK(6000.0f, kSqrt2, fs); cutHp2_[c].setK(6000.0f, kSqrt2, fs); }
-    cutAtt_ = 1.0f - std::exp(-1.0f / (0.001f * fs));
-    cutRel_ = 1.0f - std::exp(-1.0f / (0.05f * fs));
-    const size_t n = static_cast<size_t>(kRaster);
-    for (int d = 0; d < kDecks; ++d) { deckL_[d].assign(n, 0.0f); deckR_[d].assign(n, 0.0f); }
-    for (std::vector<float>* b : { &sendL_, &sendR_, &fxL_, &fxR_ }) b->assign(n, 0.0f);
-    cellDirty_ = true;
+    m_smooth = 1.0f - std::exp(-1.0f / (0.001f * fs));
+    m_djEcho.prepare(sampleRate, 3.0, 0x444A4543484Full);   // "DJECHO"
+    m_djHall.prepare(sampleRate);
+    m_limiter.prepare(sampleRate);
+    for (BandLimit& b : m_cutLp) b.prepare(sampleRate, 16000.0f);
+    for (int c = 0; c < 2; ++c) { m_cutHp1[c].setK(6000.0f, Sqrt2, fs); m_cutHp2[c].setK(6000.0f, Sqrt2, fs); }
+    m_cutAtt = 1.0f - std::exp(-1.0f / (0.001f * fs));
+    m_cutRel = 1.0f - std::exp(-1.0f / (0.05f * fs));
+    const size_t n = static_cast<size_t>(Raster);
+    for (int d = 0; d < Decks; ++d) { m_deckL[d].assign(n, 0.0f); m_deckR[d].assign(n, 0.0f); }
+    for (std::vector<float>* b : { &m_sendL, &m_sendR, &m_fxL, &m_fxR }) b->assign(n, 0.0f);
+    m_cellDirty = true;
 }
 
 void Engine::load(const Score& score)
 {
     SetScore s;
-    s.decks[0] = score;
-    s.lengthBeats = score.lengthBeats;
+    s.m_decks[0] = score;
+    s.m_lengthBeats = score.m_lengthBeats;
     loadSet(s);
-    isSet_ = live_;   // a track alone: no isolator, no filter in its path -- unless it is played live
+    m_isSet = m_live;   // a track alone: no isolator, no filter in its path -- unless it is played live
 }
 
 void Engine::setLive(bool on)
 {
-    live_ = on;
-    for (Deck& d : decks_) d.setLive(on);
+    m_live = on;
+    for (Deck& d : m_decks) d.setLive(on);
 }
 
 void Engine::loadSet(const SetScore& set)
 {
-    for (int d = 0; d < kDecks; ++d) {
-        if (d == 0 || !set.decks[d].notes.empty() || !set.decks[d].gestures.empty()) decks_[d].load(set.decks[d]);
-        else decks_[d].clear();
+    for (int d = 0; d < Decks; ++d) {
+        if (d == 0 || !set.m_decks[d].m_notes.empty() || !set.m_decks[d].m_gestures.empty()) m_decks[d].load(set.m_decks[d]);
+        else m_decks[d].clear();
     }
-    tempo_ = set.decks[0].tempo;
-    lengthBeats_ = set.lengthBeats;
-    isSet_ = true;
-    steps_.clear();
-    for (const Deck& d : decks_) steps_.insert(steps_.end(), d.mixerSteps().begin(), d.mixerSteps().end());
-    std::sort(steps_.begin(), steps_.end());
-    steps_.erase(std::unique(steps_.begin(), steps_.end()), steps_.end());
+    m_tempo = set.m_decks[0].m_tempo;
+    m_lengthBeats = set.m_lengthBeats;
+    m_isSet = true;
+    m_steps.clear();
+    for (const Deck& d : m_decks) m_steps.insert(m_steps.end(), d.mixerSteps().begin(), d.mixerSteps().end());
+    std::sort(m_steps.begin(), m_steps.end());
+    m_steps.erase(std::unique(m_steps.begin(), m_steps.end()), m_steps.end());
     // The set's own automation.
-    tracks_.clear();
-    trackOf_.assign(static_cast<size_t>(params_.count()), -1);
-    std::vector<Gesture> g = set.gestures;
-    std::stable_sort(g.begin(), g.end(), [](const Gesture& a, const Gesture& b) { return a.beat < b.beat; });
+    m_tracks.clear();
+    m_trackOf.assign(static_cast<size_t>(m_params.count()), -1);
+    std::vector<Gesture> g = set.m_gestures;
+    std::stable_sort(g.begin(), g.end(), [](const Gesture& a, const Gesture& b) { return a.m_beat < b.m_beat; });
     for (const Gesture& x : g) {
-        if (x.param < 0 || x.param >= params_.count()) continue;
-        int& t = trackOf_[static_cast<size_t>(x.param)];
-        if (t < 0) { t = static_cast<int>(tracks_.size()); tracks_.push_back(Track{ x.param, {}, 0, 0.0f }); }
-        tracks_[static_cast<size_t>(t)].gestures.push_back(x);
+        if (x.m_param < 0 || x.m_param >= m_params.count()) continue;
+        int& t = m_trackOf[static_cast<size_t>(x.m_param)];
+        if (t < 0) { t = static_cast<int>(m_tracks.size()); m_tracks.push_back(Track{ x.m_param, {}, 0, 0.0f }); }
+        m_tracks[static_cast<size_t>(t)].m_gestures.push_back(x);
     }
     // The cues: every deck's marks and the set's tracks.
-    cueMarks_.clear();
-    for (int d = 0; d < kDecks; ++d) {
-        if (!decks_[d].loaded()) continue;
-        const std::vector<CueMark> m = cueMarksOf(set.decks[d], params_);
-        cueMarks_.insert(cueMarks_.end(), m.begin(), m.end());
+    m_cueMarks.clear();
+    for (int d = 0; d < Decks; ++d) {
+        if (!m_decks[d].loaded()) continue;
+        const std::vector<CueMark> m = cueMarksOf(set.m_decks[d], m_params);
+        m_cueMarks.insert(m_cueMarks.end(), m.begin(), m.end());
     }
     {
         Score names;
-        names.markers = set.markers;
-        const std::vector<CueMark> m = cueMarksOf(names, params_);
-        cueMarks_.insert(cueMarks_.end(), m.begin(), m.end());
+        names.m_markers = set.m_markers;
+        const std::vector<CueMark> m = cueMarksOf(names, m_params);
+        m_cueMarks.insert(m_cueMarks.end(), m.begin(), m.end());
     }
-    std::stable_sort(cueMarks_.begin(), cueMarks_.end(), [](const CueMark& a, const CueMark& b) { return a.beat < b.beat; });
+    std::stable_sort(m_cueMarks.begin(), m_cueMarks.end(), [](const CueMark& a, const CueMark& b) { return a.m_beat < b.m_beat; });
     // The mixer's effects run where a deck sends into them (and always live: the throw).
-    fxOn_ = live_;
-    for (int d = 0; d < kDecks; ++d)
-        for (const Gesture& x : set.decks[d].gestures)
-            if (x.param == params_.id(Module::Deck, d, deck::FxSend)) fxOn_ = true;
-    endSample_ = static_cast<int64_t>(std::ceil(lengthSeconds() * sampleRate_));
+    m_fxOn = m_live;
+    for (int d = 0; d < Decks; ++d)
+        for (const Gesture& x : set.m_decks[d].m_gestures)
+            if (x.m_param == m_params.id(ModuleE::DECK, d, deck::FX_SEND)) m_fxOn = true;
+    m_endSample = static_cast<int64_t>(std::ceil(lengthSeconds() * m_sampleRate));
     seek(0.0);
 }
 
 void Engine::seek(double beat)
 {
-    const double x = std::max(0.0, tempo_.secondsAt(beat)) * sampleRate_;
-    sample_ = static_cast<int64_t>(std::llround(x));
-    for (Deck& d : decks_) if (d.loaded()) d.seek(sample_);
-    for (bool& p : playing_) p = false;
-    stepCursor_ = 0;
-    while (stepCursor_ < steps_.size() && steps_[stepCursor_] < sample_) ++stepCursor_;
-    for (Track& t : tracks_) { t.cursor = t.gestures.size(); t.offset = 0.0f; }
-    for (auto& deck : stemBands_) for (auto& stem : deck) for (ThreeBand& b : stem) b.reset();
-    for (auto& deck : stemFilt_) for (auto& stem : deck) for (Svf& f : stem) f.reset();
-    for (Channel& c : ch_) {
-        for (ThreeBand& b : c.bands) b.reset();
-        for (Svf& f : c.filt) f.reset();
-        for (int k = 0; k < 3; ++k) c.g[k] = c.target[k] = 1.0f;
-        c.gFader = c.fader = 1.0f;
+    const double x = std::max(0.0, m_tempo.secondsAt(beat)) * m_sampleRate;
+    m_sample = static_cast<int64_t>(std::llround(x));
+    for (Deck& d : m_decks) if (d.loaded()) d.seek(m_sample);
+    for (bool& p : m_playing) p = false;
+    m_stepCursor = 0;
+    while (m_stepCursor < m_steps.size() && m_steps[m_stepCursor] < m_sample) ++m_stepCursor;
+    for (Track& t : m_tracks) { t.m_cursor = t.m_gestures.size(); t.m_offset = 0.0f; }
+    for (auto& deck : m_stemBands) for (auto& stem : deck) for (ThreeBand& b : stem) b.reset();
+    for (auto& deck : m_stemFilt) for (auto& stem : deck) for (Svf& f : stem) f.reset();
+    for (Channel& c : m_ch) {
+        for (ThreeBand& b : c.m_bands) b.reset();
+        for (Svf& f : c.m_filt) f.reset();
+        for (int k = 0; k < 3; ++k) c.m_g[k] = c.m_target[k] = 1.0f;
+        c.m_gFader = c.m_fader = 1.0f;
     }
-    djEcho_.reset();
-    djHall_.reset();
-    limiter_.reset();
-    for (Oversampler4& o : clipOs_) o.reset();
-    for (BandLimit& b : cutLp_) b.reset();
-    for (int c = 0; c < 2; ++c) { cutHp1_[c].reset(); cutHp2_[c].reset(); }
-    cutEnv_ = 0.0f;
-    sideHp1_.reset();
-    sideHp2_.reset();
-    for (Svf& f : perfFilt_) f.reset();
-    lead_ = -1;
-    leadGroup_ = -1.0;
-    cellDirty_ = true;
+    m_djEcho.reset();
+    m_djHall.reset();
+    m_limiter.reset();
+    for (Oversampler4& o : m_clipOs) o.reset();
+    for (BandLimit& b : m_cutLp) b.reset();
+    for (int c = 0; c < 2; ++c) { m_cutHp1[c].reset(); m_cutHp2[c].reset(); }
+    m_cutEnv = 0.0f;
+    m_sideHp1.reset();
+    m_sideHp2.reset();
+    for (Svf& f : m_perfFilt) f.reset();
+    m_lead = -1;
+    m_leadGroup = -1.0;
+    m_cellDirty = true;
 }
 
 void Engine::showKnobs(int d)
 {
-    for (int id = 0; id < params_.count(); ++id) {
-        const float b = decks_[d].baseOf(id);
+    for (int id = 0; id < m_params.count(); ++id) {
+        const float b = m_decks[d].baseOf(id);
         if (!(b == b)) continue;
-        params_.set(id, b);
-        shown_[static_cast<size_t>(id)] = params_.get(id);
+        m_params.set(id, b);
+        m_shown[static_cast<size_t>(id)] = m_params.get(id);
     }
-    lead_ = d;
-    leadGroup_ = decks_[d].knobGroup();
-    soundsVersion_.fetch_add(1, std::memory_order_relaxed);
+    m_lead = d;
+    m_leadGroup = m_decks[d].knobGroup();
+    m_soundsVersion.fetch_add(1, std::memory_order_relaxed);
 }
 
 float Engine::setPlayed(int id) const
 {
-    const float knob = params_.get(id);
-    if (id < 0 || id >= static_cast<int>(trackOf_.size()) || trackOf_[static_cast<size_t>(id)] < 0) return knob;
-    const float off = tracks_[static_cast<size_t>(trackOf_[static_cast<size_t>(id)])].offset;
-    return off == 0.0f ? knob : params_.fromNormalised(id, params_.toNormalised(id, knob) + off);
+    const float knob = m_params.get(id);
+    if (id < 0 || id >= static_cast<int>(m_trackOf.size()) || m_trackOf[static_cast<size_t>(id)] < 0) return knob;
+    const float off = m_tracks[static_cast<size_t>(m_trackOf[static_cast<size_t>(id)])].m_offset;
+    return off == 0.0f ? knob : m_params.fromNormalised(id, m_params.toNormalised(id, knob) + off);
 }
 
 void Engine::updateCell()
 {
-    cellDirty_ = false;
-    const double beat = tempo_.beatAt(seconds());
-    for (Track& t : tracks_) {
-        const size_t none = t.gestures.size();
-        size_t c = t.cursor, next = c == none ? 0 : c + 1;
-        while (next < t.gestures.size() && t.gestures[next].beat <= beat) { c = next; ++next; }
-        t.cursor = c;
-        t.offset = c == none ? 0.0f : gestureValue(t.gestures[c], beat);
+    m_cellDirty = false;
+    const double beat = m_tempo.beatAt(seconds());
+    for (Track& t : m_tracks) {
+        const size_t none = t.m_gestures.size();
+        size_t c = t.m_cursor, next = c == none ? 0 : c + 1;
+        while (next < t.m_gestures.size() && t.m_gestures[next].m_beat <= beat) { c = next; ++next; }
+        t.m_cursor = c;
+        t.m_offset = c == none ? 0.0f : gestureValue(t.m_gestures[c], beat);
     }
-    const float fs = static_cast<float>(sampleRate_);
+    const float fs = static_cast<float>(m_sampleRate);
     // The channels: each deck reads its own channel as its score moves it.
-    for (int d = 0; d < kDecks; ++d) {
-        Channel& c = ch_[d];
-        if (!decks_[d].loaded()) continue;
+    for (int d = 0; d < Decks; ++d) {
+        Channel& c = m_ch[d];
+        if (!m_decks[d].loaded()) continue;
         float v[16];
-        decks_[d].readPlayed(Module::Deck, d, v);
+        m_decks[d].readPlayed(ModuleE::DECK, d, v);
         const auto gain = [](float db) { return db <= -59.9f ? 0.0f : dbToGain(db); };
-        c.fader = gain(v[deck::Fader]);
-        c.target[0] = gain(v[deck::Low]);
-        c.target[1] = gain(v[deck::Mid]);
-        c.target[2] = gain(v[deck::High]);
-        c.send = v[deck::FxSend];
-        c.filter = v[deck::Filter];
-        if (std::fabs(c.filter) >= 0.01f) {
+        c.m_fader = gain(v[deck::FADER]);
+        c.m_target[0] = gain(v[deck::LOW]);
+        c.m_target[1] = gain(v[deck::MID]);
+        c.m_target[2] = gain(v[deck::HIGH]);
+        c.m_send = v[deck::FX_SEND];
+        c.m_filter = v[deck::FILTER];
+        if (std::fabs(c.m_filter) >= 0.01f) {
             // Below 0 a low pass from 20 kHz down to 20 Hz, above 0 a high pass from 20 Hz up to 20 kHz.
-            const float f = c.filter < 0.0f ? 20000.0f * std::exp2(10.0f * c.filter) : 20.0f * std::exp2(10.0f * c.filter);
-            for (Svf& s : c.filt) s.setQ(std::min(f, 0.45f * fs), 0.9f, fs);
+            const float f = c.m_filter < 0.0f ? 20000.0f * std::exp2(10.0f * c.m_filter) : 20.0f * std::exp2(10.0f * c.m_filter);
+            for (Svf& s : c.m_filt) s.setQ(std::min(f, 0.45f * fs), 0.9f, fs);
         } else {
-            for (Svf& s : c.filt) s.reset();
-            for (auto& stem : stemFilt_[d]) for (Svf& s : stem) s.reset();
+            for (Svf& s : c.m_filt) s.reset();
+            for (auto& stem : m_stemFilt[d]) for (Svf& s : stem) s.reset();
         }
     }
     // The performer (live only): the master filter, the echo throw.
-    if (live_) {
-        perfFilter_ = params_.get(params_.id(Module::Perform, 0, perform::Filter));
+    if (m_live) {
+        m_perfFilter = m_params.get(m_params.id(ModuleE::PERFORM, 0, perform::FILTER));
         // The family jam (02.10.2026): the leader's energy as a low pass -- open at full energy, about 3.5 kHz at 0.3 --,
         // gliding over half a second, and only while the knob rests (the performer's hand comes first).
-        const float jamTarget = jamEnergy_ >= 0.0f ? (std::clamp(jamEnergy_, 0.0f, 1.0f) - 1.0f) * 0.35f : 0.0f;
-        jamFilter_ += (jamTarget - jamFilter_) * (1.0f - std::exp(-static_cast<float>(kRaster) / (0.5f * fs)));
-        if (std::fabs(perfFilter_) < 0.01f && std::fabs(jamFilter_) >= 0.01f) perfFilter_ = jamFilter_;
-        perfThrow_ = params_.get(params_.id(Module::Perform, 0, perform::Throw));
-        if (std::fabs(perfFilter_) >= 0.01f) {
-            const float f = perfFilter_ < 0.0f ? 20000.0f * std::exp2(10.0f * perfFilter_) : 20.0f * std::exp2(10.0f * perfFilter_);
-            for (Svf& s : perfFilt_) s.setQ(std::min(f, 0.45f * fs), 0.9f, fs);
+        const float jamTarget = m_jamEnergy >= 0.0f ? (std::clamp(m_jamEnergy, 0.0f, 1.0f) - 1.0f) * 0.35f : 0.0f;
+        m_jamFilter += (jamTarget - m_jamFilter) * (1.0f - std::exp(-static_cast<float>(Raster) / (0.5f * fs)));
+        if (std::fabs(m_perfFilter) < 0.01f && std::fabs(m_jamFilter) >= 0.01f) m_perfFilter = m_jamFilter;
+        m_perfThrow = m_params.get(m_params.id(ModuleE::PERFORM, 0, perform::THROW));
+        if (std::fabs(m_perfFilter) >= 0.01f) {
+            const float f = m_perfFilter < 0.0f ? 20000.0f * std::exp2(10.0f * m_perfFilter) : 20.0f * std::exp2(10.0f * m_perfFilter);
+            for (Svf& s : m_perfFilt) s.setQ(std::min(f, 0.45f * fs), 0.9f, fs);
         } else {
-            for (Svf& s : perfFilt_) s.reset();
+            for (Svf& s : m_perfFilt) s.reset();
         }
     }
-    if (fxOn_) {
+    if (m_fxOn) {
         float v[16];
-        for (int k = 0; k < djfx::Count; ++k) v[k] = setPlayed(params_.id(Module::DjFx, 0, k));
-        static const double kEchoBeats[] = { 0.25, 0.5, 0.75, 1.0, 1.5, 2.0 };
+        for (int k = 0; k < djfx::COUNT; ++k) v[k] = setPlayed(m_params.id(ModuleE::DJ_FX, 0, k));
+        static const double EchoBeats[] = { 0.25, 0.5, 0.75, 1.0, 1.5, 2.0 };
         EchoSettings e;
-        e.delaySeconds = kEchoBeats[std::clamp(static_cast<int>(std::lround(v[djfx::EchoTime])), 0, 5)] * 60.0 / std::max(20.0, tempo_.bpmAt(beat));
-        e.feedback = v[djfx::Feedback];
-        e.toneHz = 5000.0f;
-        e.lowCutHz = 250.0f;
-        djEcho_.set(e);
-        djHall_.set(1.2f, v[djfx::HallDecay], 0.4f, 0.02f * fs, 300.0f, 8000.0f);
-        echoReturn_ = v[djfx::EchoReturn] <= -59.9f ? 0.0f : dbToGain(v[djfx::EchoReturn]);
-        hallReturn_ = v[djfx::HallReturn] <= -59.9f ? 0.0f : dbToGain(v[djfx::HallReturn]);
+        e.m_delaySeconds = EchoBeats[std::clamp(static_cast<int>(std::lround(v[djfx::ECHO_TIME])), 0, 5)] * 60.0 / std::max(20.0, m_tempo.bpmAt(beat));
+        e.m_feedback = v[djfx::FEEDBACK];
+        e.m_toneHz = 5000.0f;
+        e.m_lowCutHz = 250.0f;
+        m_djEcho.set(e);
+        m_djHall.set(1.2f, v[djfx::HALL_DECAY], 0.4f, 0.02f * fs, 300.0f, 8000.0f);
+        m_echoReturn = v[djfx::ECHO_RETURN] <= -59.9f ? 0.0f : dbToGain(v[djfx::ECHO_RETURN]);
+        m_hallReturn = v[djfx::HALL_RETURN] <= -59.9f ? 0.0f : dbToGain(v[djfx::HALL_RETURN]);
     }
     // The master: the knobs.
-    masterGain_ = dbToGain(params_.get(params_.id(Module::Master, 0, master::Level)));
-    clipDrive_ = dbToGain(params_.get(params_.id(Module::Master, 0, master::Clip)));
-    limiter_.set(params_.get(params_.id(Module::Master, 0, master::Ceiling)), 60.0f);
-    cut_ = false;   // (Totality's vinyl cut profile is not Parhelion's)
-    const float monoKnob = params_.get(params_.id(Module::Master, 0, master::MonoBelow));
-    const float mono = cut_ ? std::max(monoKnob, 150.0f) : monoKnob;
-    sideHp1_.setK(mono, 1.8477590f, fs);   // fourth-order Butterworth
-    sideHp2_.setK(mono, 0.7653669f, fs);
+    m_masterGain = dbToGain(m_params.get(m_params.id(ModuleE::MASTER, 0, master::LEVEL)));
+    m_clipDrive = dbToGain(m_params.get(m_params.id(ModuleE::MASTER, 0, master::CLIP)));
+    m_limiter.set(m_params.get(m_params.id(ModuleE::MASTER, 0, master::CEILING)), 60.0f);
+    m_cut = false;   // (Totality's vinyl cut profile is not Parhelion's)
+    const float monoKnob = m_params.get(m_params.id(ModuleE::MASTER, 0, master::MONO_BELOW));
+    const float mono = m_cut ? std::max(monoKnob, 150.0f) : monoKnob;
+    m_sideHp1.setK(mono, 1.8477590f, fs);   // fourth-order Butterworth
+    m_sideHp2.setK(mono, 0.7653669f, fs);
 }
 
 void Engine::mix(float* L, float* R, int n)
 {
     PARH_PROF_BEGIN(Mixer);
-    for (int i = 0; i < n; ++i) { L[i] = 0.0f; R[i] = 0.0f; sendL_[static_cast<size_t>(i)] = 0.0f; sendR_[static_cast<size_t>(i)] = 0.0f; }
-    for (int d = 0; d < kDecks; ++d) {
-        if (!playing_[d]) continue;
-        Channel& c = ch_[d];
-        float* dl = deckL_[d].data();
-        float* dr = deckR_[d].data();
+    for (int i = 0; i < n; ++i) { L[i] = 0.0f; R[i] = 0.0f; m_sendL[static_cast<size_t>(i)] = 0.0f; m_sendR[static_cast<size_t>(i)] = 0.0f; }
+    for (int d = 0; d < Decks; ++d) {
+        if (!m_playing[d]) continue;
+        Channel& c = m_ch[d];
+        float* dl = m_deckL[d].data();
+        float* dr = m_deckR[d].data();
         for (int i = 0; i < n; ++i) {
             float l = dl[i], r = dr[i];
-            if (isSet_) {
-                for (int k = 0; k < 3; ++k) c.g[k] += (c.target[k] - c.g[k]) * smooth_;
-                c.gFader += (c.fader - c.gFader) * smooth_;
+            if (m_isSet) {
+                for (int k = 0; k < 3; ++k) c.m_g[k] += (c.m_target[k] - c.m_g[k]) * m_smooth;
+                c.m_gFader += (c.m_fader - c.m_gFader) * m_smooth;
                 float lo, mi, hi;
-                c.bands[0].process(l, lo, mi, hi);
-                l = (lo * c.g[0] + mi * c.g[1] + hi * c.g[2]) * c.gFader;
-                c.bands[1].process(r, lo, mi, hi);
-                r = (lo * c.g[0] + mi * c.g[1] + hi * c.g[2]) * c.gFader;
-                if (std::fabs(c.filter) >= 0.01f) {
+                c.m_bands[0].process(l, lo, mi, hi);
+                l = (lo * c.m_g[0] + mi * c.m_g[1] + hi * c.m_g[2]) * c.m_gFader;
+                c.m_bands[1].process(r, lo, mi, hi);
+                r = (lo * c.m_g[0] + mi * c.m_g[1] + hi * c.m_g[2]) * c.m_gFader;
+                if (std::fabs(c.m_filter) >= 0.01f) {
                     float lp, bp, hp;
-                    c.filt[0].tick(l, lp, bp, hp);
-                    l = c.filter < 0.0f ? lp : hp;
-                    c.filt[1].tick(r, lp, bp, hp);
-                    r = c.filter < 0.0f ? lp : hp;
+                    c.m_filt[0].tick(l, lp, bp, hp);
+                    l = c.m_filter < 0.0f ? lp : hp;
+                    c.m_filt[1].tick(r, lp, bp, hp);
+                    r = c.m_filter < 0.0f ? lp : hp;
                 }
             }
             L[i] += l;
             R[i] += r;
-            if (tapL_ != nullptr) { tapL_[d][tapOffset_ + i] = l; tapR_[d][tapOffset_ + i] = r; }
-            if (fxOn_) { sendL_[static_cast<size_t>(i)] += l * c.send; sendR_[static_cast<size_t>(i)] += r * c.send; }
-            if (stemL_ != nullptr) { chGains_[0][i] = c.g[0]; chGains_[1][i] = c.g[1]; chGains_[2][i] = c.g[2]; chGains_[3][i] = c.gFader; }
+            if (m_tapL != nullptr) { m_tapL[d][m_tapOffset + i] = l; m_tapR[d][m_tapOffset + i] = r; }
+            if (m_fxOn) { m_sendL[static_cast<size_t>(i)] += l * c.m_send; m_sendR[static_cast<size_t>(i)] += r * c.m_send; }
+            if (m_stemL != nullptr) { m_chGains[0][i] = c.m_g[0]; m_chGains[1][i] = c.m_g[1]; m_chGains[2][i] = c.m_g[2]; m_chGains[3][i] = c.m_gFader; }
         }
-        if (stemL_ == nullptr) continue;
+        if (m_stemL == nullptr) continue;
         // The deck's stems through their own copies of its channel (the same gains, the filters' own states).
-        const bool filtered = std::fabs(c.filter) >= 0.01f;
-        for (int s = 0; s < Deck::kStems; ++s) {
-            const float* in[2] = { deckStemL_[d][s], deckStemR_[d][s] };
-            float* out[2] = { stemL_[s] + tapOffset_, stemR_[s] + tapOffset_ };
+        const bool filtered = std::fabs(c.m_filter) >= 0.01f;
+        for (int s = 0; s < Deck::STEMS; ++s) {
+            const float* in[2] = { m_deckStemL[d][s], m_deckStemR[d][s] };
+            float* out[2] = { m_stemL[s] + m_tapOffset, m_stemR[s] + m_tapOffset };
             for (int ch = 0; ch < 2; ++ch) {
-                ThreeBand& b = stemBands_[d][s][ch];
-                Svf& f = stemFilt_[d][s][ch];
-                f.copyCoefficients(c.filt[ch]);
+                ThreeBand& b = m_stemBands[d][s][ch];
+                Svf& f = m_stemFilt[d][s][ch];
+                f.copyCoefficients(c.m_filt[ch]);
                 for (int i = 0; i < n; ++i) {
                     float x = in[ch][i];
-                    if (isSet_) {
+                    if (m_isSet) {
                         float lo, mi, hi;
                         b.process(x, lo, mi, hi);
-                        x = (lo * chGains_[0][i] + mi * chGains_[1][i] + hi * chGains_[2][i]) * chGains_[3][i];
+                        x = (lo * m_chGains[0][i] + mi * m_chGains[1][i] + hi * m_chGains[2][i]) * m_chGains[3][i];
                         if (filtered) {
                             float lp, bp, hp;
                             f.tick(x, lp, bp, hp);
-                            x = c.filter < 0.0f ? lp : hp;
+                            x = c.m_filter < 0.0f ? lp : hp;
                         }
                     }
                     out[ch][i] += x;
@@ -331,59 +331,59 @@ void Engine::mix(float* L, float* R, int n)
             }
         }
     }
-    if (live_) {
+    if (m_live) {
         // The performer's master filter over the decks, then the throw of what is heard into the echo.
-        const bool filtered = std::fabs(perfFilter_) >= 0.01f;
+        const bool filtered = std::fabs(m_perfFilter) >= 0.01f;
         for (int i = 0; i < n; ++i) {
             if (filtered) {
                 float lp, bp, hp;
-                perfFilt_[0].tick(L[i], lp, bp, hp);
-                L[i] = perfFilter_ < 0.0f ? lp : hp;
-                perfFilt_[1].tick(R[i], lp, bp, hp);
-                R[i] = perfFilter_ < 0.0f ? lp : hp;
+                m_perfFilt[0].tick(L[i], lp, bp, hp);
+                L[i] = m_perfFilter < 0.0f ? lp : hp;
+                m_perfFilt[1].tick(R[i], lp, bp, hp);
+                R[i] = m_perfFilter < 0.0f ? lp : hp;
             }
-            sendL_[static_cast<size_t>(i)] += L[i] * perfThrow_;
-            sendR_[static_cast<size_t>(i)] += R[i] * perfThrow_;
+            m_sendL[static_cast<size_t>(i)] += L[i] * m_perfThrow;
+            m_sendR[static_cast<size_t>(i)] += R[i] * m_perfThrow;
         }
     }
-    if (fxOn_) {
-        for (int i = 0; i < n; ++i) { fxL_[static_cast<size_t>(i)] = 0.0f; fxR_[static_cast<size_t>(i)] = 0.0f; }
-        djEcho_.process(sendL_.data(), sendR_.data(), fxL_.data(), fxR_.data(), n);
+    if (m_fxOn) {
+        for (int i = 0; i < n; ++i) { m_fxL[static_cast<size_t>(i)] = 0.0f; m_fxR[static_cast<size_t>(i)] = 0.0f; }
+        m_djEcho.process(m_sendL.data(), m_sendR.data(), m_fxL.data(), m_fxR.data(), n);
         for (int i = 0; i < n; ++i) {
-            L[i] += fxL_[static_cast<size_t>(i)] * echoReturn_;
-            R[i] += fxR_[static_cast<size_t>(i)] * echoReturn_;
+            L[i] += m_fxL[static_cast<size_t>(i)] * m_echoReturn;
+            R[i] += m_fxR[static_cast<size_t>(i)] * m_echoReturn;
         }
-        if (stemL_ != nullptr)
+        if (m_stemL != nullptr)
             for (int i = 0; i < n; ++i) {
-                stemL_[kStemMixFx][tapOffset_ + i] = fxL_[static_cast<size_t>(i)] * echoReturn_;
-                stemR_[kStemMixFx][tapOffset_ + i] = fxR_[static_cast<size_t>(i)] * echoReturn_;
+                m_stemL[STEM_MIX_FX][m_tapOffset + i] = m_fxL[static_cast<size_t>(i)] * m_echoReturn;
+                m_stemR[STEM_MIX_FX][m_tapOffset + i] = m_fxR[static_cast<size_t>(i)] * m_echoReturn;
             }
-        djHall_.process(sendL_.data(), sendR_.data(), fxL_.data(), fxR_.data(), n);
+        m_djHall.process(m_sendL.data(), m_sendR.data(), m_fxL.data(), m_fxR.data(), n);
         for (int i = 0; i < n; ++i) {
-            L[i] += fxL_[static_cast<size_t>(i)] * hallReturn_;
-            R[i] += fxR_[static_cast<size_t>(i)] * hallReturn_;
+            L[i] += m_fxL[static_cast<size_t>(i)] * m_hallReturn;
+            R[i] += m_fxR[static_cast<size_t>(i)] * m_hallReturn;
         }
-        if (stemL_ != nullptr)
+        if (m_stemL != nullptr)
             for (int i = 0; i < n; ++i) {
-                stemL_[kStemMixFx][tapOffset_ + i] += fxL_[static_cast<size_t>(i)] * hallReturn_;
-                stemR_[kStemMixFx][tapOffset_ + i] += fxR_[static_cast<size_t>(i)] * hallReturn_;
+                m_stemL[STEM_MIX_FX][m_tapOffset + i] += m_fxL[static_cast<size_t>(i)] * m_hallReturn;
+                m_stemR[STEM_MIX_FX][m_tapOffset + i] += m_fxR[static_cast<size_t>(i)] * m_hallReturn;
             }
     }
-    if (preL_ != nullptr)
-        for (int i = 0; i < n; ++i) { preL_[tapOffset_ + i] = L[i]; preR_[tapOffset_ + i] = R[i]; }
-    PARH_PROF_END(Mixer);
+    if (m_preL != nullptr)
+        for (int i = 0; i < n; ++i) { m_preL[m_tapOffset + i] = L[i]; m_preR[m_tapOffset + i] = R[i]; }
+    PARH_PROF_END(MIXER);
     PARH_PROF_BEGIN(MasterTone);
     // The master: the side under Mono Below goes (PLAN 8.2), the level, the vinyl cut, the clipper, the limiter.
     for (int i = 0; i < n; ++i) {
         const float mid = 0.5f * (L[i] + R[i]);
         float side = 0.5f * (L[i] - R[i]), lp, bp, hp;
-        sideHp1_.tick(side, lp, bp, hp);
-        sideHp2_.tick(hp, lp, bp, hp);
+        m_sideHp1.tick(side, lp, bp, hp);
+        m_sideHp2.tick(hp, lp, bp, hp);
         side = hp;
-        L[i] = (mid + side) * masterGain_;
-        R[i] = (mid - side) * masterGain_;
+        L[i] = (mid + side) * m_masterGain;
+        R[i] = (mid - side) * m_masterGain;
     }
-    if (cut_) {
+    if (m_cut) {
         // The vinyl cut (Erg. 3): the band over 6 kHz limited dynamically (a cutter head's protection), then 16 kHz.
         for (int i = 0; i < n; ++i) {
             float h[2];
@@ -391,26 +391,26 @@ void Engine::mix(float* L, float* R, int n)
             float peak = 0.0f;
             for (int c = 0; c < 2; ++c) {
                 float lp, bp, hp;
-                cutHp1_[c].tick(*chn[c], lp, bp, hp);
-                cutHp2_[c].tick(hp, lp, bp, h[c]);
+                m_cutHp1[c].tick(*chn[c], lp, bp, hp);
+                m_cutHp2[c].tick(hp, lp, bp, h[c]);
                 peak = std::max(peak, std::fabs(h[c]));
             }
-            cutEnv_ += (peak - cutEnv_) * (peak > cutEnv_ ? cutAtt_ : cutRel_);
+            m_cutEnv += (peak - m_cutEnv) * (peak > m_cutEnv ? m_cutAtt : m_cutRel);
             const float thr = 0.1f;   // -20 dBFS in the band
-            const float gr = cutEnv_ > thr ? std::pow(thr / cutEnv_, 0.75f) : 1.0f;   // ratio 4
-            for (int c = 0; c < 2; ++c) *chn[c] = cutLp_[c].process(*chn[c] - (1.0f - gr) * h[c]);
+            const float gr = m_cutEnv > thr ? std::pow(thr / m_cutEnv, 0.75f) : 1.0f;   // ratio 4
+            for (int c = 0; c < 2; ++c) *chn[c] = m_cutLp[c].process(*chn[c] - (1.0f - gr) * h[c]);
         }
     }
-    PARH_PROF_END(MasterTone);
+    PARH_PROF_END(MASTER_TONE);
     PARH_PROF_BEGIN(Clipper);
-    const float gd = clipDrive_, t = kClipCeiling;
+    const float gd = m_clipDrive, t = ClipCeiling;
     auto curve = [gd, t](float x) { return t * std::tanh(gd * x / t); };
     for (int i = 0; i < n; ++i) {
-        L[i] = clipOs_[0].process(L[i], curve);
-        R[i] = clipOs_[1].process(R[i], curve);
+        L[i] = m_clipOs[0].process(L[i], curve);
+        R[i] = m_clipOs[1].process(R[i], curve);
     }
-    PARH_PROF_END(Clipper);
-    { PARH_PROF(Limiter); limiter_.process(L, R, n); }
+    PARH_PROF_END(CLIPPER);
+    { PARH_PROF(LIMITER); m_limiter.process(L, R, n); }
 }
 
 bool Engine::process(float* L, float* R, int n)
@@ -418,108 +418,108 @@ bool Engine::process(float* L, float* R, int n)
     DenormalGuard guard;
     int done = 0;
     while (done < n) {
-        const bool atRaster = sample_ % kRaster == 0;
+        const bool atRaster = m_sample % Raster == 0;
         bool atStep = false;
-        while (stepCursor_ < steps_.size() && steps_[stepCursor_] <= sample_) { atStep = atStep || steps_[stepCursor_] == sample_; ++stepCursor_; }
-        const bool cell = cellDirty_ || atRaster || atStep;
-        for (int d = 0; d < kDecks; ++d) {
-            const bool plays = decks_[d].loaded() && decks_[d].playsAt(sample_);
-            if (plays && (cell || !playing_[d])) { PARH_PROF(Cells); decks_[d].updateCell(sample_); }
-            playing_[d] = plays;
+        while (m_stepCursor < m_steps.size() && m_steps[m_stepCursor] <= m_sample) { atStep = atStep || m_steps[m_stepCursor] == m_sample; ++m_stepCursor; }
+        const bool cell = m_cellDirty || atRaster || atStep;
+        for (int d = 0; d < Decks; ++d) {
+            const bool plays = m_decks[d].loaded() && m_decks[d].playsAt(m_sample);
+            if (plays && (cell || !m_playing[d])) { PARH_PROF(CELLS); m_decks[d].updateCell(m_sample); }
+            m_playing[d] = plays;
         }
         // The knobs show the knob settings of the track that began last on deck A or B (the loops' deck C only while
         // they have none): written when that changes. The sound does not wait for it -- every deck plays from its own.
         {
             int lead = -1;
             double at = -1.0;
-            for (int d = 0; d < 2; ++d) if (decks_[d].knobGroup() >= 0.0 && decks_[d].knobGroup() > at) { at = decks_[d].knobGroup(); lead = d; }
-            if (lead < 0 && decks_[2].knobGroup() >= 0.0) lead = 2;
-            for (Deck& d : decks_) d.takeNewGroup();
-            if (lead >= 0 && (lead != lead_ || decks_[lead].knobGroup() != leadGroup_)) showKnobs(lead);
+            for (int d = 0; d < 2; ++d) if (m_decks[d].knobGroup() >= 0.0 && m_decks[d].knobGroup() > at) { at = m_decks[d].knobGroup(); lead = d; }
+            if (lead < 0 && m_decks[2].knobGroup() >= 0.0) lead = 2;
+            for (Deck& d : m_decks) d.takeNewGroup();
+            if (lead >= 0 && (lead != m_lead || m_decks[lead].knobGroup() != m_leadGroup)) showKnobs(lead);
         }
-        if (cell) { PARH_PROF(Cells); updateCell(); }
-        { PARH_PROF(Events); for (int d = 0; d < kDecks; ++d) if (playing_[d]) decks_[d].dispatchUntil(sample_); }
+        if (cell) { PARH_PROF(CELLS); updateCell(); }
+        { PARH_PROF(EVENTS); for (int d = 0; d < Decks; ++d) if (m_playing[d]) m_decks[d].dispatchUntil(m_sample); }
         // The keys played on a MIDI keyboard, on their samples (queueLive, 01.10.2026).
-        while (liveCursor_ < liveCount_ && liveQueue_[liveCursor_].at <= sample_) playLive(liveQueue_[liveCursor_++]);
-        int64_t end = std::min<int64_t>(sample_ + (n - done), (sample_ / kRaster + 1) * kRaster);
-        for (const Deck& d : decks_) {
+        while (m_liveCursor < m_liveCount && m_liveQueue[m_liveCursor].m_at <= m_sample) playLive(m_liveQueue[m_liveCursor++]);
+        int64_t end = std::min<int64_t>(m_sample + (n - done), (m_sample / Raster + 1) * Raster);
+        for (const Deck& d : m_decks) {
             if (!d.loaded()) continue;
-            const int64_t e = d.nextEvent(), r = d.nextRestChange(sample_);
-            if (e > sample_ && e < end) end = e;
+            const int64_t e = d.nextEvent(), r = d.nextRestChange(m_sample);
+            if (e > m_sample && e < end) end = e;
             if (r < end) end = r;
         }
-        if (stepCursor_ < steps_.size() && steps_[stepCursor_] < end) end = steps_[stepCursor_];
-        if (liveCursor_ < liveCount_ && liveQueue_[liveCursor_].at < end) end = liveQueue_[liveCursor_].at;
-        const int len = static_cast<int>(end - sample_);
-        if (stemL_ != nullptr)
-            for (int s = 0; s < kStems; ++s)
-                for (int i = 0; i < len; ++i) { stemL_[s][done + i] = 0.0f; stemR_[s][done + i] = 0.0f; }
-        for (int d = 0; d < kDecks; ++d)
-            if (playing_[d])
-                decks_[d].render(sample_, deckL_[d].data(), deckR_[d].data(), len, stemL_ != nullptr ? deckStemL_[d] : nullptr,
-                                 stemL_ != nullptr ? deckStemR_[d] : nullptr);
-        if (tapL_ != nullptr)
-            for (int d = 0; d < kDecks; ++d)
-                for (int i = 0; i < len; ++i) { tapL_[d][done + i] = 0.0f; tapR_[d][done + i] = 0.0f; }
-        tapOffset_ = done;
+        if (m_stepCursor < m_steps.size() && m_steps[m_stepCursor] < end) end = m_steps[m_stepCursor];
+        if (m_liveCursor < m_liveCount && m_liveQueue[m_liveCursor].m_at < end) end = m_liveQueue[m_liveCursor].m_at;
+        const int len = static_cast<int>(end - m_sample);
+        if (m_stemL != nullptr)
+            for (int s = 0; s < STEMS; ++s)
+                for (int i = 0; i < len; ++i) { m_stemL[s][done + i] = 0.0f; m_stemR[s][done + i] = 0.0f; }
+        for (int d = 0; d < Decks; ++d)
+            if (m_playing[d])
+                m_decks[d].render(m_sample, m_deckL[d].data(), m_deckR[d].data(), len, m_stemL != nullptr ? m_deckStemL[d] : nullptr,
+                                 m_stemL != nullptr ? m_deckStemR[d] : nullptr);
+        if (m_tapL != nullptr)
+            for (int d = 0; d < Decks; ++d)
+                for (int i = 0; i < len; ++i) { m_tapL[d][done + i] = 0.0f; m_tapR[d][done + i] = 0.0f; }
+        m_tapOffset = done;
         mix(L + done, R + done, len);
         done += len;
-        sample_ += len;
+        m_sample += len;
     }
-    while (liveCursor_ < liveCount_) playLive(liveQueue_[liveCursor_++]);   // a key past the block's end: now
-    liveCount_ = liveCursor_ = 0;
-    return sample_ < endSample_;
+    while (m_liveCursor < m_liveCount) playLive(m_liveQueue[m_liveCursor++]);   // a key past the block's end: now
+    m_liveCount = m_liveCursor = 0;
+    return m_sample < m_endSample;
 }
 
 int Engine::keyboardTarget(int channel) const
 {
-    const int part = params_.getInt(params_.id(Module::Perform, 0, perform::KeyboardPart));
-    if (part != perform::keys::ByChannel) return std::clamp(part, 0, static_cast<int>(perform::keys::ByChannel) - 1);
+    const int part = m_params.getInt(m_params.id(ModuleE::PERFORM, 0, perform::KEYBOARD_PART));
+    if (part != perform::keys::BY_CHANNEL) return std::clamp(part, 0, static_cast<int>(perform::keys::BY_CHANNEL) - 1);
     // By channel: 1 kit, 2 bass, 3 303, 4 .. 9 the polyphonic voices, 10 kit (General MIDI's drums), 11 .. 14 the piano,
     // the strings, the choir, the brass.
-    static const int kChannel[14] = { perform::keys::Kit, perform::keys::Bass, perform::keys::Acid, perform::keys::Lead,
-                                      perform::keys::Counter, perform::keys::Pluck, perform::keys::Arp, perform::keys::Pad,
-                                      perform::keys::Stab, perform::keys::Kit, perform::keys::Piano, perform::keys::Strings,
-                                      perform::keys::Choir, perform::keys::Brass };
-    return channel >= 0 && channel < 14 ? kChannel[channel] : perform::keys::Off;
+    static const int KeysOfChannel[14] = { perform::keys::KIT, perform::keys::BASS, perform::keys::ACID, perform::keys::LEAD,
+                                      perform::keys::COUNTER, perform::keys::PLUCK, perform::keys::ARP, perform::keys::PAD,
+                                      perform::keys::STAB, perform::keys::KIT, perform::keys::PIANO, perform::keys::STRINGS,
+                                      perform::keys::CHOIR, perform::keys::BRASS };
+    return channel >= 0 && channel < 14 ? KeysOfChannel[channel] : perform::keys::OFF;
 }
 
 void Engine::queueLive(int offset, int pitch, int velocity, int channel, bool on, int target)
 {
-    if (!live_ || pitch < 0 || pitch > 127 || liveCount_ >= kLiveQueue) return;
+    if (!m_live || pitch < 0 || pitch > 127 || m_liveCount >= LiveQueue) return;
     LiveKey k;
-    k.at = sample_ + std::max(0, offset);
-    k.pitch = pitch;
-    k.velocity = static_cast<float>(std::clamp(velocity, 1, 127)) / 127.0f;
-    k.target = on ? (target > perform::keys::Off ? target : keyboardTarget(channel)) : liveTarget_[pitch] - 1;   // the split names one
-    k.on = on;
-    if (k.target <= perform::keys::Off) return;
-    liveQueue_[liveCount_++] = k;
+    k.m_at = m_sample + std::max(0, offset);
+    k.m_pitch = pitch;
+    k.m_velocity = static_cast<float>(std::clamp(velocity, 1, 127)) / 127.0f;
+    k.m_target = on ? (target > perform::keys::OFF ? target : keyboardTarget(channel)) : m_liveTarget[pitch] - 1;   // the split names one
+    k.m_on = on;
+    if (k.m_target <= perform::keys::OFF) return;
+    m_liveQueue[m_liveCount++] = k;
 }
 
 void Engine::playLive(const LiveKey& k)
 {
-    if (!k.on) { releaseLive(k.pitch); return; }
-    if (liveTarget_[k.pitch] != 0) releaseLive(k.pitch);
-    const int d = std::max(0, lead_.load(std::memory_order_relaxed));
-    if (!decks_[d].loaded()) return;
-    decks_[d].liveNote(sample_, k.target, k.pitch, k.velocity, true);
-    liveTarget_[k.pitch] = static_cast<uint8_t>(k.target + 1);
-    liveDeck_[k.pitch] = static_cast<uint8_t>(d);
+    if (!k.m_on) { releaseLive(k.m_pitch); return; }
+    if (m_liveTarget[k.m_pitch] != 0) releaseLive(k.m_pitch);
+    const int d = std::max(0, m_lead.load(std::memory_order_relaxed));
+    if (!m_decks[d].loaded()) return;
+    m_decks[d].liveNote(m_sample, k.m_target, k.m_pitch, k.m_velocity, true);
+    m_liveTarget[k.m_pitch] = static_cast<uint8_t>(k.m_target + 1);
+    m_liveDeck[k.m_pitch] = static_cast<uint8_t>(d);
 }
 
 void Engine::releaseLive(int pitch)
 {
-    if (liveTarget_[pitch] == 0) return;
-    decks_[liveDeck_[pitch]].liveNote(sample_, liveTarget_[pitch] - 1, pitch, 0.0f, false);
-    liveTarget_[pitch] = 0;
+    if (m_liveTarget[pitch] == 0) return;
+    m_decks[m_liveDeck[pitch]].liveNote(m_sample, m_liveTarget[pitch] - 1, pitch, 0.0f, false);
+    m_liveTarget[pitch] = 0;
 }
 
 void Engine::liveAllOff()
 {
-    liveCount_ = liveCursor_ = 0;
+    m_liveCount = m_liveCursor = 0;
     for (int k = 0; k < 128; ++k) releaseLive(k);
-    for (Deck& d : decks_) d.liveAllOff();
+    for (Deck& d : m_decks) d.liveAllOff();
 }
 
 } // namespace parh

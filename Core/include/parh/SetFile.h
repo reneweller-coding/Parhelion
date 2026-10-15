@@ -34,20 +34,20 @@ class ParamStore;
 
 /** @brief The rerolls of a track or set: unit name -> how often it was drawn again. */
 struct Curation {
-    std::map<std::string, int> rerolls;   ///< unit name -> reroll count
+    std::map<std::string, int> m_rerolls;   ///< unit name -> reroll count
     /** @brief The counter of @p unit (0 if never rerolled). */
-    int count(const std::string& unit) const { const auto it = rerolls.find(unit); return it == rerolls.end() ? 0 : it->second; }
+    int count(const std::string& unit) const { const auto it = m_rerolls.find(unit); return it == m_rerolls.end() ? 0 : it->second; }
     /** @brief Draws @p unit once more. */
-    void reroll(const std::string& unit) { ++rerolls[unit]; }
+    void reroll(const std::string& unit) { ++m_rerolls[unit]; }
 };
 
 /** @brief Everything a set file holds. */
 struct SetFile {
-    uint64_t seed = 1;       ///< the seed of the track or set
-    double minutes = 0.0;    ///< track length (0: compose.minutes)
-    double set = 0.0;        ///< set length in minutes (0: one track)
-    Curation curation;       ///< the rerolls
-    std::string params;      ///< the parameters that differ from their defaults, as ParamStore text
+    uint64_t m_seed = 1;       ///< the seed of the track or set
+    double m_minutes = 0.0;    ///< track length (0: compose.minutes)
+    double m_set = 0.0;        ///< set length in minutes (0: one track)
+    Curation m_curation;       ///< the rerolls
+    std::string m_params;      ///< the parameters that differ from their defaults, as ParamStore text
 };
 
 /** @brief Writes a set; @p params' changed values are taken as they are now. */

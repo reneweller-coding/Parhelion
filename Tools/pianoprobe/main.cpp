@@ -28,8 +28,8 @@ using namespace parh;
 
 namespace {
 
-constexpr double kPiD = 3.14159265358979323846;
-constexpr double kRate = 48000.0;
+constexpr double PiD = 3.14159265358979323846;
+constexpr double Rate = 48000.0;
 
 void fft(std::vector<std::complex<double>>& a)
 {
@@ -41,7 +41,7 @@ void fft(std::vector<std::complex<double>>& a)
         if (i < j) std::swap(a[i], a[j]);
     }
     for (size_t len = 2; len <= n; len <<= 1) {
-        const double ang = -2.0 * kPiD / static_cast<double>(len);
+        const double ang = -2.0 * PiD / static_cast<double>(len);
         const std::complex<double> wl(std::cos(ang), std::sin(ang));
         for (size_t i = 0; i < n; i += len) {
             std::complex<double> w(1.0);
@@ -59,19 +59,19 @@ void fft(std::vector<std::complex<double>>& a)
 std::vector<float> renderNote(Piano& p, int midi, float vel, double hold, double secs, float pedal = 0.0f)
 {
     ParamStore ps;
-    std::vector<float> v(static_cast<size_t>(piano::Count));
-    ps.readModule(Module::Piano, 0, v.data());
-    v[piano::Pedal] = pedal;
+    std::vector<float> v(static_cast<size_t>(piano::COUNT));
+    ps.readModule(ModuleE::PIANO, 0, v.data());
+    v[piano::PEDAL] = pedal;
     p.update(v.data());
     p.reset();
-    const int total = static_cast<int>(secs * kRate), off = static_cast<int>(hold * kRate);
+    const int total = static_cast<int>(secs * Rate), off = static_cast<int>(hold * Rate);
     std::vector<float> out(static_cast<size_t>(total));
-    float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
+    float L[Piano::MaxBlock], R[Piano::MaxBlock];
     p.noteOn(midi, vel, 0.0);
     bool released = false;
-    for (int i = 0; i < total; i += Piano::kMaxBlock) {
+    for (int i = 0; i < total; i += Piano::MaxBlock) {
         if (!released && i >= off) { p.noteOff(midi); released = true; }
-        const int n = std::min(Piano::kMaxBlock, total - i);
+        const int n = std::min(Piano::MaxBlock, total - i);
         p.process(L, R, n);
         for (int k = 0; k < n; ++k) out[static_cast<size_t>(i + k)] = 0.5f * (L[k] + R[k]);
     }
@@ -83,7 +83,7 @@ std::vector<double> spectrum(const std::vector<float>& x, size_t start, size_t n
 {
     std::vector<std::complex<double>> a(n);
     for (size_t i = 0; i < n; ++i) {
-        const double w = 0.5 - 0.5 * std::cos(2.0 * kPiD * i / (n - 1));
+        const double w = 0.5 - 0.5 * std::cos(2.0 * PiD * i / (n - 1));
         a[i] = start + i < x.size() ? x[start + i] * w : 0.0;
     }
     fft(a);
@@ -95,7 +95,7 @@ std::vector<double> spectrum(const std::vector<float>& x, size_t start, size_t n
 /** @brief The level (dB RMS) of @p x over 50 ms windows. */
 std::vector<double> envelope(const std::vector<float>& x)
 {
-    const size_t w = static_cast<size_t>(0.05 * kRate);
+    const size_t w = static_cast<size_t>(0.05 * Rate);
     std::vector<double> e;
     for (size_t i = 0; i + w <= x.size(); i += w) {
         double s = 0.0;
@@ -108,30 +108,30 @@ std::vector<double> envelope(const std::vector<float>& x)
 void info(int instrument)
 {
     PianoSpec spec;
-    spec.instrument = instrument;
+    spec.m_instrument = instrument;
     const auto t0 = std::chrono::steady_clock::now();
-    auto d = designPiano(spec, kRate);
+    auto d = designPiano(spec, Rate);
     const auto t1 = std::chrono::steady_clock::now();
-    std::printf("design %s: %.2f s\n", kPianoInstrumentNames[instrument], std::chrono::duration<double>(t1 - t0).count());
-    const PianoBoard& b = d->board;
-    std::printf("board: %zu modes up to %.0f Hz, Y_inf %.2e s/kg; first:", b.freq.size(), b.modeTop, b.yInf);
-    for (size_t n = 0; n < std::min<size_t>(12, b.freq.size()); ++n) std::printf(" %.1f", b.freq[n]);
+    std::printf("design %s: %.2f s\n", PianoInstrumentNames[instrument], std::chrono::duration<double>(t1 - t0).count());
+    const PianoBoard& b = d->m_board;
+    std::printf("board: %zu modes up to %.0f Hz, Y_inf %.2e s/kg; first:", b.m_freq.size(), b.m_modeTop, b.m_yInf);
+    for (size_t n = 0; n < std::min<size_t>(12, b.m_freq.size()); ++n) std::printf(" %.1f", b.m_freq[n]);
     std::printf("\n");
     for (int midi : { 21, 28, 36, 44, 45, 48, 60, 72, 84, 96, 108 }) {
-        const PianoKey& k = d->keys[static_cast<size_t>(midi - kPianoLowKey)];
-        const double f1 = k.f0 * std::sqrt(1.0 + k.B);
-        const std::complex<double> y = pianoAdmittance(*d, midi - kPianoLowKey, f1);
+        const PianoKey& k = d->m_keys[static_cast<size_t>(midi - PianoLowKey)];
+        const double f1 = k.m_f0 * std::sqrt(1.0 + k.m_B);
+        const std::complex<double> y = pianoAdmittance(*d, midi - PianoLowKey, f1);
         // The slowest and the fastest decay among the first partial's coupled modes.
         double slow = 0.0, fast = 1e9;
-        for (int m = 0; m < k.strings; ++m) {
-            const double mag = std::hypot(k.modes.pr[static_cast<size_t>(m)], k.modes.pi[static_cast<size_t>(m)]);
-            const double t60 = 6.91 / (-std::log(mag) * kRate);
+        for (int m = 0; m < k.m_strings; ++m) {
+            const double mag = std::hypot(k.m_modes.m_pr[static_cast<size_t>(m)], k.m_modes.m_pi[static_cast<size_t>(m)]);
+            const double t60 = 6.91 / (-std::log(mag) * Rate);
             slow = std::max(slow, t60);
             fast = std::min(fast, t60);
         }
         std::printf("  %3d f1 %7.2f L %.3f T %6.0f B %.2e Z0 %5.2f N %d partials %3d modes %3d |Y| %.2e  T60 %.1f .. %.1f s  long %d (%.0f Hz)\n",
-                    midi, f1, k.length, k.tension, k.B, k.z0, k.strings, k.partials, k.modes.count, std::abs(y), fast, slow,
-                    k.longCount, k.longCount > 0 ? std::atan2(k.lpi[0], k.lpr[0]) * kRate / (2.0 * kPiD) : 0.0);
+                    midi, f1, k.m_length, k.m_tension, k.m_B, k.m_z0, k.m_strings, k.m_partials, k.m_modes.m_count, std::abs(y), fast, slow,
+                    k.m_longCount, k.m_longCount > 0 ? std::atan2(k.m_lpi[0], k.m_lpr[0]) * Rate / (2.0 * PiD) : 0.0);
     }
 }
 
@@ -139,30 +139,30 @@ void info(int instrument)
 void cost()
 {
     auto piano = std::make_unique<Piano>();
-    piano->prepare(kRate);
+    piano->prepare(Rate);
     piano->setSpec(PianoSpec{});
-    struct Case { const char* name; int midi; double hold; float sym; float pedal; };
+    struct Case { const char* m_name; int m_midi; double m_hold; float m_sym; float m_pedal; };
     const Case cases[] = { { "no note (the board alone)", -1, 10.0, 0.0f, 0.0f }, { "C2 held, sympathetic", 36, 10.0, 1.0f, 0.0f }, { "C2 held, no sympathetic", 36, 10.0, 0.0f, 0.0f },
                            { "C2 released at 0.1 s", 36, 0.1, 0.0f, 0.0f }, { "C4 held, no sympathetic", 60, 10.0, 0.0f, 0.0f },
                            { "C4 held, pedal down", 60, 10.0, 1.0f, 1.0f } };
     for (const Case& c : cases) {
         ParamStore ps;
-        std::vector<float> v(static_cast<size_t>(piano::Count));
-        ps.readModule(Module::Piano, 0, v.data());
-        v[piano::Sympathetic] = c.sym;
-        v[piano::Pedal] = c.pedal;
+        std::vector<float> v(static_cast<size_t>(piano::COUNT));
+        ps.readModule(ModuleE::PIANO, 0, v.data());
+        v[piano::SYMPATHETIC] = c.m_sym;
+        v[piano::PEDAL] = c.m_pedal;
         piano->update(v.data());
         piano->reset();
-        if (c.midi >= 0) piano->noteOn(c.midi, 0.7f, 0.0);
-        float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
-        const int total = static_cast<int>(5.0 * kRate), off = static_cast<int>(c.hold * kRate);
+        if (c.m_midi >= 0) piano->noteOn(c.m_midi, 0.7f, 0.0);
+        float L[Piano::MaxBlock], R[Piano::MaxBlock];
+        const int total = static_cast<int>(5.0 * Rate), off = static_cast<int>(c.m_hold * Rate);
         const auto t0 = std::chrono::steady_clock::now();
-        for (int i = 0; i < total; i += Piano::kMaxBlock) {
-            if (i <= off && off < i + Piano::kMaxBlock) piano->noteOff(c.midi);
-            piano->process(L, R, Piano::kMaxBlock);
+        for (int i = 0; i < total; i += Piano::MaxBlock) {
+            if (i <= off && off < i + Piano::MaxBlock) piano->noteOff(c.m_midi);
+            piano->process(L, R, Piano::MaxBlock);
         }
         const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        std::printf("  %-28s %.2f %% of a core\n", c.name, 100.0 * s / 5.0);
+        std::printf("  %-28s %.2f %% of a core\n", c.m_name, 100.0 * s / 5.0);
     }
 }
 
@@ -171,16 +171,16 @@ void splits()
 {
     auto a = std::make_unique<Piano>(), b = std::make_unique<Piano>();
     for (Piano* p : { a.get(), b.get() }) {
-        p->prepare(kRate);
+        p->prepare(Rate);
         p->setSpec(PianoSpec{});
         ParamStore ps;
-        std::vector<float> v(static_cast<size_t>(piano::Count));
-        ps.readModule(Module::Piano, 0, v.data());
-        v[piano::Pedal] = 0.6f;
+        std::vector<float> v(static_cast<size_t>(piano::COUNT));
+        ps.readModule(ModuleE::PIANO, 0, v.data());
+        v[piano::PEDAL] = 0.6f;
         p->update(v.data());
         p->reset();
     }
-    const int total = static_cast<int>(3.0 * kRate);
+    const int total = static_cast<int>(3.0 * Rate);
     std::vector<float> xa(total), xb(total);
     float L[64], R[64];
     const int events[4] = { 0, 12345, 30001, 70000 };
@@ -208,20 +208,20 @@ void measure()
 {
     PianoSpec spec;
     auto piano = std::make_unique<Piano>();
-    piano->prepare(kRate);
+    piano->prepare(Rate);
     piano->setSpec(spec);
     // Cost: ten seconds of a chord of six notes.
     {
         ParamStore ps;
-        std::vector<float> v(static_cast<size_t>(piano::Count));
-        ps.readModule(Module::Piano, 0, v.data());
+        std::vector<float> v(static_cast<size_t>(piano::COUNT));
+        ps.readModule(ModuleE::PIANO, 0, v.data());
         piano->update(v.data());
         piano->reset();
         for (int m : { 36, 48, 55, 60, 64, 67 }) piano->noteOn(m, 0.7f, 0.0);
-        float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
+        float L[Piano::MaxBlock], R[Piano::MaxBlock];
         const auto t0 = std::chrono::steady_clock::now();
-        const int total = static_cast<int>(10.0 * kRate);
-        for (int i = 0; i < total; i += Piano::kMaxBlock) piano->process(L, R, Piano::kMaxBlock);
+        const int total = static_cast<int>(10.0 * Rate);
+        for (int i = 0; i < total; i += Piano::MaxBlock) piano->process(L, R, Piano::MaxBlock);
         const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         std::printf("cost: six notes, 10 s of audio in %.2f s (%.1f %% of a core)\n", s, 100.0 * s / 10.0);
     }
@@ -229,13 +229,13 @@ void measure()
     for (int midi : { 36, 60 }) {
         const std::vector<float> x = renderNote(*piano, midi, 0.7f, 3.0, 1.5);
         const size_t n = 32768;
-        const std::vector<double> s = spectrum(x, static_cast<size_t>(0.2 * kRate), n);
-        const PianoKey& k = piano->design()->keys[static_cast<size_t>(midi - kPianoLowKey)];
-        const double bin = kRate / n;
-        std::printf("partials of %d (B %.2e):", midi, k.B);
+        const std::vector<double> s = spectrum(x, static_cast<size_t>(0.2 * Rate), n);
+        const PianoKey& k = piano->design()->m_keys[static_cast<size_t>(midi - PianoLowKey)];
+        const double bin = Rate / n;
+        std::printf("partials of %d (B %.2e):", midi, k.m_B);
         double worst = 0.0;
         for (int p = 1; p <= 12; ++p) {
-            const double f = p * k.f0 * std::sqrt(1.0 + k.B * p * p);
+            const double f = p * k.m_f0 * std::sqrt(1.0 + k.m_B * p * p);
             size_t lo = static_cast<size_t>((f * 0.985) / bin), hi = static_cast<size_t>((f * 1.015) / bin), at = lo;
             for (size_t i = lo; i <= hi && i < s.size(); ++i) if (s[i] > s[at]) at = i;
             // Parabolic interpolation of the peak.
@@ -267,7 +267,7 @@ void measure()
         double num = 0.0, den = 0.0;
         for (size_t i = 1; i < s.size(); ++i) {
             const double p = std::pow(10.0, s[i] / 10.0);
-            num += p * i * (kRate / n);
+            num += p * i * (Rate / n);
             den += p;
         }
         float peak = 0.0f;
@@ -277,11 +277,11 @@ void measure()
     // The pitch glide: the fundamental of A1 fortissimo in its first 0.2 s against 3 .. 3.4 s.
     {
         const std::vector<float> x = renderNote(*piano, 33, 1.0f, 6.0, 4.0);
-        const PianoKey& k = piano->design()->keys[static_cast<size_t>(33 - kPianoLowKey)];
+        const PianoKey& k = piano->design()->m_keys[static_cast<size_t>(33 - PianoLowKey)];
         auto peakHz = [&](double t) {
             const size_t n = 32768;
-            const std::vector<double> s = spectrum(x, static_cast<size_t>(t * kRate), n);
-            const double bin = kRate / n, f = 2.0 * k.f0 * std::sqrt(1.0 + 4.0 * k.B);
+            const std::vector<double> s = spectrum(x, static_cast<size_t>(t * Rate), n);
+            const double bin = Rate / n, f = 2.0 * k.m_f0 * std::sqrt(1.0 + 4.0 * k.m_B);
             size_t lo = static_cast<size_t>(f * 0.97 / bin), hi = static_cast<size_t>(f * 1.03 / bin), at = lo;
             for (size_t i = lo; i <= hi; ++i) if (s[i] > s[at]) at = i;
             const double a = s[at - 1], b = s[at], c = s[at + 1];
@@ -314,45 +314,45 @@ int main(int argc, char** argv)
         // The timing of Tools/pianoref/notes_mid.py (30.09.2026): silence before the first note, and after each release.
         else if (!std::strcmp(argv[i], "--lead") && i + 1 < argc) lead = static_cast<float>(std::atof(argv[++i]));
         else if (!std::strcmp(argv[i], "--gap") && i + 1 < argc) gap = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--hardness") && i + 1 < argc) tune.hardness = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--impedance") && i + 1 < argc) tune.impedance = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--strike") && i + 1 < argc) tune.strike = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--unison") && i + 1 < argc) tune.unison = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--radiation") && i + 1 < argc) tune.radiation = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--radiation-end") && i + 1 < argc) tune.radiationEnd = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--voice-bass") && i + 1 < argc) tune.voiceBass = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--voice-treble") && i + 1 < argc) tune.voiceTreble = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--damper") && i + 1 < argc) tune.damperRate = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--hard-velocity") && i + 1 < argc) tune.hardVelocity = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--knock") && i + 1 < argc) tune.knock = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--body-corner") && i + 1 < argc) tune.bodyCorner = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--high-bank") && i + 1 < argc) tune.highBank = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--board-loss") && i + 1 < argc) tune.boardLoss = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--damper-length") && i + 1 < argc) tune.damperLength = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--felt") && i + 1 < argc) tune.felt = static_cast<float>(std::atof(argv[++i]));
-        else if (!std::strcmp(argv[i], "--coupling") && i + 1 < argc) tune.coupling = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--hardness") && i + 1 < argc) tune.m_hardness = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--impedance") && i + 1 < argc) tune.m_impedance = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--strike") && i + 1 < argc) tune.m_strike = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--unison") && i + 1 < argc) tune.m_unison = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--radiation") && i + 1 < argc) tune.m_radiation = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--radiation-end") && i + 1 < argc) tune.m_radiationEnd = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--voice-bass") && i + 1 < argc) tune.m_voiceBass = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--voice-treble") && i + 1 < argc) tune.m_voiceTreble = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--damper") && i + 1 < argc) tune.m_damperRate = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--hard-velocity") && i + 1 < argc) tune.m_hardVelocity = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--knock") && i + 1 < argc) tune.m_knock = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--body-corner") && i + 1 < argc) tune.m_bodyCorner = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--high-bank") && i + 1 < argc) tune.m_highBank = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--board-loss") && i + 1 < argc) tune.m_boardLoss = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--damper-length") && i + 1 < argc) tune.m_damperLength = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--felt") && i + 1 < argc) tune.m_felt = static_cast<float>(std::atof(argv[++i]));
+        else if (!std::strcmp(argv[i], "--coupling") && i + 1 < argc) tune.m_coupling = static_cast<float>(std::atof(argv[++i]));
     }
     if (doInfo) info(instrument);
     if (doMeasure) measure();
     if (!notes.empty()) {
         PianoSpec spec = tune;
-        spec.instrument = instrument;
+        spec.m_instrument = instrument;
         auto piano = std::make_unique<Piano>();
-        piano->prepare(kRate);
+        piano->prepare(Rate);
         piano->setSpec(spec);
         ParamStore ps;
-        std::vector<float> v(static_cast<size_t>(piano::Count));
-        ps.readModule(Module::Piano, 0, v.data());
-        v[piano::Pedal] = pedal;
+        std::vector<float> v(static_cast<size_t>(piano::COUNT));
+        ps.readModule(ModuleE::PIANO, 0, v.data());
+        v[piano::PEDAL] = pedal;
         piano->update(v.data());
         WavWriter wav;
-        if (!wav.open(out.c_str(), static_cast<int>(kRate), 2, WavFormat::Float32)) return 1;
+        if (!wav.open(out.c_str(), static_cast<int>(Rate), 2, WavFormatE::FLOAT32)) return 1;
         // "midi:velocity:seconds" one after another, each held for its seconds, then --gap seconds (one by default).
         {
-            float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
-            for (int i = 0; i < static_cast<int>(lead * kRate); i += Piano::kMaxBlock) {
-                piano->process(L, R, Piano::kMaxBlock);
-                wav.write(L, R, Piano::kMaxBlock);
+            float L[Piano::MaxBlock], R[Piano::MaxBlock];
+            for (int i = 0; i < static_cast<int>(lead * Rate); i += Piano::MaxBlock) {
+                piano->process(L, R, Piano::MaxBlock);
+                wav.write(L, R, Piano::MaxBlock);
             }
         }
         size_t pos = 0;
@@ -364,12 +364,12 @@ int main(int argc, char** argv)
             float vel = 0.7f, secs = 2.0f;
             std::sscanf(item.c_str(), "%d:%f:%f", &midi, &vel, &secs);
             piano->noteOn(midi, vel, 0.0);
-            float L[Piano::kMaxBlock], R[Piano::kMaxBlock];
-            const int total = static_cast<int>((secs + gap) * kRate), off = static_cast<int>(secs * kRate);
-            for (int i = 0; i < total; i += Piano::kMaxBlock) {
-                if (i <= off && off < i + Piano::kMaxBlock) piano->noteOff(midi);
-                piano->process(L, R, Piano::kMaxBlock);
-                wav.write(L, R, Piano::kMaxBlock);
+            float L[Piano::MaxBlock], R[Piano::MaxBlock];
+            const int total = static_cast<int>((secs + gap) * Rate), off = static_cast<int>(secs * Rate);
+            for (int i = 0; i < total; i += Piano::MaxBlock) {
+                if (i <= off && off < i + Piano::MaxBlock) piano->noteOff(midi);
+                piano->process(L, R, Piano::MaxBlock);
+                wav.write(L, R, Piano::MaxBlock);
             }
         }
         wav.close();
