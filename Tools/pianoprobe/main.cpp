@@ -56,7 +56,16 @@ void fft(std::vector<std::complex<double>>& a)
     }
 }
 
-/** @brief Renders one note (held @p hold seconds) for @p secs seconds, mono (L + R). */
+/**
+ * @brief Renders one note (held @p hold seconds) for @p secs seconds, mono (L + R).
+ * @param[in,out] p      the piano
+ * @param[in]     midi   the MIDI note
+ * @param[in]     vel    the velocity, 0..1
+ * @param[in]     hold   the seconds held
+ * @param[in]     secs   the seconds rendered
+ * @param[in]     pedal  the pedal, 0..1
+ * @return the mono samples
+ */
 std::vector<float> renderNote(Piano& p, int midi, float vel, double hold, double secs, float pedal = 0.0f)
 {
     ParamStore ps;
@@ -79,7 +88,13 @@ std::vector<float> renderNote(Piano& p, int midi, float vel, double hold, double
     return out;
 }
 
-/** @brief The magnitude spectrum (dB) of @p x from @p start over @p n samples (Hann), and the bin width. */
+/**
+ * @brief The magnitude spectrum (dB) of @p x from @p start over @p n samples (Hann), and the bin width.
+ * @param[in] x      the samples
+ * @param[in] start  the first sample
+ * @param[in] n      the transform's length
+ * @return the magnitudes in dB
+ */
 std::vector<double> spectrum(const std::vector<float>& x, size_t start, size_t n)
 {
     std::vector<std::complex<double>> a(n);
@@ -93,7 +108,11 @@ std::vector<double> spectrum(const std::vector<float>& x, size_t start, size_t n
     return m;
 }
 
-/** @brief The level (dB RMS) of @p x over 50 ms windows. */
+/**
+ * @brief The level (dB RMS) of @p x over 50 ms windows.
+ * @param[in] x  the samples
+ * @return the level per window in dB
+ */
 std::vector<double> envelope(const std::vector<float>& x)
 {
     const size_t w = static_cast<size_t>(0.05 * Rate);
@@ -106,6 +125,10 @@ std::vector<double> envelope(const std::vector<float>& x)
     return e;
 }
 
+/**
+ * @brief Prints the design's numbers for an instrument: the time it takes, the board's modes, per key the strings.
+ * @param[in] instrument  the instrument (PianoInstrument)
+ */
 void info(int instrument)
 {
     PianoSpec spec;
@@ -205,6 +228,7 @@ void splits()
     std::printf("splits: %d samples differ, the first at %d\n", count, first);
 }
 
+/** @brief The measurements of phase 4a: inharmonicity, the two-stage decay, the centroid over the velocity, the glide. */
 void measure()
 {
     PianoSpec spec;
@@ -295,6 +319,12 @@ void measure()
 
 } // namespace
 
+/**
+ * @brief The command line (see the file comment).
+ * @param[in] argc  the number of arguments
+ * @param[in] argv  the arguments
+ * @return 0, or 1 on a file that cannot be written
+ */
 int main(int argc, char** argv)
 {
     const DenormalGuard guard;   // as the engine runs: decayed partials are zero, not subnormal

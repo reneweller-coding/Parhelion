@@ -30,9 +30,13 @@ using namespace parh;
 
 namespace {
 
-constexpr double PiD = 3.14159265358979323846;
-constexpr double Rate = 48000.0;
+constexpr double PiD = 3.14159265358979323846;   ///< pi in double precision
+constexpr double Rate = 48000.0;                 ///< the sample rate the probe renders at, Hz
 
+/**
+ * @brief In-place radix-2 FFT (the length a power of two).
+ * @param[in,out] a  the samples, replaced by their spectrum
+ */
 void fft(std::vector<std::complex<double>>& a)
 {
     const size_t n = a.size();
@@ -56,6 +60,13 @@ void fft(std::vector<std::complex<double>>& a)
     }
 }
 
+/**
+ * @brief The magnitude spectrum of @p x from @p start over @p n samples (Hann window).
+ * @param[in] x      the samples
+ * @param[in] start  the first sample
+ * @param[in] n      the transform's length, a power of two
+ * @return the n / 2 magnitudes in dB
+ */
 std::vector<double> spectrumDb(const std::vector<float>& x, size_t start, size_t n)
 {
     std::vector<std::complex<double>> a(n);
@@ -66,7 +77,13 @@ std::vector<double> spectrumDb(const std::vector<float>& x, size_t start, size_t
     return m;
 }
 
-/** @brief The strongest peak's frequency within f +- 3 %. */
+/**
+ * @brief The strongest peak's frequency within f +- 3 %.
+ * @param[in] s  the magnitude spectrum
+ * @param[in] f  the frequency expected
+ * @param[in] n  the transform's length
+ * @return the peak's frequency in Hz
+ */
 double peakNear(const std::vector<double>& s, double f, size_t n)
 {
     const double bin = Rate / n;
@@ -76,6 +93,16 @@ double peakNear(const std::vector<double>& s, double f, size_t n)
     return (static_cast<double>(at) + 0.5 * (a - c) / (a - 2.0 * b + c)) * bin;
 }
 
+/**
+ * @brief Renders one note of an instrument: struck at once, released after @p hold seconds, @p secs seconds in all.
+ * @tparam InstrT the instrument (StringSection, Choir, Brass, Timpani)
+ * @param[in,out] ins    the instrument
+ * @param[in]     pitch  the MIDI note
+ * @param[in]     vel    the velocity, 0..1
+ * @param[in]     hold   the seconds until the release
+ * @param[in]     secs   the seconds rendered
+ * @return the channels' mean
+ */
 template <class InstrT>
 std::vector<float> renderOne(InstrT& ins, int pitch, float vel, double hold, double secs)
 {
@@ -92,7 +119,12 @@ std::vector<float> renderOne(InstrT& ins, int pitch, float vel, double hold, dou
     return out;
 }
 
-/** @brief The period of @p x from @p start (autocorrelation over 4096 samples, lags for 30 .. 2000 Hz), in Hz. */
+/**
+ * @brief The period of @p x from @p start (autocorrelation over 4096 samples, lags for 30 .. 2000 Hz), in Hz.
+ * @param[in] x      the samples
+ * @param[in] start  the first sample
+ * @return the pitch in Hz
+ */
 double acfPitch(const std::vector<float>& x, size_t start)
 {
     const size_t n = 4096;
@@ -114,6 +146,14 @@ double acfPitch(const std::vector<float>& x, size_t start)
     return Rate / (lag + 0.5 * (a - c) / (a - 2.0 * b + c));
 }
 
+/**
+ * @brief The string section: per pitch where it sounds (autocorrelation and spectral peak), the partials against the
+ *        first, the peak level; then the cost of a four-note chord.
+ * @param[in] players   players per note
+ * @param[in] vibrato   the vibrato knob
+ * @param[in] pressure  the bow pressure knob
+ * @param[in] position  the bow position knob
+ */
 void measureStrings(int players, float vibrato, float pressure, float position)
 {
     auto s = std::make_unique<StringSection>();
@@ -152,7 +192,10 @@ void measureStrings(int players, float vibrato, float pressure, float position)
     std::printf("strings cost: four notes, %d lanes, %.1f %% of a core\n", s->activeLanes(), 100.0 * secs / 10.0);
 }
 
-/** @brief Four chords (Am F C G) twice: strings, then choir, then brass with timpani, then all; written to @p path. */
+/**
+ * @brief Four chords (Am F C G) twice: strings, then choir, then brass with timpani, then all; written to @p path.
+ * @param[in] path  the WAV file
+ */
 void demo(const char* path)
 {
     ParamStore ps;
@@ -281,6 +324,12 @@ void measureOthers()
 
 } // namespace
 
+/**
+ * @brief The command line (see the file comment).
+ * @param[in] argc  the number of arguments
+ * @param[in] argv  the arguments
+ * @return 0, or 1 on a file that cannot be written
+ */
 int main(int argc, char** argv)
 {
     const DenormalGuard guard;
