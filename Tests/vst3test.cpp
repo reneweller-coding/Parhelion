@@ -14,6 +14,7 @@
  * @note Copied from Ephemeris `Tests/vst3test.cpp` at d047d79 (27.09.2026), after Phosphene's; the performer's MIDI is
  *       Parhelion's.
  * @note Copied from Totality `Tests/vst3test.cpp` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -28,7 +29,11 @@ namespace {
 int failures = 0;   ///< checks that failed
 int checks = 0;   ///< checks made
 
-/** @brief Records one check's result and prints it. */
+/**
+ * @brief Records one check's result and prints it.
+ * @param[in] ok    the check's result
+ * @param[in] what  what it checked
+ */
 void check(bool ok, const juce::String& what)
 {
     ++checks;
@@ -39,7 +44,10 @@ void check(bool ok, const juce::String& what)
 /** @brief A transport a host would offer: playing, at a tempo, from a position. */
 class TestPlayHead final : public juce::AudioPlayHead {
 public:
-    /** @brief The transport as it stands: playing, at bpm, at ppq and samples. */
+    /**
+     * @brief The transport as it stands: playing, at bpm, at ppq and samples.
+     * @return the transport's position
+     */
     juce::Optional<PositionInfo> getPosition() const override
     {
         PositionInfo info;
@@ -50,14 +58,26 @@ public:
         info.setIsPlaying(true);
         return info;
     }
-    void advance(int n) { m_samples += n; m_ppq += n * m_bpm / (60.0 * m_sampleRate); }   ///< moves on by @p n samples
+    /**
+     * moves on by @p n samples
+     * @param[in] n  how many samples
+     */
+    void advance(int n) { m_samples += n; m_ppq += n * m_bpm / (60.0 * m_sampleRate); }
     double m_bpm = 120.0;   ///< the tempo
     double m_ppq = 0.0;   ///< the position, quarter notes
     double m_sampleRate = 48000.0;   ///< the sample rate, Hz
     double m_samples = 0.0;   ///< the position, samples
 };
 
-/** @brief Plays @p seconds of blocks, running the message loop between them; returns the peak. */
+/**
+ * @brief Plays @p seconds of blocks, running the message loop between them; returns the peak.
+ * @param[in,out] p        the plugin
+ * @param[in,out] head     the play head
+ * @param[in]     seconds  how long
+ * @param[in]     block    the block size
+ * @param[out]    finite   receives whether every sample was finite, or null
+ * @return the peak of what played
+ */
 double play(juce::AudioPluginInstance& p, TestPlayHead& head, double seconds, int block, bool* finite = nullptr)
 {
     juce::AudioBuffer<float> buf(2, block);
@@ -80,7 +100,10 @@ double play(juce::AudioPluginInstance& p, TestPlayHead& head, double seconds, in
     return peak;
 }
 
-/** @brief Prints the tally and returns the exit code. */
+/**
+ * @brief Prints the tally and returns the exit code.
+ * @return the exit code: the number of failures
+ */
 int finish()
 {
     std::printf("%d checks, %d failures\n", checks, failures);
@@ -89,7 +112,12 @@ int finish()
 
 } // namespace
 
-/** @brief Loads the built VST3 as a host would and runs the checks. */
+/**
+ * @brief Loads the built VST3 as a host would and runs the checks.
+ * @param[in]     argc  the number of arguments
+ * @param[in,out] argv  the arguments: sections to run
+ * @return the number of failures
+ */
 int main(int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI juceInit;

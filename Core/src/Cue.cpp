@@ -4,6 +4,7 @@
  * @note Copied from Ephemeris `Core/src/Cue.cpp` (namespace eph) at d047d79 (27.09.2026) by way of Totality; the marks are
  *       Parhelion's: the sections, what the layer matrix adds, filters or takes away, the keys.
  * @note Copied from Totality `Core/src/Cue.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/Cue.h"
 #include "parh/Dsp.h"
@@ -34,20 +35,32 @@ namespace parh {
 
 namespace {
 
-/** @brief Copies @p src into @p dst, cut at 23 characters and terminated. */
+/**
+ * @brief Copies @p src into @p dst, cut at 23 characters and terminated.
+ * @param[out] dst  receives the text
+ * @param[in]  src  the text
+ */
 void copyText(char (&dst)[24], const char* src)
 {
     std::strncpy(dst, src, sizeof(dst) - 1);
     dst[sizeof(dst) - 1] = 0;
 }
 
-/** @brief Appends @p v big-endian (OSC). */
+/**
+ * @brief Appends @p v big-endian (OSC).
+ * @param[in,out] out  the bytes, appended to
+ * @param[in]     v    the value
+ */
 void put32(std::vector<uint8_t>& out, uint32_t v)
 {
     for (int s = 24; s >= 0; s -= 8) out.push_back(static_cast<uint8_t>(v >> s));
 }
 
-/** @brief Appends @p s as an OSC string: terminated and padded to four bytes. */
+/**
+ * @brief Appends @p s as an OSC string: terminated and padded to four bytes.
+ * @param[in,out] out  the bytes, appended to
+ * @param[in]     s    the string
+ */
 void putString(std::vector<uint8_t>& out, const char* s)
 {
     const size_t n = std::strlen(s);
@@ -57,7 +70,12 @@ void putString(std::vector<uint8_t>& out, const char* s)
 
 } // namespace
 
-/** @brief The Camelot name of a minor key (Ionian: its major), the notation DJs mix by ("8A" is A minor). */
+/**
+ * @brief The Camelot name of a minor key (Ionian: its major), the notation DJs mix by ("8A" is A minor).
+ * @param[in] key    the key's root, a pitch class
+ * @param[in] major  true for Ionian
+ * @return the Camelot name
+ */
 std::string camelotOf(int key, bool major)
 {
     static const int Minor[12] = { 5, 12, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10 };   // C minor 5A, C# minor 12A, ...

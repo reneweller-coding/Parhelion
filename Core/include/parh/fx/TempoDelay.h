@@ -13,6 +13,7 @@
  * tracks move it by a fraction of a sample per chunk; the read position is interpolated linearly,
  * so the change neither clicks nor steps. A jump of the time setting glides over about 50 ms.
  * @note Copied from Phosphene `Core/include/phos/TempoDelay.h` at 76f7100 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -23,7 +24,10 @@ namespace parh {
 /** @brief Stereo tempo delay. */
 class TempoDelay {
 public:
-    /** @brief Allocates for a sample rate (up to two seconds of delay at any tempo the engine allows). */
+    /**
+     * @brief Allocates for a sample rate (up to two seconds of delay at any tempo the engine allows).
+     * @param[in] sampleRate  the sample rate
+     */
     void prepare(double sampleRate)
     {
         m_sr = sampleRate;
@@ -47,10 +51,12 @@ public:
     }
     /**
      * @brief Sets the delay.
-     * @param beatsLeft,beatsRight delay times in beats
-     * @param bpm      current tempo
-     * @param feedback 0..0.9
-     * @param hpHz,lpHz band limits inside the loop
+     * @param[in] beatsLeft   delay times in beats
+     * @param[in] beatsRight  delay times in beats
+     * @param[in] bpm         current tempo
+     * @param[in] feedback    0..0.9
+     * @param[in] hpHz        band limits inside the loop
+     * @param[in] lpHz        band limits inside the loop
      */
     void set(float beatsLeft, float beatsRight, double bpm, float feedback, float hpHz, float lpHz)
     {
@@ -67,9 +73,10 @@ public:
     }
     /**
      * @brief Adds the delayed signal of a mono send to a stereo output.
-     * @param send mono input, @p n samples (already scaled by the send amount)
-     * @param L,R  outputs the echoes are added to
-     * @param n    samples
+     * @param[in]     send  mono input, @p n samples (already scaled by the send amount)
+     * @param[in,out] L     outputs the echoes are added to
+     * @param[in,out] R     outputs the echoes are added to
+     * @param[in]     n     samples
      */
     void process(const float* send, float* L, float* R, int n)
     {
@@ -96,7 +103,12 @@ public:
     }
 
 private:
-    /** @brief Reads @p buf @p delay samples back, linearly interpolated. */
+    /**
+     * @brief Reads @p buf @p delay samples back, linearly interpolated.
+     * @param[in] buf    the delay buffer
+     * @param[in] delay  the delay in samples
+     * @return the sample read
+     */
     float read(const std::vector<float>& buf, float delay) const
     {
         // In double: at a write index of 2^17 a float resolves only 1/64 of a sample.

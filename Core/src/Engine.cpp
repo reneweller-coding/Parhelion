@@ -4,6 +4,7 @@
  * @note The raster and the event splitting follow Ephemeris `Core/src/Engine.cpp` at d047d79 (27.09.2026).
  * @note Copied from Totality `Core/src/Engine.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_; the stems are
  *       Parhelion's.
+ * @author Rene Weller
  */
 #include "parh/Engine.h"
 #include "parh/Profile.h"

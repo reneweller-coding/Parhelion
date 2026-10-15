@@ -1,6 +1,7 @@
 /**
  * @file Corpus.cpp
  * @brief The variable-order step model and the constrained sampler (Corpus.h).
+ * @author Rene Weller
  */
 #include "parh/compose/Corpus.h"
 #include <algorithm>

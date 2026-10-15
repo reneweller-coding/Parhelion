@@ -4,6 +4,7 @@
  *
  * 2048 presets in 11 families, from seed 20260923; the readable copy is docs/sfx_bank.tsv.
  * @note Copied from Phosphene `Core/src/SfxBankTables.cpp` at 76f7100 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/synth/Sfx.h"
 

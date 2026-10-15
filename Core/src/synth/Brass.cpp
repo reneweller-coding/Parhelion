@@ -1,6 +1,7 @@
 /**
  * @file Brass.cpp
  * @brief The brass (Brass.h).
+ * @author Rene Weller
  */
 #include "parh/synth/Brass.h"
 #include "parh/Params.h"

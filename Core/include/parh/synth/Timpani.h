@@ -19,6 +19,7 @@
  *
  * **The drums**: four (the timpanist's set), each tuned to the note it plays last; a roll is strokes in quick
  * succession on the ringing membrane.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -33,23 +34,52 @@ constexpr int TimpaniModes = 32;   ///< modes of a drum's membrane
 /** @brief The timpani: four kettle drums, modal membranes struck by a felt mallet (see the file comment). */
 class Timpani {
 public:
-    /** @brief Sets the sample rate and the seed, and falls silent. */
+    /**
+     * @brief Sets the sample rate and the seed, and falls silent.
+     * @param[in] sampleRate  the sample rate
+     * @param[in] seed        the seed
+     */
     void prepare(double sampleRate, uint64_t seed);
-    /** @brief Reads the effective parameter values (indexed by timpani::). */
+    /**
+     * @brief Reads the effective parameter values (indexed by timpani::).
+     * @param[in] v  the effective parameter values
+     */
     void update(const float* v);
-    /** @brief Strikes the drum for @p pitch (tuned to it) at @p velocity, @p late samples ago; @p unused is not read. */
+    /**
+     * @brief Strikes the drum for @p pitch (tuned to it) at @p velocity, @p late samples ago; @p unused is not read.
+     * @param[in] pitch     the MIDI note
+     * @param[in] velocity  the velocity, 0..1
+     * @param[in] unused    not read
+     * @param[in] late      samples ago
+     */
     void noteOn(int pitch, float velocity, bool unused, double late);
     /** @brief Nothing: a drum rings out. */
     void noteOff(int) {}
     /** @brief Silence: every drum still. */
     void reset();
-    /** @brief Renders @p n samples, replacing @p L and @p R. */
+    /**
+     * @brief Renders @p n samples, replacing @p L and @p R.
+     * @param[out] L  the left channel
+     * @param[out] R  the right channel
+     * @param[in]  n  the block's samples
+     */
     void process(float* L, float* R, int n);
-    /** @brief The frequency ratio of mode @p i to the note (the tests). */
+    /**
+     * @brief The frequency ratio of mode @p i to the note (the tests).
+     * @param[in] i  the mode
+     * @return its frequency ratio to the note
+     */
     static double ratio(int i);
-    /** @brief The deck's shared modulation sources (Modulation.h). */
+    /**
+     * @brief The deck's shared modulation sources (Modulation.h).
+     * @param[in] g  the shared sources
+     */
     void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
-    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    /**
+     * @brief The beat now and the beats per sample (the synced LFOs).
+     * @param[in] beat            the beat now
+     * @param[in] beatsPerSample  the beats per sample
+     */
     void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
 
 private:
@@ -85,9 +115,20 @@ private:
         double m_gainL = 1.0;   ///< the drum's place: gain left
         double m_gainR = 1.0;   ///< ... gain right
     };
-    /** @brief Tunes drum @p d to @p pitch, times @p bend, its decays times @p decayMul: the poles, the gains, the shapes. */
+    /**
+     * @brief Tunes drum @p d to @p pitch, times @p bend, its decays times @p decayMul: the poles, the gains, the
+     *        shapes.
+     * @param[in,out] d         the drum
+     * @param[in]     pitch     the MIDI note
+     * @param[in]     bend      the frequency factor
+     * @param[in]     decayMul  the decays' factor
+     */
     void tune(Drum& d, int pitch, double bend = 1.0, double decayMul = 1.0);
-    /** @brief Drum @p k's modulation now; @p strike: the mallet is about to meet it (the felt and the place). */
+    /**
+     * @brief Drum @p k's modulation now; @p strike: the mallet is about to meet it (the felt and the place).
+     * @param[in] k       the drum
+     * @param[in] strike  true when the mallet is about to meet it
+     */
     void modDrum(int k, bool strike);
     double m_sr = 48000.0;   ///< the sample rate, Hz
     uint64_t m_seed = 1;   ///< the seed

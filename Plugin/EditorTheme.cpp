@@ -2,11 +2,11 @@
  * @file EditorTheme.cpp
  * @brief The palette, the families, the modules' panels and the look and feel (EditorTheme.h).
  * @note Copied from Totality `Plugin/EditorTheme.cpp` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #include "EditorTheme.h"
+#include "PluginEditor.h"   // drawLogo
 #include "ParhelionData.h"
-
-void drawLogo(juce::Graphics& g, juce::Rectangle<float> r);   ///< PluginEditor.cpp
 #include <cmath>
 
 namespace parhui {

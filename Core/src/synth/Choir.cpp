@@ -1,6 +1,7 @@
 /**
  * @file Choir.cpp
  * @brief The choir (Choir.h).
+ * @author Rene Weller
  */
 #include "parh/synth/Choir.h"
 #include "parh/Params.h"

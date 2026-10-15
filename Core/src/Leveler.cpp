@@ -3,6 +3,7 @@
  * @brief Every track as loud as its style means (Leveler.h).
  * @note After Totality `Core/src/Leveler.cpp` at 4d3c0d2 (29.09.2026): the readings, the ranked corrections and the
  *       two-pass loudness are its; the windows and the breakdown's correction are Parhelion's.
+ * @author Rene Weller
  */
 #include "parh/Leveler.h"
 #include "parh/Dsp.h"
@@ -33,7 +34,16 @@ struct PartPeaks {
     float m_part[BalParts] = {};   ///< every part's loudest sample
 };
 
-/** @brief Plays @p seconds from @p beat (after BalWarm before it) and keeps the loudest samples. False if stopped. */
+/**
+ * @brief Plays @p seconds from @p beat (after BalWarm before it) and keeps the loudest samples. False if stopped.
+ * @param[in,out] e        the engine
+ * @param[in]     s        the score
+ * @param[in]     beat     the first beat
+ * @param[in]     seconds  the seconds played
+ * @param[out]    peaks    the loudest samples per part
+ * @param[in]     stop     asked between blocks: true breaks off
+ * @return false if stopped
+ */
 bool readParts(Engine& e, const Score& s, double beat, double seconds, PartPeaks& peaks, const std::function<bool()>& stop)
 {
     const double at = s.m_tempo.secondsAt(beat);
@@ -56,7 +66,11 @@ bool readParts(Engine& e, const Score& s, double beat, double seconds, PartPeaks
     return true;
 }
 
-/** @brief Every part's loudest sample against the loudest kick, dB (NaN: more than 60 dB under it). */
+/**
+ * @brief Every part's loudest sample against the loudest kick, dB (NaN: more than 60 dB under it).
+ * @param[in] peaks  the parts' loudest samples
+ * @return each part against the loudest kick in dB, NaN more than 60 dB under it
+ */
 BalanceDbT against(const PartPeaks& peaks)
 {
     BalanceDbT out;
@@ -72,6 +86,10 @@ BalanceDbT against(const PartPeaks& peaks)
  * @brief The corrections that bring @p found into the windows. A rank within the kit's two kinds (the hat-like lanes, the
  *        percussion): the two loudest keep their windows, the third's lies 3 dB lower, the others' 6 (Totality's rule:
  *        ten parts pushed up at once flood the mids). @p windowDb moves the voices' windows (LevelMark::windowDb).
+ * @param[in] e         the engine
+ * @param[in] found     the levels found, dB
+ * @param[in] windowDb  the windows' width, dB
+ * @return the corrections, dB
  */
 BalanceDbT corrections(const Engine& e, const BalanceDbT& found, float windowDb)
 {
@@ -105,7 +123,16 @@ BalanceDbT corrections(const Engine& e, const BalanceDbT& found, float windowDb)
     return out;
 }
 
-/** @brief The loudness of @p seconds from @p beat (after Warm before it): integrated and the short-term maximum. */
+/**
+ * @brief The loudness of @p seconds from @p beat (after Warm before it): integrated and the short-term maximum.
+ * @param[in,out] e            the engine
+ * @param[in]     s            the score
+ * @param[in]     beat         the first beat
+ * @param[in]     seconds      the seconds measured
+ * @param[in]     stop         asked between blocks: true breaks off
+ * @param[in]     warmSeconds  the seconds played before
+ * @return the loudness, nothing if stopped
+ */
 std::optional<LoudnessReport> measure(Engine& e, const Score& s, double beat, double seconds, const std::function<bool()>& stop,
                                       double warmSeconds = Warm)
 {
@@ -132,6 +159,12 @@ std::optional<LoudnessReport> measure(Engine& e, const Score& s, double beat, do
  *        (at most 150), every 20-second window hopping 5 s -- the loudest window's integrated loudness is the drop's
  *        (the references' loud20), the loudest 3 s anywhere in it its short-term maximum. A drop that grows (its second
  *        half an octave up, the choir coming in) is measured where it is loudest, not where it begins.
+ * @param[in,out] e        the engine
+ * @param[in]     s        the score
+ * @param[in]     beat     the drop's first beat
+ * @param[in]     seconds  its seconds
+ * @param[in]     stop     asked between blocks: true breaks off
+ * @return the drop's loudness, nothing if stopped
  */
 std::optional<LoudnessReport> measureDrop(Engine& e, const Score& s, double beat, double seconds, const std::function<bool()>& stop)
 {
@@ -165,7 +198,12 @@ std::optional<LoudnessReport> measureDrop(Engine& e, const Score& s, double beat
     return rep;
 }
 
-/** @brief The length in seconds of the section that begins at or contains @p beat. */
+/**
+ * @brief The length in seconds of the section that begins at or contains @p beat.
+ * @param[in] s     the score
+ * @param[in] beat  the position in beats
+ * @return the section's length in seconds
+ */
 double sectionSeconds(const Score& s, double beat)
 {
     for (const Section& sec : s.m_sections)
@@ -173,7 +211,13 @@ double sectionSeconds(const Score& s, double beat)
     return 20.0;
 }
 
-/** @brief The main breakdown of the track that begins at @p from: the longest Breakdown section (else Break) after it. */
+/**
+ * @brief The main breakdown of the track that begins at @p from: the longest Breakdown section (else Break) after it.
+ * @param[in] s     the score
+ * @param[in] from  the track's first beat
+ * @param[in] to    its end in beats
+ * @return the main breakdown, or null
+ */
 const Section* mainBreakdown(const Score& s, double from, double to)
 {
     const Section* best = nullptr;

@@ -22,6 +22,7 @@
  * pitch, the pulse width, the cutoff, the resonance, the envelope's amount, the drive, the level and the pan, read every
  * 16 samples of the voice's own absolute count (so the host's blocks never move it); the filter envelope is a source.
  * @note Copied from Totality `Core/include/tot/synth/Synth.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -36,13 +37,19 @@ namespace parh {
 /** @brief One monophonic synth voice with its strip. */
 class MonoSynth {
 public:
-    /** @brief Prepares for a sample rate; @p seed: the modulation's random stream. */
+    /**
+     * @brief Prepares for a sample rate; @p seed: the modulation's random stream.
+     * @param[in] sampleRate  the sample rate
+     * @param[in] seed        the seed of the modulation's random stream
+     */
     void prepare(double sampleRate, uint64_t seed = 0x4D4F4E4Full);
     /** @brief Silence. */
     void reset();
     /**
      * @brief Reads the effective parameter values (indexed by synth::).
-     * @param minLowCut the lowest Low Cut the engine allows now (0: none; 100 Hz where the rumble owns the low end)
+     * @param[in] v          the effective parameter values, indexed by synth::
+     * @param[in] minLowCut  the lowest Low Cut the engine allows now (0: none; 100 Hz where the rumble owns the low
+     *                       end)
      */
     void update(const float* v, float minLowCut);
     /**
@@ -53,24 +60,42 @@ public:
     void refreshModulation();
     /**
      * @brief Starts a note.
-     * @param pitch    MIDI note
-     * @param velocity 0..1
-     * @param late     samples since its ideal start (0 <= late < 1)
-     * @param accent   the 303's accent
-     * @param slide    this note slides into the next (the next neither retriggers nor jumps)
+     * @param[in] pitch     MIDI note
+     * @param[in] velocity  0..1
+     * @param[in] late      samples since its ideal start (0 <= late < 1)
+     * @param[in] accent    the 303's accent
+     * @param[in] slide     this note slides into the next (the next neither retriggers nor jumps)
      */
     void noteOn(int pitch, float velocity, double late, bool accent, bool slide);
     /** @brief Releases the note (unless a slid note has taken over). */
     void noteOff();
-    /** @brief A kick starts: the duck. */
+    /**
+     * @brief A kick starts: the duck.
+     * @param[in] late  samples since the kick's ideal start
+     */
     void kick(double late) { m_duck.trigger(late); }
-    /** @brief Renders @p n samples into @p L and @p R (replaced). */
+    /**
+     * @brief Renders @p n samples into @p L and @p R (replaced).
+     * @param[out] L  receives the left channel (replaced)
+     * @param[out] R  receives the right channel (replaced)
+     * @param[in]  n  how many samples
+     */
     void process(float* L, float* R, int n);
-    /** @brief Whether anything sounds. */
+    /**
+     * @brief Whether anything sounds.
+     * @return true while anything sounds
+     */
     bool active() const { return m_amp.isActive(); }
-    /** @brief The deck's shared modulation sources (Modulation.h). */
+    /**
+     * @brief The deck's shared modulation sources (Modulation.h).
+     * @param[in] g  the shared sources
+     */
     void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
-    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    /**
+     * @brief The beat now and the beats per sample (the synced LFOs).
+     * @param[in] beat            the beat now
+     * @param[in] beatsPerSample  the beats per sample
+     */
     void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
 
 private:

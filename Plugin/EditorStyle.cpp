@@ -1,6 +1,7 @@
 /**
  * @file EditorStyle.cpp
  * @brief The Style tab (EditorStyle.h).
+ * @author Rene Weller
  */
 #include "EditorStyle.h"
 #include "parh/Presets.h"
@@ -22,7 +23,11 @@ struct Axis {
 
 /** @brief the lead archetypes, in the order of LeadKind */
 const char* const LeadNames[static_cast<int>(LeadKindE::COUNT)] = { "Supersaw", "Piano", "303", "Pluck and Arp", "Pad" };
-/** @brief Where each lead archetype sits on its axis (from the dry riff to the wide pad). */
+/**
+ * @brief Where each lead archetype sits on its axis (from the dry riff to the wide pad).
+ * @param[in] k  the lead archetype
+ * @return its place on the axis, 0..1
+ */
 float leadPlace(LeadKindE k)
 {
     switch (k) {
@@ -34,7 +39,10 @@ float leadPlace(LeadKindE k)
     }
 }
 
-/** @brief The six axes, built on first use. */
+/**
+ * @brief The six axes, built on first use.
+ * @return the axes
+ */
 const std::vector<Axis>& axes()
 {
     static const std::vector<Axis> a = {

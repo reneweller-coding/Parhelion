@@ -13,7 +13,7 @@
  *
  * A track is composed from its seed (compose/Composer.h); --study renders the fixed study of Phase 1 instead; --dj (or
  * set.minutes) a DJ set of that many minutes (compose/Set.h), every track levelled before it is placed. Beside the WAV
- * the cues go into its cue chunk, into <out>.cues.json and into a rekordbox collection <out>.rekordbox.xml (the beat
+ * the cues go into its cue chunk, into \<out\>.cues.json and into a rekordbox collection \<out\>.rekordbox.xml (the beat
  * grid, the breakdowns and drops as memory cues); --loops writes the intro's, the main drop's and the outro's eight bars
  * as seamless loops (Export.h); --plan-json the plan as JSON (the style, the key, the tempo, every section with its
  * bar and second; a set's tracks with theirs) for Tools/eval_report.py. Without
@@ -22,6 +22,10 @@
  *
  * @note The frame (arguments, stems, the measurement, the timing) follows Totality `Tools/render/main.cpp` at 4d3c0d2
  *       (29.09.2026).
+ * @author Rene Weller
+ *
+ * @par Compile Flags:
+ *   @arg @c PARH_PROFILE - prints what each stage of the engine cost after a render (Profile.h)
  */
 #include "parh/Engine.h"
 #include "parh/Export.h"
@@ -63,7 +67,10 @@ void usage()
     std::printf(" section<n>; in a set track<n>, track<n>.<unit> and set\n");
 }
 
-/** @brief Prints the plan: the sections and the layer matrix, one row per element, one column per 8-bar block. */
+/**
+ * @brief Prints the plan: the sections and the layer matrix, one row per element, one column per 8-bar block.
+ * @param[in] sc  the score
+ */
 void printPlan(const Score& sc)
 {
     std::printf("sections:\n");
@@ -83,7 +90,12 @@ void printPlan(const Score& sc)
     }
 }
 
-/** @brief The label of a synth (its bank's): "kick", "lead", "perc3". */
+/**
+ * @brief The label of a synth (its bank's): "kick", "lead", "perc3".
+ * @param[in] module    the module
+ * @param[in] instance  its instance
+ * @return the label
+ */
 std::string synthLabel(int module, int instance)
 {
     const ModuleE m = static_cast<ModuleE>(module);
@@ -96,7 +108,13 @@ std::string synthLabel(int module, int instance)
     return "?";
 }
 
-/** @brief The presets a track plays from beat @p from (its SoundPicks there): "lead Anthem Supersaw / Golden Zenith", ... */
+/**
+ * @brief The presets a track plays from beat @p from (its SoundPicks there): "lead Anthem Supersaw / Golden Zenith",
+ *        ...
+ * @param[in] sc    the score
+ * @param[in] from  the track's first beat
+ * @return (synth, preset) pairs
+ */
 std::vector<std::pair<std::string, std::string>> soundsAt(const Score& sc, double from)
 {
     std::vector<std::pair<std::string, std::string>> out;
@@ -109,7 +127,14 @@ std::vector<std::pair<std::string, std::string>> soundsAt(const Score& sc, doubl
     return out;
 }
 
-/** @brief One track's plan as a JSON object: what the evaluation compares the audio with. */
+/**
+ * @brief One track's plan as a JSON object: what the evaluation compares the audio with.
+ * @param[in] sc     the score
+ * @param[in] info   the track's facts
+ * @param[in] at     the track's first beat
+ * @param[in] tempo  the tempo map
+ * @return the JSON object
+ */
 std::string trackJson(const Score& sc, const TrackInfo& info, double at, const TempoMap& tempo)
 {
     auto sec = [&](double beat) { return tempo.secondsAt(at + beat); };
@@ -128,7 +153,12 @@ std::string trackJson(const Score& sc, const TrackInfo& info, double at, const T
     return s + "}}";
 }
 
-/** @brief Writes @p text to @p path; false if it cannot. */
+/**
+ * @brief Writes @p text to @p path; false if it cannot.
+ * @param[in] path  the file's path
+ * @param[in] text  the text
+ * @return false if it cannot be written
+ */
 bool writeText(const std::string& path, const std::string& text)
 {
     FILE* f = std::fopen(path.c_str(), "wb");
@@ -139,7 +169,12 @@ bool writeText(const std::string& path, const std::string& text)
 
 } // namespace
 
-/** @brief Renders what the command line asks for; the exit code is 0 on success. */
+/**
+ * @brief Renders what the command line asks for; the exit code is 0 on success.
+ * @param[in]     argc  the number of arguments
+ * @param[in,out] argv  the arguments: sections to run
+ * @return the number of failures
+ */
 int main(int argc, char** argv)
 {
     uint64_t seed = 1;

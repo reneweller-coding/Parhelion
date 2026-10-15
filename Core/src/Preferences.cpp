@@ -2,6 +2,7 @@
  * @file Preferences.cpp
  * @brief The ratings and the preferences they give (Preferences.h).
  * @note Copied from Totality `Core/src/Preferences.cpp` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #include "parh/Preferences.h"
 #include <algorithm>
@@ -14,7 +15,11 @@ namespace parh {
 
 namespace {
 
-/** @brief A weight limited to 0.25 .. 3. */
+/**
+ * @brief A weight limited to 0.25 .. 3.
+ * @param[in] f  the weight
+ * @return the weight limited to 0.25 .. 3
+ */
 float clampFactor(float f) { return std::clamp(f, 0.25f, 3.0f); }
 
 } // namespace

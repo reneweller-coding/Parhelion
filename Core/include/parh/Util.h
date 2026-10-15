@@ -8,6 +8,7 @@
  * were the same are this one now, to the character, so every render is the same to the bit; where they differed
  * (reading a file, reporting a format error) the stricter version is the one that stayed.
  * @note Copied from Phosphene `Core/include/phos/Util.h` at 76f7100 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -22,7 +23,11 @@
 
 namespace parh {
 
-/** @brief A standard normal draw from @p r (Box-Muller: two uniforms per draw, the cosine branch). */
+/**
+ * @brief A standard normal draw from @p r (Box-Muller: two uniforms per draw, the cosine branch).
+ * @param[in,out] r  the random stream
+ * @return the draw
+ */
 inline double gaussian(Rng& r)
 {
     const double u1 = 1.0 - static_cast<double>(r.uniform());
@@ -30,7 +35,13 @@ inline double gaussian(Rng& r)
     return std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * 3.141592653589793 * u2);
 }
 
-/** @brief An index in [0, @p n) drawn from non-negative weights @p w; uniform when they are all zero. */
+/**
+ * @brief An index in [0, @p n) drawn from non-negative weights @p w; uniform when they are all zero.
+ * @param[in,out] r  the random stream
+ * @param[in]     w  the weights, not negative
+ * @param[in]     n  their count
+ * @return the index drawn
+ */
 inline int drawIndex(Rng& r, const double* w, int n)
 {
     double total = 0.0;
@@ -44,6 +55,12 @@ inline int drawIndex(Rng& r, const double* w, int n)
 /**
  * @brief The trapezoidal state-variable filter's coefficients (Zavalishin) for cutoff @p fc and damping @p damping at
  *        @p sr; the cutoff is kept between 10 Hz and 0.45 of the sample rate.
+ * @param[in]  fc       the cutoff in Hz
+ * @param[in]  damping  the damping
+ * @param[in]  sr       the sample rate
+ * @param[out] a1       the first coefficient
+ * @param[out] a2       the second coefficient
+ * @param[out] a3       the third coefficient
  */
 inline void svfCoefs(double fc, double damping, double sr, float& a1, float& a2, float& a3)
 {
@@ -55,7 +72,12 @@ inline void svfCoefs(double fc, double damping, double sr, float& a1, float& a2,
     a3 = static_cast<float>(g * g * d1);
 }
 
-/** @brief Reads a whole file into @p out; false if it cannot be opened, is empty, or cannot be read completely. */
+/**
+ * @brief Reads a whole file into @p out; false if it cannot be opened, is empty, or cannot be read completely.
+ * @param[in]  path  the file's path
+ * @param[out] out   its bytes
+ * @return false if it cannot be read
+ */
 inline bool readFile(const char* path, std::vector<uint8_t>& out)
 {
     std::FILE* f = std::fopen(path, "rb");
@@ -69,12 +91,21 @@ inline bool readFile(const char* path, std::vector<uint8_t>& out)
     std::fclose(f);
     return got == out.size();
 }
-/** @brief readFile() for a path held as a std::string. */
+/**
+ * @brief readFile() for a path held as a std::string.
+ * @param[in]  path  the file's path
+ * @param[out] out   its bytes
+ * @return false if it cannot be read
+ */
 inline bool readFile(const std::string& path, std::vector<uint8_t>& out) { return readFile(path.c_str(), out); }
 
 /**
  * @brief Writes "@p what (at byte @p at)" into @p error (when it is not null) and returns false: the one-line
  *        failure of a binary file reader.
+ * @param[out] error  receives the message, or null
+ * @param[in]  what   what went wrong
+ * @param[in]  at     the byte it went wrong at
+ * @return false
  */
 inline bool fileError(std::string* error, const char* what, size_t at)
 {
@@ -86,7 +117,11 @@ inline bool fileError(std::string* error, const char* what, size_t at)
     return false;
 }
 
-/** @brief @p s without leading and trailing spaces, tabs and carriage returns. */
+/**
+ * @brief @p s without leading and trailing spaces, tabs and carriage returns.
+ * @param[in] s  the text
+ * @return the text trimmed
+ */
 inline std::string_view trimView(std::string_view s)
 {
     while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\r')) s.remove_prefix(1);

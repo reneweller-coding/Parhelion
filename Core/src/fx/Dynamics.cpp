@@ -4,6 +4,7 @@
  * @note Copied from Phosphene `Core/src/Dynamics.cpp` at 9a2f615 (24.09.2026); namespace eph, prefix EPH_.
  * @note Copied from Ephemeris `Core/src/fx/Dynamics.cpp` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/src/fx/Dynamics.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/fx/Dynamics.h"
 #include <algorithm>
@@ -14,7 +15,11 @@ namespace parh {
 namespace {
 constexpr double PiD = 3.141592653589793;   ///< pi
 
-/** @brief Modified Bessel function of the first kind, order zero (power series). */
+/**
+ * @brief Modified Bessel function of the first kind, order zero (power series).
+ * @param[in] x  the argument
+ * @return I0(x)
+ */
 double besselI0(double x)
 {
     double sum = 1.0, term = 1.0;

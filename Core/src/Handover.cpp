@@ -1,6 +1,7 @@
 /**
  * @file Handover.cpp
  * @brief The handover from the engine that plays to a second one (Handover.h).
+ * @author Rene Weller
  */
 #include "parh/Handover.h"
 #include <algorithm>

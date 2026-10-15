@@ -1,6 +1,7 @@
 /**
  * @file Composer.cpp
  * @brief The composer (Composer.h): plan, harmony, parts, effects, automation.
+ * @author Rene Weller
  */
 #include "parh/compose/Composer.h"
 #include "parh/compose/Harmony.h"
@@ -40,9 +41,19 @@ constexpr PartE Tamb = PartE::PERC8;     ///< the tambourine's lane
 constexpr PartE Conga = PartE::PERC9;    ///< the conga's lane
 constexpr PartE Tom = PartE::PERC10;     ///< the tom's lane
 
-/** @brief Whether bar @p bar of @p p lies in a drop. */
+/**
+ * @brief Whether bar @p bar of @p p lies in a drop.
+ * @param[in] p    the plan
+ * @param[in] bar  the bar
+ * @return true in a drop
+ */
 bool isDrop(const Plan& p, int bar) { const int s = p.sectionAt(bar); return s >= 0 && p.m_sections[static_cast<size_t>(s)].m_kind == SectionKindE::DROP; }
-/** @brief Whether @p v holds @p x. */
+/**
+ * @brief Whether @p v holds @p x.
+ * @param[in] v  the values
+ * @param[in] x  the value
+ * @return true when it is among them
+ */
 bool contains(const std::vector<int>& v, int x) { return std::find(v.begin(), v.end(), x) != v.end(); }
 
 } // namespace

@@ -28,6 +28,7 @@
  * the frequency): the mouth pressure grows with the note's frequency to the power 0.3.
  *
  * **The section**: three players a note (their tuning, onset and breath their own), up to six notes.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -45,31 +46,72 @@ class Brass {
 public:
     static constexpr int MaxBlock = 32;   ///< the longest block process() renders at once
 
-    /** @brief Sets the sample rate and the seed of the players' streams, and falls silent. */
+    /**
+     * @brief Sets the sample rate and the seed of the players' streams, and falls silent.
+     * @param[in] sampleRate  the sample rate
+     * @param[in] seed        the seed of the players' streams
+     */
     void prepare(double sampleRate, uint64_t seed);
-    /** @brief Reads the effective parameter values (indexed by brass::). */
+    /**
+     * @brief Reads the effective parameter values (indexed by brass::).
+     * @param[in] v  the effective parameter values
+     */
     void update(const float* v);
-    /** @brief Players take up @p pitch at @p velocity (0..1), @p late samples after its ideal start; @p unused is not read. */
+    /**
+     * @brief Players take up @p pitch at @p velocity (0..1), @p late samples after its ideal start; @p unused is not
+     *        read.
+     * @param[in] pitch     the MIDI note
+     * @param[in] velocity  the velocity, 0..1
+     * @param[in] unused    not read
+     * @param[in] late      samples after the ideal start
+     */
     void noteOn(int pitch, float velocity, bool unused, double late);
-    /** @brief The players of @p pitch stop blowing. */
+    /**
+     * @brief The players of @p pitch stop blowing.
+     * @param[in] pitch  the MIDI note
+     */
     void noteOff(int pitch);
     /** @brief Silence: every player off. */
     void reset();
-    /** @brief Players on a note (1 .. BrassPlayers, at most the quality's limit): the knob, through update(). */
+    /**
+     * @brief Players on a note (1 .. BrassPlayers, at most the quality's limit): the knob, through update().
+     * @param[in] n  the players per note
+     */
     void setPlayers(int n) { m_players = n < 1 ? 1 : (n > m_playerLimit ? m_playerLimit : n); }
-    /** @brief The quality's limit on the players (Deck::setQuest), as StringSection::setPlayerLimit. */
+    /**
+     * @brief The quality's limit on the players (Deck::setQuest), as StringSection::setPlayerLimit.
+     * @param[in] n  the most players per note
+     */
     void setPlayerLimit(int n) { m_playerLimit = n < 1 ? 1 : (n > BrassPlayers ? BrassPlayers : n); }
-    /** @brief Renders @p n samples, replacing @p L and @p R. */
+    /**
+     * @brief Renders @p n samples, replacing @p L and @p R.
+     * @param[out] L  the left channel
+     * @param[out] R  the right channel
+     * @param[in]  n  the block's samples
+     */
     void process(float* L, float* R, int n);
-    /** @brief How many players blow now (for the tests). */
+    /**
+     * @brief How many players blow now (for the tests).
+     * @return the players blowing
+     */
     int activePlayers() const;
-    /** @brief The deck's shared modulation sources (Modulation.h). */
+    /**
+     * @brief The deck's shared modulation sources (Modulation.h).
+     * @param[in] g  the shared sources
+     */
     void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
-    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    /**
+     * @brief The beat now and the beats per sample (the synced LFOs).
+     * @param[in] beat            the beat now
+     * @param[in] beatsPerSample  the beats per sample
+     */
     void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
 
 private:
-    /** @brief Note @p s's modulation now, onto its players. */
+    /**
+     * @brief Note @p s's modulation now, onto its players.
+     * @param[in] s  the note's slot
+     */
     void modNote(int s);
     /** @brief One player on one note: his lips, his bore, his ear. */
     struct Player {

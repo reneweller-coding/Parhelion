@@ -1,6 +1,7 @@
 /**
  * @file Timpani.cpp
  * @brief The timpani (Timpani.h).
+ * @author Rene Weller
  */
 #include "parh/synth/Timpani.h"
 #include "parh/Params.h"
@@ -71,14 +72,22 @@ struct ModeTable {
     }
 };
 
-/** @brief The mode table, built on first use. */
+/**
+ * @brief The mode table, built on first use.
+ * @return the mode table
+ */
 const ModeTable& table()
 {
     static const ModeTable t;
     return t;
 }
 
-/** @brief J_m(x), the Bessel function of the first kind, by its series (x < 12 here). */
+/**
+ * @brief J_m(x), the Bessel function of the first kind, by its series (x < 12 here).
+ * @param[in] m  the order
+ * @param[in] x  the argument, below 12
+ * @return J_m(x)
+ */
 double besselJ(int m, double x)
 {
     double term = 1.0;

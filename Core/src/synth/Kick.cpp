@@ -3,6 +3,7 @@
  * @brief Kick drum implementation.
  * @note Adapted from Phosphene `Core/src/Kick.cpp` at 76f7100 (27.09.2026); see Kick.h for what is new.
  * @note Copied from Totality `Core/src/synth/Kick.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/synth/Kick.h"
 #include "parh/Params.h"
@@ -19,10 +20,19 @@ constexpr float ClickGain = 4.0f;            ///< gain of the click layer at Cli
 constexpr float DipQ = 0.8f;                 ///< the EQ dip's quality: broad, "-3 dB at 500 Hz, wide" (Dok. 3)
 constexpr float Sqrt2 = 1.41421356f;   ///< sqrt 2
 
-/** @brief Drive knob to saturator gain. */
+/**
+ * @brief Drive knob to saturator gain.
+ * @param[in] drive  the drive knob, 0..1
+ * @return the saturator's gain
+ */
 float driveGain(float drive) { return 0.2f + 7.8f * drive; }
 
-/** @brief Small-signal gain of the normalised saturator relative to full scale, in dB. */
+/**
+ * @brief Small-signal gain of the normalised saturator relative to full scale, in dB.
+ * @param[in] drive  the drive knob, 0..1
+ * @param[in] clip   the clip type
+ * @return the small-signal gain against full scale, in dB
+ */
 double saturationLiftDb(float drive, int clip)
 {
     const double g = driveGain(drive);
@@ -30,14 +40,26 @@ double saturationLiftDb(float drive, int clip)
     return 20.0 * std::log10(g > 1.0 ? g : 1.0);
 }
 
-/** @brief A triangle whose fundamental is in phase with sin(2 pi phi): 0 at phi = 0, rising to 1 at a quarter. */
+/**
+ * @brief A triangle whose fundamental is in phase with sin(2 pi phi): 0 at phi = 0, rising to 1 at a quarter.
+ * @param[in] phi  the phase in cycles
+ * @return the triangle's value
+ */
 inline double triangle(double phi)
 {
     const double u = phi + 0.25 - std::floor(phi + 0.25);
     return 1.0 - 4.0 * std::fabs(u - 0.5);
 }
 
-/** @brief Phase in radians of the trapezoidal SVF's band pass (normalised by k) at @p w, for corner @p fc and damping @p k. */
+/**
+ * @brief Phase in radians of the trapezoidal SVF's band pass (normalised by k) at @p w, for corner @p fc and damping @p
+ *        k.
+ * @param[in] w   the frequency in Hz
+ * @param[in] fc  the corner in Hz
+ * @param[in] k   the damping
+ * @param[in] sr  the sample rate in Hz
+ * @return the band pass's normalised response there
+ */
 std::complex<double> svfBandNorm(double w, double fc, double k, double sr)
 {
     const double x = std::tan(0.5 * w) / std::tan(PiD * std::min(fc, 0.45 * sr) / sr);

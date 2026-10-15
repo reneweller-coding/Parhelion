@@ -2,6 +2,7 @@
  * @file Memo.cpp
  * @brief The memorisation gate (Memo.h); the hash is the one of Tools/corpus/memorisation.py (FNV-1a 64 over the bytes
  *        onset, interval + 128).
+ * @author Rene Weller
  */
 #include "parh/compose/Memo.h"
 #include <algorithm>

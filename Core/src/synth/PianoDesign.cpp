@@ -2,6 +2,7 @@
  * @file PianoDesign.cpp
  * @brief The physical piano's design (PianoDesign.h): the data sheet, the soundboard by Rayleigh-Ritz, the bridge
  *        admittance, the coupled strings, the hammers.
+ * @author Rene Weller
  */
 #include "parh/synth/PianoDesign.h"
 #include "parh/Dsp.h"
@@ -32,7 +33,12 @@ using PtT = std::array<double, 2>;   ///< A point of the plate, m (x across the 
 
 // ------------------------------------------------------------------------------------------------ linear algebra
 
-/** @brief Cholesky in place: the lower triangle of @p a (n x n, row-major) becomes L with A = L L^T. */
+/**
+ * @brief Cholesky in place: the lower triangle of @p a (n x n, row-major) becomes L with A = L L^T.
+ * @param[in,out] a  the matrix, replaced by L
+ * @param[in]     n  its size
+ * @return false when it is not positive definite
+ */
 bool cholesky(std::vector<double>& a, int n)
 {
     for (int j = 0; j < n; ++j) {
@@ -51,7 +57,12 @@ bool cholesky(std::vector<double>& a, int n)
     return true;
 }
 
-/** @brief Solves L X = B for every column of @p b (n x n, row-major) in place, L lower triangular. */
+/**
+ * @brief Solves L X = B for every column of @p b (n x n, row-major) in place, L lower triangular.
+ * @param[in]     l  the lower triangular matrix
+ * @param[in,out] b  the right-hand sides, replaced by the solution
+ * @param[in]     n  the size
+ */
 void forwardSolve(const std::vector<double>& l, std::vector<double>& b, int n)
 {
     for (int c = 0; c < n; ++c)
@@ -66,6 +77,9 @@ void forwardSolve(const std::vector<double>& l, std::vector<double>& b, int n)
  * @brief Eigenvalues and eigenvectors of a symmetric matrix: Householder tridiagonalisation and the implicit QL
  *        method (the EISPACK routines tred2 and tql2 as JAMA gives them). @p v holds the matrix on entry (row-major)
  *        and the eigenvectors in its columns on exit; @p d the eigenvalues, ascending.
+ * @param[in,out] v  the matrix, replaced by the eigenvectors
+ * @param[in]     n  its size
+ * @param[out]    d  the eigenvalues
  */
 void symmetricEigen(std::vector<double>& v, int n, std::vector<double>& d)
 {
@@ -232,7 +246,13 @@ struct PlateModes {
     double m_b = 1.0;   ///< the rectangle along the grain, m
     int m_nx = 0;   ///< basis functions across the grain
     int m_ny = 0;   ///< basis functions along the grain
-    /** @brief Mode @p m's displacement at (x, y). */
+    /**
+     * @brief Mode @p m's displacement at (x, y).
+     * @param[in] m  the mode
+     * @param[in] x  the x coordinate
+     * @param[in] y  the y coordinate
+     * @return the displacement
+     */
     double shape(int m, double x, double y) const
     {
         double s = 0.0;
@@ -244,7 +264,13 @@ struct PlateModes {
     }
 };
 
-/** @brief Whether the point (@p x, @p y) lies inside @p poly. */
+/**
+ * @brief Whether the point (@p x, @p y) lies inside @p poly.
+ * @param[in] poly  the polygon
+ * @param[in] x     the point's x
+ * @param[in] y     the point's y
+ * @return true when inside
+ */
 bool insidePolygon(const std::vector<PtT>& poly, double x, double y)
 {
     bool in = false;
@@ -255,7 +281,13 @@ bool insidePolygon(const std::vector<PtT>& poly, double x, double y)
     return in;
 }
 
-/** @brief Points every @p ds along a polyline, with the unit tangent there. */
+/**
+ * @brief Points every @p ds along a polyline, with the unit tangent there.
+ * @param[in] pts     the polyline
+ * @param[in] ds      the spacing
+ * @param[in] closed  true for a closed polyline
+ * @return (x, y, tangent x, tangent y) per point
+ */
 std::vector<std::array<double, 4>> samplePolyline(const std::vector<PtT>& pts, double ds, bool closed)
 {
     std::vector<std::array<double, 4>> out;
@@ -273,7 +305,12 @@ std::vector<std::array<double, 4>> samplePolyline(const std::vector<PtT>& pts, d
     return out;
 }
 
-/** @brief The plate's first @p keep modes by Rayleigh-Ritz (sine basis, the beams' and the rim's energies added). */
+/**
+ * @brief The plate's first @p keep modes by Rayleigh-Ritz (sine basis, the beams' and the rim's energies added).
+ * @param[in] ps    the plate
+ * @param[in] keep  the modes kept
+ * @return the modes
+ */
 PlateModes solvePlate(const PlateSpec& ps, int keep)
 {
     const int nx = ps.m_nx, ny = ps.m_ny, N = nx * ny;
@@ -429,7 +466,11 @@ struct Instrument {
     double m_stringLoss;   ///< factor on the strings' high-frequency losses
 };
 
-/** @brief Instrument @p which (PianoInstrument), clamped. */
+/**
+ * @brief Instrument @p which (PianoInstrument), clamped.
+ * @param[in] which  the instrument
+ * @return the instrument
+ */
 const Instrument& instrument(int which)
 {
     static const std::vector<PtT> GrandOutline = { { 0, 0 }, { 1, 0 }, { 1, 0.12 }, { 0.93, 0.35 }, { 0.8, 0.55 }, { 0.62, 0.72 },
@@ -453,7 +494,13 @@ const Instrument& instrument(int which)
     return Instr[std::clamp(which, 0, PianoInstruments - 1)];
 }
 
-/** @brief Polyline @p p scaled from the unit square to @p w by @p d metres. */
+/**
+ * @brief Polyline @p p scaled from the unit square to @p w by @p d metres.
+ * @param[in] p  the polyline
+ * @param[in] w  the width in metres
+ * @param[in] d  the depth in metres
+ * @return the polyline scaled
+ */
 std::vector<PtT> scaled(const std::vector<PtT>& p, double w, double d)
 {
     std::vector<PtT> o;
@@ -461,7 +508,12 @@ std::vector<PtT> scaled(const std::vector<PtT>& p, double w, double d)
     return o;
 }
 
-/** @brief The point at arc parameter @p t (0 .. 1) of a polyline. */
+/**
+ * @brief The point at arc parameter @p t (0 .. 1) of a polyline.
+ * @param[in] p  the polyline
+ * @param[in] t  the arc parameter, 0..1
+ * @return the point
+ */
 PtT alongPolyline(const std::vector<PtT>& p, double t)
 {
     double total = 0.0;
@@ -478,7 +530,11 @@ PtT alongPolyline(const std::vector<PtT>& p, double t)
     return p.back();
 }
 
-/** @brief The length of polyline @p p. */
+/**
+ * @brief The length of polyline @p p.
+ * @param[in] p  the polyline
+ * @return its length
+ */
 double polylineLength(const std::vector<PtT>& p)
 {
     double total = 0.0;
@@ -486,7 +542,11 @@ double polylineLength(const std::vector<PtT>& p)
     return total;
 }
 
-/** @brief The board of an instrument: the plate's modes, cached (it does not depend on the knobs). */
+/**
+ * @brief The board of an instrument: the plate's modes, cached (it does not depend on the knobs).
+ * @param[in] which  the instrument
+ * @return the plate's modes
+ */
 const PlateModes& boardModes(int which)
 {
     static std::mutex mtx;
@@ -515,7 +575,12 @@ const PlateModes& boardModes(int which)
 
 // ------------------------------------------------------------------------------------------------ the scale
 
-/** @brief Piecewise-linear interpolation over key indices (0 .. 87). */
+/**
+ * @brief Piecewise-linear interpolation over key indices (0 .. 87).
+ * @param[in] key  the key index, 0..87
+ * @param[in] pts  the (key, value) points
+ * @return the value at the key
+ */
 double overKeys(double key, std::initializer_list<std::pair<double, double>> pts)
 {
     const auto* b = pts.begin();
@@ -535,7 +600,11 @@ double overKeys(double key, std::initializer_list<std::pair<double, double>> pts
 constexpr double SteelE = 2.0e11;   ///< steel's Young's modulus, Pa
 constexpr double SteelRho = 7850.0;   ///< steel's density, kg/m^3
 
-/** @brief The strings' data of every key (length, wire, tension, B) before the tuning. */
+/**
+ * @brief The strings' data of every key (length, wire, tension, B) before the tuning.
+ * @param[in,out] d    the design
+ * @param[in]     ins  the instrument
+ */
 void scaleStrings(PianoDesign& d, const Instrument& ins)
 {
     for (int k = 0; k < PianoKeys; ++k) {
@@ -587,6 +656,7 @@ void scaleStrings(PianoDesign& d, const Instrument& ins)
  * @brief The stretched tuning from the inharmonicity (PianoDesign.h): the fundamentals f0 of the ideal strings. A3 to A4
  *        equal-tempered; above, a note's first partial on the second of the note an octave under it; below, a note's
  *        fourth partial on the second of the note an octave above it (the sixth on the third in the lowest octave).
+ * @param[in,out] d  the design
  */
 void tune(PianoDesign& d)
 {
@@ -624,7 +694,13 @@ void tune(PianoDesign& d)
 
 // ------------------------------------------------------------------------------------------------ the board
 
-/** @brief The admittance at a point given its mode shapes (the modal sum plus the ribbed plate above the modes). */
+/**
+ * @brief The admittance at a point given its mode shapes (the modal sum plus the ribbed plate above the modes).
+ * @param[in] b      the board
+ * @param[in] shape  the point's mode shapes
+ * @param[in] hz     the frequency
+ * @return the admittance in s/kg
+ */
 cd admittanceAt(const PianoBoard& b, const float* shape, double hz)
 {
     const double w = 2.0 * PiD * hz;
@@ -642,6 +718,10 @@ cd admittanceAt(const PianoBoard& b, const float* shape, double hz)
 /**
  * @brief The board of @p d: its modes from @p pm, their shapes at the regions, the listening points and the keys' bridge
  *        points, the high bank (@p seed: its spread).
+ * @param[in,out] d     the design
+ * @param[in]     ins   the instrument
+ * @param[in]     pm    the plate's modes
+ * @param[in]     seed  the high bank's spread
  */
 void designBoard(PianoDesign& d, const Instrument& ins, const PlateModes& pm, uint64_t seed)
 {
@@ -743,7 +823,13 @@ void designBoard(PianoDesign& d, const Instrument& ins, const PlateModes& pm, ui
 
 // ------------------------------------------------------------------------------------------------ the strings
 
-/** @brief The roots of prod(z - s_j) + kappa sum_j prod_(l != j)(z - s_l) (Durand-Kerner), n <= 3. */
+/**
+ * @brief The roots of prod(z - s_j) + kappa sum_j prod_(l != j)(z - s_l) (Durand-Kerner), n <= 3.
+ * @param[in]  s      the strings' poles
+ * @param[in]  n      their count, at most 3
+ * @param[in]  kappa  the coupling
+ * @param[out] roots  the roots
+ */
 void courseEigen(const cd* s, int n, cd kappa, cd* roots)
 {
     auto poly = [&](cd z) {
@@ -772,7 +858,11 @@ void courseEigen(const cd* s, int n, cd kappa, cd* roots)
     }
 }
 
-/** @brief sin(x) / x, 1 at 0. */
+/**
+ * @brief sin(x) / x, 1 at 0.
+ * @param[in] x  the argument
+ * @return sin(x) / x
+ */
 double sinc(double x) { return std::fabs(x) < 1e-9 ? 1.0 : std::sin(x) / x; }
 
 /**
@@ -780,6 +870,12 @@ double sinc(double x) { return std::fabs(x) < 1e-9 ? 1.0 : std::sin(x) / x; }
  *        holds for weak coupling; where the board's mobility peaks, string and board share the energy instead, and the
  *        partial cannot lose it faster than the board's own mode does. The course's share of the bridge's losses
  *        (N Re kappa) is held under half the board's modal decay rate at that frequency, the phase kept.
+ * @param[in] kappa       the coupling
+ * @param[in] strings     the strings of the course
+ * @param[in] hz          the frequency
+ * @param[in] ins         the instrument
+ * @param[in] lossFactor  the board's loss factor
+ * @return the coupling bounded
  */
 cd boundedCoupling(cd kappa, int strings, double hz, const Instrument& ins, double lossFactor)
 {
@@ -793,6 +889,10 @@ cd boundedCoupling(cd kappa, int strings, double hz, const Instrument& ins, doub
 /**
  * @brief Key @p k of @p d: its strings' coupled modes, its hammer, its dampers, its longitudinal and sympathetic modes (@p r:
  *        the condition's mistuning).
+ * @param[in,out] d    the design
+ * @param[in]     ins  the instrument
+ * @param[in]     k    the key
+ * @param[in,out] r    the random stream
  */
 void designKey(PianoDesign& d, const Instrument& ins, int k, Rng& r)
 {
@@ -929,7 +1029,12 @@ void designKey(PianoDesign& d, const Instrument& ins, int k, Rng& r)
     key.m_pan = static_cast<float>((key.m_midi - 64.5) / 43.5);
 }
 
-/** @brief The whole design for @p spec at @p sampleRate (designPiano caches it). */
+/**
+ * @brief The whole design for @p spec at @p sampleRate (designPiano caches it).
+ * @param[in] spec        the piano's specification
+ * @param[in] sampleRate  the sample rate
+ * @return the design
+ */
 std::shared_ptr<PianoDesign> build(const PianoSpec& spec, double sampleRate)
 {
     auto d = std::make_shared<PianoDesign>();

@@ -3,6 +3,7 @@
  * @brief The `.parhset` text form.
  * @note Copied from Ephemeris `Core/src/SetFile.cpp` (namespace eph) at d047d79 (27.09.2026).
  * @note Copied from Totality `Core/src/SetFile.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/SetFile.h"
 #include "parh/Params.h"

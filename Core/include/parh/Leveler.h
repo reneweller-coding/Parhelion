@@ -24,6 +24,7 @@
  *
  * @note After Totality `Core/include/tot/Leveler.h` at 4d3c0d2 (29.09.2026), which had it from Ephemeris; the windows and
  *       the breakdown's correction are Parhelion's.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Params.h"
@@ -50,8 +51,10 @@ struct LevelReading {
 
 /**
  * @brief Measures every track of @p score (its LevelMarks) with the knobs of @p params and sets their corrections.
- * @param seconds how much of each loudest part is measured
- * @param stop    asked between blocks: true breaks off, and @p score is left as it was
+ * @param[in,out] score    the score; its marks receive the corrections
+ * @param[in]     params   the knobs
+ * @param[in]     seconds  how much of each loudest part is measured
+ * @param[in]     stop     asked between blocks: true breaks off, and @p score is left as it was
  * @return what was found, a reading per track (nothing if broken off)
  */
 std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, double seconds = 20.0,
@@ -61,6 +64,11 @@ std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, dou
  * @brief Every track of a set (Phase 6, the plugin: a set plays at once and its corrections glide in): deck A's and deck
  *        B's scores levelled as levelScore does, and the teases on deck C given their source's corrections (their marks
  *        have no target of their own, only the source's peak).
+ * @param[in,out] set      the set; its decks' marks receive the corrections
+ * @param[in]     params   the knobs
+ * @param[in]     seconds  how much of each loudest part is measured
+ * @param[in]     stop     asked between blocks: true breaks off
+ * @return the readings of decks A and B, in deck order
  * @note After Totality `Core/src/Leveler.cpp` (levelSet) at 4d3c0d2 (29.09.2026).
  */
 std::vector<LevelReading> levelSet(SetScore& set, const ParamStore& params, double seconds = 20.0,
@@ -69,6 +77,10 @@ std::vector<LevelReading> levelSet(SetScore& set, const ParamStore& params, doub
 /**
  * @brief The window of part @p part's loudest sample against the kick's, dB; a lane (0 .. 11) by its @p role (PercRole),
  *        a voice (BalPart) by itself.
+ * @param[in]  part  the part
+ * @param[in]  role  the lane's role
+ * @param[out] lo    the window's low end, dB
+ * @param[out] hi    its high end, dB
  */
 void balanceWindow(int part, int role, float& lo, float& hi);
 

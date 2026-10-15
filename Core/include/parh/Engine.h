@@ -18,6 +18,7 @@
  *
  * **Loading** allocates and must not run on the audio thread (as in Ephemeris).
  * @note Copied from Totality `Core/include/tot/Engine.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Cue.h"
@@ -45,67 +46,131 @@ public:
                       STEM_ARP, STEM_PAD, STEM_STAB, STEM_PIANO, STEM_STRINGS, STEM_CHOIR, STEM_BRASS, STEM_TIMPANI, STEM_ROOM,
                       STEM_PLATE, STEM_HALL, STEM_CLOUD, STEM_FX, STEM_MIX_FX, STEMS };
     static_assert(static_cast<int>(STEM_MIX_FX) == static_cast<int>(Deck::STEMS), "the stems are the deck's and the mixer's");
-    /** @brief Name of stem @p s. */
+    /**
+     * @brief Name of stem @p s.
+     * @param[in] s  the stem
+     * @return its name
+     */
     static const char* stemName(int s);
     /** @brief The raster the parameters and the automation are read on, in samples. */
     static constexpr int Raster = Deck::Raster;
 
-    /** @brief The parameters; any thread may write them. */
+    /**
+     * @brief The parameters; any thread may write them.
+     * @return the parameters
+     */
     ParamStore& params() { return m_params; }
-    /** @brief The parameters, read-only. */
+    /**
+     * @brief The parameters, read-only.
+     * @return the parameters
+     */
     const ParamStore& params() const { return m_params; }
-    /** @brief Sets the sample rate and the largest block; call before load(). */
+    /**
+     * @brief Sets the sample rate and the largest block; call before load().
+     * @param[in] sampleRate  the sample rate in Hz
+     * @param[in] maxBlock    the largest block process() will be asked for
+     * @pre called before load()
+     */
     void prepare(double sampleRate, int maxBlock);
-    /** @brief Plays a track on deck A (not from the audio thread) and returns to its start. */
+    /**
+     * @brief Plays a track on deck A (not from the audio thread) and returns to its start.
+     * @param[in] score  the track
+     * @pre not called on the audio thread
+     */
     void load(const Score& score);
-    /** @brief Plays a set on the three decks (not from the audio thread) and returns to its start. */
+    /**
+     * @brief Plays a set on the three decks (not from the audio thread) and returns to its start.
+     * @param[in] set  the set
+     * @pre not called on the audio thread
+     */
     void loadSet(const SetScore& set);
     /**
      * @brief Renders @p n samples into @p L and @p R (overwritten) and advances the position.
+     * @param[out] L  receives the left channel (overwritten)
+     * @param[out] R  receives the right channel (overwritten)
+     * @param[in]  n  how many samples
      * @return false once the position has passed the end (the tails still ring)
      */
     bool process(float* L, float* R, int n);
-    /** @brief Jumps to @p beat: every voice falls silent, the next note and curve are found again. */
+    /**
+     * @brief Jumps to @p beat: every voice falls silent, the next note and curve are found again.
+     * @param[in] beat  the position to jump to, in beats
+     */
     void seek(double beat);
-    /** @brief The score deck A plays (the track). */
+    /**
+     * @brief The score deck A plays (the track).
+     * @return the score deck A plays
+     */
     const Score& score() const { return m_decks[0].score(); }
-    /** @brief Current position in seconds. */
+    /**
+     * @brief Current position in seconds.
+     * @return the current position in seconds
+     */
     double seconds() const { return static_cast<double>(m_sample) / m_sampleRate; }
-    /** @brief Current position in samples (Handover.h: two engines meet on it). */
+    /**
+     * @brief Current position in samples (Handover.h: two engines meet on it).
+     * @return the current position in samples
+     */
     int64_t samplePosition() const { return m_sample; }
-    /** @brief Every deck writes the composer notes it plays into @p tap from now on (null: stops; MIDI out, 02.10.2026). */
+    /**
+     * @brief Every deck writes the composer notes it plays into @p tap from now on (null: stops; MIDI out, 02.10.2026).
+     * @param[out] tap  where the notes go, null to stop
+     */
     void setNoteTap(NoteTap* tap) { for (Deck& d : m_decks) d.setNoteTap(tap); }
     /**
      * @brief The family jam (02.10.2026, the plugin's Jam.h), live only: the pitched parts @p transpose semitones away,
      *        the leader's @p energy (0..1; negative: none) as a darker master filter while its knob rests, and with
      *        @p rhythmOut the kick, the sub and the bass out for the leader's break.
+     * @param[in] transpose  semitones the pitched parts move
+     * @param[in] energy     the leader's energy, 0..1; negative for none
+     * @param[in] rhythmOut  true to leave out the rhythm's foundation
      */
     void setJam(int transpose, float energy, bool rhythmOut)
     {
         for (Deck& d : m_decks) d.setJam(transpose, rhythmOut);
         m_jamEnergy = energy;
     }
-    /** @brief Current position in beats. */
+    /**
+     * @brief Current position in beats.
+     * @return the current position in beats
+     */
     double beat() const { return m_tempo.beatAt(seconds()); }
-    /** @brief Length of the track or set in seconds. */
+    /**
+     * @brief Length of the track or set in seconds.
+     * @return the length of the track or set in seconds
+     */
     double lengthSeconds() const { return m_tempo.secondsAt(m_lengthBeats); }
-    /** @brief Sample rate set by prepare(). */
+    /**
+     * @brief Sample rate set by prepare().
+     * @return the sample rate in Hz
+     */
     double sampleRate() const { return m_sampleRate; }
-    /** @brief The value of parameter @p id as deck A plays it: the knob plus its score's automation. */
+    /**
+     * @brief The value of parameter @p id as deck A plays it: the knob plus its score's automation.
+     * @param[in] id  the parameter
+     * @return its value as deck A plays it
+     */
     float played(int id) const { return m_decks[0].played(id); }
     /**
      * @brief Stems: from now on every process() call also writes the stems (Stem) into @p left[s] and @p right[s], each
      *        at least the block long. Null switches them off. Set them before the first sample: each stem runs through
      *        copies of the filters it passes, which start from silence.
+     * @param[in] left   per stem its left channel buffer, null to switch the stems off
+     * @param[in] right  per stem its right channel buffer
      */
     void setStems(float* const* left, float* const* right) { m_stemL = left; m_stemR = right; }
-    /** @brief The mix as it enters the master into @p left and @p right on every process() call (the stems' sum; for the
-     *         tests). Null switches it off. */
+    /**
+     * @brief The mix as it enters the master into @p left and @p right on every process() call (the stems' sum; for the
+     *         tests). Null switches it off.
+     * @param[in,out] left   the left buffer, null to switch the tap off
+     * @param[in,out] right  the right buffer
+     */
     void setPremasterTap(float* left, float* right) { m_preL = left; m_preR = right; }
     /**
      * @brief Live play (the plugin; before load): the mixer is in the path of a single track too, and the perform module
      *        acts -- the mutes, the master filter, the echo throw into the mixer's echo. Off (renders, exports, the
      *        default): the score plays as it was composed, and the stems sum to the mix.
+     * @param[in] on  true for live play
      */
     void setLive(bool on);
     /**
@@ -117,10 +182,19 @@ public:
     /**
      * @brief Queues a key for the next process() call, @p offset samples into it: it is played on that sample. The
      *        rendering thread, before process().
-     * @param pitch MIDI note; @param velocity 1..127; @param channel 0..15 (by channel); @param on false: its release
+     * @param[in] offset    the sample within the next block the key is played at
+     * @param[in] pitch     MIDI note;
+     * @param[in] velocity  1..127;
+     * @param[in] channel   0..15 (by channel);
+     * @param[in] on        false: its release
+     * @param[in] target    the perform::keys value it plays, -1 for the keyboard part of its channel
      */
     void queueLive(int offset, int pitch, int velocity, int channel, bool on, int target = -1);
-    /** @brief The target a key on @p channel plays when it names none (perform.keyboard_part; perform::keys). */
+    /**
+     * @brief The target a key on @p channel plays when it names none (perform.keyboard_part; perform::keys).
+     * @param[in] channel  the MIDI channel
+     * @return the target its keys play (perform::keys)
+     */
     int keyTargetFor(int channel) const { return keyboardTarget(channel); }
     /** @brief Releases every played key and forgets the queued ones (a stop, another keyboard target). */
     void liveAllOff();
@@ -128,39 +202,85 @@ public:
     /** @brief How much the engine does: all of it (the desktop, the default), or the Quest's share (PLAN 10: fewer unison
      *         oscillators and voices, Deck::setQuest). */
     enum class QualityE { DESKTOP, QUEST };
-    /** @brief Sets the quality (before load; any time is safe, the cloud's tail is cut). */
+    /**
+     * @brief Sets the quality (before load; any time is safe, the cloud's tail is cut).
+     * @param[in] q  the quality
+     */
     void setQuality(QualityE q) { for (Deck& d : m_decks) d.setQuest(q == QualityE::QUEST); }
     /**
      * @brief Counts the times the engine wrote a track's knob settings onto the knobs (Score::knobs): a track began on
      *        deck A or B, or a jump landed in another. The knobs then show that track's sounds and mix -- its presets,
      *        its style's settings -- and every deck plays from its own track's values, moved by as much as a hand turns
      *        a knob away from what was written on it. The plugin tells the host when the count changes.
+     * @return how many times a track's knob settings were written onto the knobs
      */
     uint32_t soundsVersion() const { return m_soundsVersion.load(std::memory_order_relaxed); }
-    /** @brief The deck whose track's knob settings the knobs show, -1 before any. */
+    /**
+     * @brief The deck whose track's knob settings the knobs show, -1 before any.
+     * @return the deck whose knob settings the knobs show, -1 before any
+     */
     int leadDeck() const { return m_lead.load(std::memory_order_relaxed); }
-    /** @brief The cue marks of what is loaded (Cue.h: blocks, operations, keys, a set's tracks), for CueTap::scan(). */
+    /**
+     * @brief The cue marks of what is loaded (Cue.h: blocks, operations, keys, a set's tracks), for CueTap::scan().
+     * @return the cue marks of what is loaded
+     */
     const std::vector<CueMark>& cueMarks() const { return m_cueMarks; }
-    /** @brief Deck taps: from now on every process() call also writes each deck after its mixer channel (before the
-     *         effects and the master) into @p left[d] and @p right[d]. Null switches them off. */
+    /**
+     * @brief Deck taps: from now on every process() call also writes each deck after its mixer channel (before the
+     *         effects and the master) into @p left[d] and @p right[d]. Null switches them off.
+     * @param[in] left   per deck its left channel buffer, null to switch the taps off
+     * @param[in] right  per deck its right channel buffer
+     */
     void setDeckTaps(float* const* left, float* const* right) { m_tapL = left; m_tapR = right; }
-    /** @brief The loudness corrections of deck A's tracks (a trim per LevelMark), found after they began; they glide in. */
+    /**
+     * @brief The loudness corrections of deck A's tracks (a trim per LevelMark), found after they began; they glide in.
+     * @param[in] trims  one loudness trim per LevelMark of deck A's score
+     */
     void setLevelTrims(const std::vector<float>& trims) { m_decks[0].setLevelTrims(trims); }
-    /** @brief The same for deck @p d. */
+    /**
+     * @brief The same for deck @p d.
+     * @param[in] d      the deck
+     * @param[in] trims  one loudness trim per LevelMark of its score
+     */
     void setLevelTrims(int d, const std::vector<float>& trims) { m_decks[d].setLevelTrims(trims); }
-    /** @brief Phase 18: the parts' corrections of deck @p d's tracks (one per LevelMark), found after they began. */
+    /**
+     * @brief Phase 18: the parts' corrections of deck @p d's tracks (one per LevelMark), found after they began.
+     * @param[in] d    the deck
+     * @param[in] bal  one set of part corrections per LevelMark of its score
+     */
     void setLevelBalance(int d, const std::vector<BalanceDbT>& bal) { m_decks[d].setLevelBalance(bal); }
-    /** @brief Phase 18: every deck keeps its parts' loudest samples from now on (Deck::watchPeaks), or stops. */
+    /**
+     * @brief Phase 18: every deck keeps its parts' loudest samples from now on (Deck::watchPeaks), or stops.
+     * @param[in] on  true to keep the peaks, false to stop
+     */
     void watchPeaks(bool on) { for (Deck& d : m_decks) d.watchPeaks(on); }
-    /** @brief The mixer page's strip meters: every deck adds into @p sink from now on (null: stops). */
+    /**
+     * @brief The mixer page's strip meters: every deck adds into @p sink from now on (null: stops).
+     * @param[out] sink  where the strips' levels go, null to stop
+     */
     void setMeterSink(MeterSink* sink) { for (Deck& d : m_decks) d.setMeterSink(sink); }
-    /** @brief Deck @p d (0 .. 2). */
+    /**
+     * @brief Deck @p d (0 .. 2).
+     * @param[in] d  the deck, 0 .. 2
+     * @return the deck
+     */
     const Deck& deck(int d) const { return m_decks[d]; }
-    /** @brief The kick of deck A (for the tests). */
+    /**
+     * @brief The kick of deck A (for the tests).
+     * @return deck A's kick
+     */
     const Kick& kick() const { return m_decks[0].kick(); }
-    /** @brief The isolator's low band gain of deck @p d at the current sample, 0..1 (for the tests). */
+    /**
+     * @brief The isolator's low band gain of deck @p d at the current sample, 0..1 (for the tests).
+     * @param[in] d  the deck
+     * @return its isolator's low band gain at the current sample, 0..1
+     */
     float lowGain(int d) const { return m_ch[d].m_g[0]; }
-    /** @brief Whether deck @p d plays at the current sample (for the tests). */
+    /**
+     * @brief Whether deck @p d plays at the current sample (for the tests).
+     * @param[in] d  the deck
+     * @return true when it plays at the current sample
+     */
     bool deckPlays(int d) const { return m_playing[d]; }
 
 private:
@@ -173,11 +293,20 @@ private:
         Svf m_mid2;   ///< its low pass again
         Svf m_top2;   ///< its high pass again
         Svf m_ap;   ///< the 2.5 kHz allpass the low band goes through
-        /** @brief Tunes the crossovers for sample rate @p fs. */
+        /**
+         * @brief Tunes the crossovers for sample rate @p fs.
+         * @param[in] fs  the sample rate in Hz
+         */
         void set(float fs);
         /** @brief Silence: every filter state cleared. */
         void reset();
-        /** @brief Splits sample @p x into @p low (in phase with the others), @p mid and @p top. */
+        /**
+         * @brief Splits sample @p x into @p low (in phase with the others), @p mid and @p top.
+         * @param[in]  x    the input sample
+         * @param[out] low  receives the low band
+         * @param[out] mid  receives the middle band
+         * @param[out] top  receives the top band
+         */
         void process(float x, float& low, float& mid, float& top);
     };
     /** @brief A mixer channel. */
@@ -201,9 +330,18 @@ private:
 
     /** @brief Reads the knobs and the automation for the next raster cell: the mixer, its effects, the master. */
     void updateCell();
-    /** @brief Mixes the decks' blocks through their channels and the mixer's effects into @p L and @p R (@p n samples). */
+    /**
+     * @brief Mixes the decks' blocks through their channels and the mixer's effects into @p L and @p R (@p n samples).
+     * @param[out] L  receives the left channel
+     * @param[out] R  receives the right channel
+     * @param[in]  n  how many samples
+     */
     void mix(float* L, float* R, int n);
-    /** @brief The value of parameter @p id as the set plays it: the knob plus the set's own automation. */
+    /**
+     * @brief The value of parameter @p id as the set plays it: the knob plus the set's own automation.
+     * @param[in] id  the parameter
+     * @return its value as the set plays it
+     */
     float setPlayed(int id) const;
 
     ParamStore m_params;   ///< the knobs
@@ -262,7 +400,10 @@ private:
     std::atomic<int> m_lead{ -1 };   ///< the deck whose knob settings the knobs show, -1 before any
     double m_leadGroup = -1.0;   ///< the beat of the lead deck's knob settings last shown, -1 before any
     std::atomic<uint32_t> m_soundsVersion{ 0 };   ///< how often knob settings were written onto the knobs
-    /** @brief Puts deck @p d's knob settings on the knobs. */
+    /**
+     * @brief Puts deck @p d's knob settings on the knobs.
+     * @param[in] d  the deck
+     */
     void showKnobs(int d);
     /// Live play (setLive).
     bool m_live = false;
@@ -280,9 +421,22 @@ private:
     int m_liveCursor = 0;   ///< index of the next queued key not yet played
     uint8_t m_liveTarget[128] = {};   ///< per key: the target it plays + 1 (0: not held)
     uint8_t m_liveDeck[128] = {};     ///< per key: the deck it plays on
-    int keyboardTarget(int channel) const;   ///< perform.keyboard_part for a key on @p channel (perform::keys; Off: none)
-    void playLive(const LiveKey& k);          ///< a queued key, now
-    void releaseLive(int pitch);              ///< the key @p pitch, wherever it plays
+    /**
+     * perform.keyboard_part for a key on @p channel (perform::keys; Off: none)
+     * @param[in] channel  the MIDI channel
+     * @return the target a key there plays (perform::keys), Off for none
+     */
+    int keyboardTarget(int channel) const;
+    /**
+     * a queued key, now
+     * @param[in] k  the queued key
+     */
+    void playLive(const LiveKey& k);
+    /**
+     * the key @p pitch, wherever it plays
+     * @param[in] pitch  the MIDI note of the key
+     */
+    void releaseLive(int pitch);
     float m_perfFilter = 0.0f;   ///< perform.filter as read at the cell: -1 low pass .. 1 high pass
     float m_jamEnergy = -1.0f;   ///< the family jam's energy (setJam); negative: no leader
     float m_jamFilter = 0.0f;    ///< the master filter the jam's energy asks for, glided (updateCell)

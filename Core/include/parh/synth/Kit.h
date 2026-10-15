@@ -28,6 +28,7 @@
  * @note Adapted from Phosphene `Core/include/phos/Perc.h` and `Core/src/Perc.cpp` at 76f7100 (27.09.2026): roles,
  *       lane outputs and the metal table are Totality's; the coefficients, triggers and the kernel are Phosphene's.
  * @note Copied from Totality `Core/include/tot/synth/Kit.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -47,54 +48,98 @@ public:
     static constexpr int Stride = PercLaneSlots;   ///< the lane outputs' stride: sample i of lane l is at i * Stride + l
     static constexpr double MetalRate = 48000.0;    ///< the metal table's own sample rate
 
-    /** @brief Prepares for a sample rate (and builds the metal table). */
+    /**
+     * @brief Prepares for a sample rate (and builds the metal table).
+     * @param[in] sampleRate  the sample rate in Hz
+     */
     void prepare(double sampleRate);
     /** @brief Silences every lane and clears all state. */
     void reset();
     /**
      * @brief Reads one lane's effective parameters.
-     * @param lane    0..11
-     * @param v       values indexed by perc::
-     * @param keyRoot pitch class of the key, for Tune to Key
-     * @param scale   compose.scale, for Tune to Key
+     * @param[in] lane     0..11
+     * @param[in] v        values indexed by perc::
+     * @param[in] keyRoot  pitch class of the key, for Tune to Key
+     * @param[in] scale    compose.scale, for Tune to Key
      */
     void update(int lane, const float* v, int keyRoot, int scale);
-    /** @brief The tempo, the time base of the auto-pan. */
+    /**
+     * @brief The tempo, the time base of the auto-pan.
+     * @param[in] bpm  the tempo in beats per minute
+     */
     void setTempo(double bpm);
     /**
      * @brief Starts a hit.
-     * @param lane     0..11
-     * @param velocity 0..1
-     * @param shift    pitch shift in semitones
-     * @param late     how many samples ago the hit ideally started (0 <= late < 1)
+     * @param[in] lane      0..11
+     * @param[in] velocity  0..1
+     * @param[in] shift     pitch shift in semitones
+     * @param[in] late      how many samples ago the hit ideally started (0 <= late < 1)
      */
     void trigger(int lane, float velocity, int shift, double late);
     /**
      * @brief Renders @p n samples (n <= MaxBlock) of every lane; read them with laneL() and laneR().
+     * @param[in] n  how many samples, at most MaxBlock
      */
     void processLanes(int n);
-    /** @brief Renders with a chosen lane type (float = scalar reference), for the vector tests. */
+    /**
+     * @brief Renders with a chosen lane type (float = scalar reference), for the vector tests.
+     * @param[in] n  how many samples, at most MaxBlock
+     */
     template <class VT> void processLanesWith(int n);
-    /** @brief Lane outputs of the last processLanes(), left: sample i of lane l at [i * Stride + l]. */
+    /**
+     * @brief Lane outputs of the last processLanes(), left: sample i of lane l at [i * Stride + l].
+     * @return the left lane outputs, sample i of lane l at [i * Stride + l]
+     */
     const float* laneL() const { return m_outL.data(); }
-    /** @brief Lane outputs of the last processLanes(), right. */
+    /**
+     * @brief Lane outputs of the last processLanes(), right.
+     * @return the right lane outputs, laid out as laneL()'s
+     */
     const float* laneR() const { return m_outR.data(); }
-    /** @brief Renders @p n samples of all lanes summed (any length), replacing @p L and @p R. */
+    /**
+     * @brief Renders @p n samples of all lanes summed (any length), replacing @p L and @p R.
+     * @param[out] L  receives the left sum (replaced)
+     * @param[out] R  receives the right sum (replaced)
+     * @param[in]  n  how many samples
+     */
     void process(float* L, float* R, int n);
 
-    /** @brief Role of a lane as last updated. */
+    /**
+     * @brief Role of a lane as last updated.
+     * @param[in] lane  the lane
+     * @return its role as last updated
+     */
     PercRoleE role(int lane) const { return static_cast<PercRoleE>(m_role[lane]); }
-    /** @brief Frequency a lane's tone and modes are tuned to (after Tune to Key, before a hit's shift). */
+    /**
+     * @brief Frequency a lane's tone and modes are tuned to (after Tune to Key, before a hit's shift).
+     * @param[in] lane  the lane
+     * @return the frequency its tone and modes are tuned to, in Hz
+     */
     double laneHz(int lane) const { return m_tunedHz[lane]; }
-    /** @brief Nearest note of the key and scale to @p hz, as a frequency. */
+    /**
+     * @brief Nearest note of the key and scale to @p hz, as a frequency.
+     * @param[in] hz       the frequency in Hz
+     * @param[in] keyRoot  the key's root, 0 .. 11
+     * @param[in] scale    the scale
+     * @return the nearest note of the key and scale, in Hz
+     */
     static double tuneToScale(double hz, int keyRoot, int scale);
-    /** @brief The metal table (for the tests). */
+    /**
+     * @brief The metal table (for the tests).
+     * @return the metal table
+     */
     const std::vector<float>& metalTable() const { return m_metal; }
 
 private:
-    /** @brief Computes lane @p lane's coefficients from its values (and its shift). */
+    /**
+     * @brief Computes lane @p lane's coefficients from its values (and its shift).
+     * @param[in] lane  the lane
+     */
     void computeCoefs(int lane);
-    /** @brief Sets lane @p lane's auto-pan rate from its period in bars and the tempo. */
+    /**
+     * @brief Sets lane @p lane's auto-pan rate from its period in bars and the tempo.
+     * @param[in] lane  the lane
+     */
     void updatePanRate(int lane);
     /** @brief Sets every lane's auto-pan offset and direction, so the lanes of a role move as a group. */
     void assignPanGroups();

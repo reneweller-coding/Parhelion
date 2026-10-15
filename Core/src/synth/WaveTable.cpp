@@ -2,6 +2,7 @@
  * @file WaveTable.cpp
  * @brief Table building from spectra, level choice, and the built-in psytrance pad tables.
  * @note Copied from Phosphene `Core/src/WaveTable.cpp` at 76f7100 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/synth/WaveTable.h"
 #include "parh/Fft.h"
@@ -16,7 +17,15 @@ namespace {
 using CoeffsT = std::vector<std::complex<double>>;   ///< A table frame's harmonics as complex coefficients.
 constexpr double PiD = 3.14159265358979323846;   ///< pi
 
-/** @brief One stored cycle at a level from the harmonics it keeps; writes the guards as well. */
+/**
+ * @brief One stored cycle at a level from the harmonics it keeps; writes the guards as well.
+ * @param[in]     c      the harmonics
+ * @param[in]     gain   the gain
+ * @param[in]     level  the level, the harmonics it keeps
+ * @param[in]     fft    the transform
+ * @param[in,out] buf    scratch
+ * @param[out]    out    the cycle and its guards
+ */
 void synthesise(const CoeffsT& c, double gain, int level, const Fft& fft, std::vector<std::complex<double>>& buf, float* out)
 {
     const int len = WaveTable::levelLength(level);
@@ -35,7 +44,11 @@ void synthesise(const CoeffsT& c, double gain, int level, const Fft& fft, std::v
     out[len + 1] = out[1];
 }
 
-/** @brief Scales a frame to unit RMS (Parseval: a cosine of amplitude A carries A^2 / 2). */
+/**
+ * @brief Scales a frame to unit RMS (Parseval: a cosine of amplitude A carries A^2 / 2).
+ * @param[in] c  the frames' harmonics
+ * @return the frames at the same RMS
+ */
 CoeffsT unit(CoeffsT c)
 {
     double e = 0.0;
@@ -45,9 +58,13 @@ CoeffsT unit(CoeffsT c)
     return c;
 }
 
-const std::complex<double> Sine(0.0, -1.0);   ///< sin x = cos(x - pi/2)
+const std::complex<double> Sine{0.0, -1.0};   ///< sin x = cos(x - pi/2)
 
-/** @brief Harmonic h of a rising saw, 2t - 1: -(2/pi) sum sin(2 pi h t)/h. */
+/**
+ * @brief Harmonic h of a rising saw, 2t - 1: -(2/pi) sum sin(2 pi h t)/h.
+ * @param[in] h  the harmonic, 1-based
+ * @return its complex amplitude
+ */
 std::complex<double> sawHarmonic(int h) { return Sine * (-2.0 / (PiD * h)); }
 
 /** @brief The built-in wavetables, built once on first use. */

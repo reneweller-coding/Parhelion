@@ -16,13 +16,18 @@
  * @note Copied from Phosphene `Core/include/phos/Adaa.h` at 9a2f615 (24.09.2026); namespace eph, prefix EPH_.
  * @note Copied from Ephemeris `Core/include/eph/Adaa.h` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/include/tot/Adaa.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include <cmath>
 
 namespace parh {
 
-/** @brief log(cosh(x)), the antiderivative of tanh, without overflow or cancellation. */
+/**
+ * @brief log(cosh(x)), the antiderivative of tanh, without overflow or cancellation.
+ * @param[in] x  the argument
+ * @return log(cosh(x))
+ */
 inline double logCosh(double x)
 {
     const double a = std::fabs(x);
@@ -39,7 +44,11 @@ struct TanhAdaa {
     float  m_x1 = 0.0f;   ///< previous input
     double m_f1 = 0.0;    ///< antiderivative at the previous input
 
-    /** @brief One sample; half a sample late. */
+    /**
+     * @brief One sample; half a sample late.
+     * @param[in] x  the input sample
+     * @return the shaped sample, half a sample behind the input
+     */
     float operator()(float x)
     {
         const double fx = logCosh(static_cast<double>(x));
@@ -65,10 +74,18 @@ struct HardClipAdaa {
     float  m_x1 = 0.0f;   ///< previous input
     double m_f1 = 0.0;    ///< antiderivative at the previous input
 
-    /** @brief The antiderivative of the clip. */
+    /**
+     * @brief The antiderivative of the clip.
+     * @param[in] x  the argument
+     * @return the antiderivative of the hard clip at x
+     */
     static double anti(double x) { const double a = std::fabs(x); return a <= 1.0 ? 0.5 * x * x : a - 0.5; }
 
-    /** @brief One sample; half a sample late. */
+    /**
+     * @brief One sample; half a sample late.
+     * @param[in] x  the input sample
+     * @return the clipped sample, half a sample behind the input
+     */
     float operator()(float x)
     {
         const double fx = anti(static_cast<double>(x));

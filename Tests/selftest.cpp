@@ -7,6 +7,7 @@
  * user's rule for Ephemeris, 24.09.2026).
  * @note The frame, the tempo-map, kick and block-size tests and their helpers are copied from Totality `Tests/selftest.cpp`
  *       at 4d3c0d2 (29.09.2026); the rest is Parhelion's.
+ * @author Rene Weller
  */
 #include "parh/Clock.h"
 #include "parh/Engine.h"
@@ -111,7 +112,15 @@ void testParams()
     check(same, "text form round-trips every value", fmt("%d parameters", p->count()));
 }
 
-/** Renders a kick triggered at @p late with the store's kick settings; returns the output. */
+/**
+ * Renders a kick triggered at @p late with the store's kick settings; returns the output.
+ * @param[in]     p        the parameters
+ * @param[in]     keyRoot  the key's root
+ * @param[in]     late     samples after the ideal start
+ * @param[in]     n        the samples rendered
+ * @param[in,out] k        the kick
+ * @return the output
+ */
 std::vector<float> renderKick(const ParamStore& p, int keyRoot, double late, int n, Kick& k)
 {
     float v[64];
@@ -125,7 +134,16 @@ std::vector<float> renderKick(const ParamStore& p, int keyRoot, double late, int
     return out;
 }
 
-/** Phase of @p x at @p hz over [from, from + len) samples, relative to the sample grid's t = 0, in cycles. */
+/**
+ * Phase of @p x at @p hz over [from, from + len) samples, relative to the sample grid's t = 0, in cycles.
+ * @param[in] x          the signal
+ * @param[in] hz         the frequency in Hz
+ * @param[in] from       the first sample
+ * @param[in] len        how many samples
+ * @param[in] sr         the sample rate in Hz
+ * @param[in] t0Samples  the time the phase is relative to, in samples
+ * @return the phase in cycles
+ */
 double phaseAt(const std::vector<float>& x, double hz, int from, int len, double sr, double t0Samples)
 {
     double re = 0.0, im = 0.0;
@@ -137,7 +155,11 @@ double phaseAt(const std::vector<float>& x, double hz, int from, int len, double
     return std::atan2(re, im) / (2.0 * PiD);
 }
 
-/** @brief Phase @p c in cycles, wrapped into -0.5 .. 0.5. */
+/**
+ * @brief Phase @p c in cycles, wrapped into -0.5 .. 0.5.
+ * @param[in] c  the phase in cycles
+ * @return the phase wrapped into -0.5 .. 0.5
+ */
 double wrapCycles(double c) { return c - std::round(c); }
 
 /** The kick's asymptotic phase (Kick.h), which the sub's lock rests on, for the three engines and a sub-sample onset. */
@@ -244,7 +266,15 @@ struct Run {
     std::vector<std::vector<float>> m_stems;   ///< the stems, left channel
     std::vector<float> m_out;                  ///< the output
 };
-/** Renders @p score from beat @p from for @p seconds with stems; returns the stems (left channel) and the output. */
+/**
+ * Renders @p score from beat @p from for @p seconds with stems; returns the stems (left channel) and the output.
+ * @param[in] score    the score
+ * @param[in] knobs    key=value lines set before, or null
+ * @param[in] from     the first beat
+ * @param[in] seconds  the seconds rendered
+ * @param[in] block    the block size
+ * @return the stems and the output
+ */
 Run render(const Score& score, const char* knobs, double from, double seconds, int block = 256)
 {
     auto e = std::make_unique<Engine>();
@@ -272,7 +302,13 @@ Run render(const Score& score, const char* knobs, double from, double seconds, i
     return run;
 }
 
-/** @brief The RMS of @p x from index @p from up to @p to. */
+/**
+ * @brief The RMS of @p x from index @p from up to @p to.
+ * @param[in] x     the samples
+ * @param[in] from  the first index
+ * @param[in] to    the end index
+ * @return the RMS
+ */
 double rmsOf(const std::vector<float>& x, size_t from, size_t to)
 {
     double s = 0.0;
@@ -346,7 +382,14 @@ void testLowEnd()
     check(kickLow > -6.0 && subLow > -3.0, "the kick and the sub live there", fmt("kick %.1f dB, sub %.1f dB", kickLow, subLow));
 }
 
-/** Renders the study from its start with block size @p block for @p seconds (interleaved). */
+/**
+ * Renders the study from its start with block size @p block for @p seconds (interleaved).
+ * @param[in] block    the block size
+ * @param[in] seconds  the seconds rendered
+ * @param[in] seed     the seed
+ * @param[in] from     the first beat
+ * @return the output, interleaved
+ */
 std::vector<float> renderStudy(int block, double seconds, uint64_t seed, double from = 0.0)
 {
     auto p = std::make_unique<ParamStore>();
@@ -870,7 +913,18 @@ void testMelody()
     check(hits == 0, "no two bars of a known track", fmt("%d tracks with a hit", hits));
 }
 
-/** @brief One piano note (held @p hold s) over @p secs s, the channels' mean, with the knobs' defaults and @p pedal. */
+/**
+ * @brief One piano note (held @p hold s) over @p secs s, the channels' mean, with the knobs' defaults and @p pedal.
+ * @param[in,out] p            the piano
+ * @param[in]     midi         the MIDI note
+ * @param[in]     vel          the velocity, 0..1
+ * @param[in]     hold         the seconds held
+ * @param[in]     secs         the seconds rendered
+ * @param[in]     pedal        the pedal, 0..1
+ * @param[in]     sympathetic  the sympathetic strings' level
+ * @param[in]     phantom      the phantom partials' level
+ * @return the channels' mean
+ */
 std::vector<float> pianoNote(Piano& p, int midi, float vel, double hold, double secs, float pedal = 0.0f, float sympathetic = 1.0f,
                              float phantom = 1.0f)
 {
@@ -895,7 +949,13 @@ std::vector<float> pianoNote(Piano& p, int midi, float vel, double hold, double 
     return out;
 }
 
-/** @brief The level (dB) of @p x between @p a and @p b seconds. */
+/**
+ * @brief The level (dB) of @p x between @p a and @p b seconds.
+ * @param[in] x  the samples
+ * @param[in] a  the first second
+ * @param[in] b  the last second
+ * @return the level in dB
+ */
 double levelDb(const std::vector<float>& x, double a, double b)
 {
     const size_t i = static_cast<size_t>(a * 48000.0), j = std::min(x.size(), static_cast<size_t>(b * 48000.0));
@@ -904,7 +964,13 @@ double levelDb(const std::vector<float>& x, double a, double b)
     return 10.0 * std::log10(s / std::max<size_t>(1, j - i) + 1e-30);
 }
 
-/** @brief The frequency of the strongest peak of @p x (from @p start, 2^15 samples, Hann) within @p f +- 2 %. */
+/**
+ * @brief The frequency of the strongest peak of @p x (from @p start, 2^15 samples, Hann) within @p f +- 2 %.
+ * @param[in] x      the samples
+ * @param[in] start  the first second
+ * @param[in] f      the frequency expected
+ * @return the peak's frequency in Hz
+ */
 double peakHz(const std::vector<float>& x, double start, double f)
 {
     const size_t n = 32768, s0 = static_cast<size_t>(start * 48000.0);
@@ -1096,7 +1162,15 @@ void testPianoBlocks()
           fmt("%zu and %zu samples differ, the first at %zu (%.4f s after bar %.0f)", diffB, diffC, firstB, firstB / 48000.0, from / 4.0));
 }
 
-/** @brief One note of an orchestral instrument (held @p hold s) over @p secs s, the channels' mean. */
+/**
+ * @brief One note of an orchestral instrument (held @p hold s) over @p secs s, the channels' mean.
+ * @param[in,out] ins    the instrument
+ * @param[in]     pitch  the MIDI note
+ * @param[in]     vel    the velocity, 0..1
+ * @param[in]     hold   the seconds held
+ * @param[in]     secs   the seconds rendered
+ * @return the channels' mean
+ */
 template <class InstrT>
 std::vector<float> orchNote(InstrT& ins, int pitch, float vel, double hold, double secs)
 {
@@ -1113,7 +1187,12 @@ std::vector<float> orchNote(InstrT& ins, int pitch, float vel, double hold, doub
     return out;
 }
 
-/** @brief The spectral centroid (Hz) of @p x over 2^14 samples from @p a seconds (Hann). */
+/**
+ * @brief The spectral centroid (Hz) of @p x over 2^14 samples from @p a seconds (Hann).
+ * @param[in] x  the samples
+ * @param[in] a  the first second
+ * @return the centroid in Hz
+ */
 double centroidHz(const std::vector<float>& x, double a)
 {
     const size_t n = 16384, s0 = static_cast<size_t>(a * 48000.0);
@@ -1504,8 +1583,8 @@ void testModulation()
  * The factory banks (Phase 5b, Presets.h): eighteen banks of 1024, every key a bank names a knob of its module, every
  * name unique within its bank, a kit lane given only presets of its role; and a sample of every bank (every 64th preset,
  * a different one per bank) played through the engine against the module's default sound -- finite, audible, within
- * 24 dB of it. With PARH_BANK_TRIMS=<file> every preset is played and the trims (PresetTrims.inl: the default's loudness
- * less the preset's, in tenths of a dB) are written to <file>.
+ * 24 dB of it. With PARH_BANK_TRIMS=\<file\> every preset is played and the trims (PresetTrims.inl: the default's loudness
+ * less the preset's, in tenths of a dB) are written to \<file\>.
  */
 struct BankId {
     ModuleE m_module;   ///< the module
@@ -1518,7 +1597,13 @@ const BankId Banks[PresetBanks] = {
     { ModuleE::PIANO, 0 }, { ModuleE::STRINGS, 0 }, { ModuleE::CHOIR, 0 }, { ModuleE::BRASS, 0 }, { ModuleE::TIMPANI, 0 },
     { ModuleE::SFX, 0 }, { ModuleE::CLOUD, 0 } };
 
-/** @brief The loudest 3 s of a short phrase on @p b's voice, the preset @p sp applied (null: the default sound), LUFS. */
+/**
+ * @brief The loudest 3 s of a short phrase on @p b's voice, the preset @p sp applied (null: the default sound), LUFS.
+ * @param[in] b      the bank
+ * @param[in] sp     the preset, or null
+ * @param[in] quest  true for the Quest's limits
+ * @return the loudness in LUFS
+ */
 double bankLoudness(const BankId& b, const SoundPreset* sp, bool quest = false)
 {
     auto p = std::make_unique<ParamStore>();
@@ -2390,7 +2475,12 @@ const TestSection Sections[] = {
 
 } // namespace
 
-/** @brief Runs every section, or those the command line names; the exit code is the number of failures. */
+/**
+ * @brief Runs every section, or those the command line names; the exit code is the number of failures.
+ * @param[in]     argc  the number of arguments
+ * @param[in,out] argv  the arguments: sections to run
+ * @return the number of failures
+ */
 int main(int argc, char** argv)
 {
     std::string only;

@@ -1,6 +1,7 @@
 /**
  * @file Strings.cpp
  * @brief The orchestra's string section (Strings.h).
+ * @author Rene Weller
  */
 #include "parh/synth/Strings.h"
 #include "parh/Params.h"

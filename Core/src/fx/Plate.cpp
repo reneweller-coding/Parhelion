@@ -3,6 +3,7 @@
  * @brief Dattorro's plate (Plate.h).
  * @note Copied from Ephemeris `Core/src/fx/Plate.cpp` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/src/fx/Plate.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/fx/Plate.h"
 #include "parh/Dsp.h"

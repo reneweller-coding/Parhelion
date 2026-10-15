@@ -20,6 +20,7 @@
  * The pump (PLAN 7.3): the ghost kick on every quarter, the pad's and the returns' duck taken to nothing through the
  * breakdown and brought back over the last two bars before the drop; the pad's filter opens over the breakdown, the hall
  * grows there. The sections and the layer matrix go into the score (Score.h) as the planner will write them.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Params.h"
@@ -30,8 +31,9 @@ namespace parh {
 
 /**
  * @brief Composes the study.
- * @param p    the knobs (compose.bpm, compose.key, compose.scale, compose.humanize, and the voices' for the automation)
- * @param seed the seed
+ * @param[in] p     the knobs (compose.bpm, compose.key, compose.scale, compose.humanize, and the voices' for the
+ *                  automation)
+ * @param[in] seed  the seed
  * @return the score, sorted
  */
 Score composeStudy(const ParamStore& p, uint64_t seed);

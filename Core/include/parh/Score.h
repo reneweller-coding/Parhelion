@@ -20,6 +20,7 @@
  * @note The gesture curve and the housekeeping come from Ephemeris by way of Totality; parts, sections and the layer
  *       matrix are Parhelion's.
  * @note Copied from Totality `Core/include/tot/Score.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Clock.h"
@@ -48,25 +49,43 @@ enum class PartE : int { KICK = 0, SUB,
                         COUNT };
 constexpr int NumParts = static_cast<int>(PartE::COUNT);   ///< number of parts
 extern const char* const PartNames[NumParts];            ///< "kick", "sub", "perc1" .. "perc12", "bass", "acid", "lead", ...
-/** @brief The part of kit lane @p lane (0-based). */
+/**
+ * @brief The part of kit lane @p lane (0-based).
+ * @param[in] lane  the kit lane, 0-based
+ * @return its part
+ */
 constexpr PartE percPart(int lane) { return static_cast<PartE>(static_cast<int>(PartE::PERC1) + lane); }
-/** @brief The kit lane of @p part, or -1 if it is not a lane. */
+/**
+ * @brief The kit lane of @p part, or -1 if it is not a lane.
+ * @param[in] part  the part
+ * @return its kit lane, -1 if it is not a lane
+ */
 constexpr int laneOf(PartE part)
 {
     const int i = static_cast<int>(part) - static_cast<int>(PartE::PERC1);
     return i >= 0 && i < 12 ? i : -1;
 }
-/** @brief The polyphonic instance of @p part (PolyInstance order), or -1. */
+/**
+ * @brief The polyphonic instance of @p part (PolyInstance order), or -1.
+ * @param[in] part  the part
+ * @return its polyphonic instance, or -1
+ */
 constexpr int polyOf(PartE part)
 {
     const int i = static_cast<int>(part) - static_cast<int>(PartE::LEAD);
     return i >= 0 && i < 6 ? i : -1;
 }
-/** @brief The part of polyphonic instance @p i. */
+/**
+ * @brief The part of polyphonic instance @p i.
+ * @param[in] i  the polyphonic instance
+ * @return its part
+ */
 constexpr PartE polyPart(int i) { return static_cast<PartE>(static_cast<int>(PartE::LEAD) + i); }
 /**
  * @brief Whether a part's notes start with their length known and need no off event: the kick, the ghost, the kit and
  *        the polyphonic voices (which take their gate at note on, Poly.h). The sub and the mono synths are held.
+ * @param[in] p  the part
+ * @return true when its notes are one-shots
  */
 constexpr bool isOneShot(PartE p)
 {
@@ -104,9 +123,19 @@ struct Gesture {
     GestureShapeE m_shape = GestureShapeE::MINIMUM_JERK;   ///< the path between the two
     uint8_t m_hand = 0;           ///< which hand (PLAN 7.3: at most two at once)
 };
-/** @brief Position 0..1 along a shape at normalised time @p t (clamped to 0..1). */
+/**
+ * @brief Position 0..1 along a shape at normalised time @p t (clamped to 0..1).
+ * @param[in] shape  the shape
+ * @param[in] t      the position in the gesture, 0..1
+ * @return the shape's value, 0..1
+ */
 double gestureShape(GestureShapeE shape, double t);
-/** @brief Offset of one curve at @p beat: @p from before it, its shape during it, @p to after it. */
+/**
+ * @brief Offset of one curve at @p beat: @p from before it, its shape during it, @p to after it.
+ * @param[in] g     the gesture
+ * @param[in] beat  the position in beats
+ * @return its offset there
+ */
 float gestureValue(const Gesture& g, double beat);
 
 /** @brief The kinds of section (PLAN 6.2, Dok. 6). */
@@ -133,7 +162,12 @@ struct LayerBlock {
     double m_beat = 0.0;                                        ///< its start (32 beats long)
     std::array<LayerStateE, NumLayers> m_state{};               ///< every element's state
     float m_energy = 5.0f;                                      ///< the energy of the block, 0..10
-    LayerStateE at(LayerE l) const { return m_state[static_cast<size_t>(l)]; }   ///< the state of @p l
+    /**
+     * the state of @p l
+     * @param[in] l  the layer
+     * @return its state
+     */
+    LayerStateE at(LayerE l) const { return m_state[static_cast<size_t>(l)]; }
 };
 
 /**
@@ -210,21 +244,40 @@ struct Score {
     std::vector<LevelMark> m_levels;   ///< every track's loudness mark, in beat order (Leveler.h)
     std::vector<KnobSet> m_knobs;      ///< the knobs every track sets at its start, sorted by beat after sort()
     std::vector<SoundPick> m_sounds;   ///< the presets the composer chose, sorted by beat after sort()
-    /** @brief The value the latest knob setting of @p param at or before @p beat gives it; NaN if none does. */
+    /**
+     * @brief The value the latest knob setting of @p param at or before @p beat gives it; NaN if none does.
+     * @param[in] param  the parameter
+     * @param[in] beat   the position in beats
+     * @return the value the latest knob setting gives it, NaN if none does
+     */
     float knobAt(int param, double beat) const;
-    /** @brief The loudness correction at @p beat in dB: the latest mark's (0 before the first). */
+    /**
+     * @brief The loudness correction at @p beat in dB: the latest mark's (0 before the first).
+     * @param[in] beat  the position in beats
+     * @return the loudness correction there in dB
+     */
     float trimAt(double beat) const;
-    /** @brief The parts' corrections at @p beat, dB: the latest mark's (none before the first). */
+    /**
+     * @brief The parts' corrections at @p beat, dB: the latest mark's (none before the first).
+     * @param[in] beat  the position in beats
+     * @return the parts' corrections there in dB
+     */
     BalanceDbT balanceAt(double beat) const;
     /** @brief Sorts every list by beat (stable, so equal beats keep the order they were written in). */
     void sort();
-    /** @brief Empties the score and resets the tempo to @p bpm. */
+    /**
+     * @brief Empties the score and resets the tempo to @p bpm.
+     * @param[in] bpm  the new tempo in beats per minute
+     */
     void clear(double bpm);
     /**
      * @brief The automation offset of @p param at @p beat, in the normalised range.
      *
      * Of the curves on one knob, the latest that has started counts; before the first one the offset is 0. Linear
      * in the number of curves -- for the offline render and the tests; the audio thread keeps a cursor instead.
+     * @param[in] param  the parameter
+     * @param[in] beat   the position in beats
+     * @return the automation offset in the normalised range
      */
     float gestureOffset(int param, double beat) const;
 };

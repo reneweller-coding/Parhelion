@@ -8,6 +8,10 @@
  * @note The operations and the half-band are copied from Ephemeris `Tests/vectest.cpp` at d047d79 (27.09.2026); the
  *       kit section follows Phosphene's; the polyphonic sections are Phosphene's `Tests/vectest.cpp` at 76f7100.
  * @note Copied from Totality `Tests/vectest.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
+ *
+ * @par Compile Flags:
+ *   @arg @c PARH_EXPECT_PATH - the vector path the build expects; the test fails when Vec.h chose another
  */
 #include "parh/Halfband.h"
 #include "parh/Params.h"
@@ -30,7 +34,11 @@ namespace {
 
 constexpr int W = VecWidth;   ///< the lanes of the vector type compiled here
 
-/** @brief A float made from @p i that covers signs, magnitudes and the denormals. */
+/**
+ * @brief A float made from @p i that covers signs, magnitudes and the denormals.
+ * @param[in] i  the index
+ * @return the float
+ */
 float testValue(uint32_t i)
 {
     uint32_t h = i * 2654435761u ^ 0x9E3779B9u;
@@ -45,7 +53,12 @@ float testValue(uint32_t i)
     }
 }
 
-/** @brief Whether @p a and @p b are the same float, bit for bit. */
+/**
+ * @brief Whether @p a and @p b are the same float, bit for bit.
+ * @param[in] a  a float
+ * @param[in] b  another float
+ * @return true when they are the same bit for bit
+ */
 bool sameBits(float a, float b) { return std::memcmp(&a, &b, sizeof(float)) == 0; }
 
 /** @brief The vector type's operations against the scalar ones, lane by lane, bit for bit. */
@@ -333,7 +346,10 @@ void testStrings()
 }
 } // namespace
 
-/** @brief Runs the tests; the exit code is the number of failures. */
+/**
+ * @brief Runs the tests; the exit code is the number of failures.
+ * @return the number of failures
+ */
 int main()
 {
     std::printf("parh_vectest: path %s, %d lanes\n", VecPathName, W);

@@ -8,6 +8,7 @@
  * carries the sample its off is due (a polyphonic voice: its gate; the kick, the ghost kick and the kit: 50 ms after
  * the on). A played key is not written: it came in as MIDI already.
  * Fixed capacity, no allocation: the audio thread fills it and the same thread empties it.
+ * @author Rene Weller
  */
 #pragma once
 #include <cstdint>
@@ -29,7 +30,15 @@ struct NoteTap {
     int m_count = 0;                           ///< how many of notes[] are valid
     /** @brief Forgets the notes of the last call. */
     void clear() { m_count = 0; }
-    /** @brief Adds a note (dropped when full); @p offSample as in Note. */
+    /**
+     * @brief Adds a note (dropped when full); @p offSample as in Note.
+     * @param[in] sample     the position of the note-on
+     * @param[in] part       the part that plays it
+     * @param[in] pitch      the MIDI note
+     * @param[in] velocity   the velocity, 0..1
+     * @param[in] on         true for a note-on
+     * @param[in] offSample  the position of its note-off, as in Note
+     */
     void add(int64_t sample, int part, int pitch, float velocity, bool on, int64_t offSample)
     {
         if (m_count >= Capacity || pitch < 0 || pitch > 127) return;

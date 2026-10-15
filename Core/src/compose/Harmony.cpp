@@ -1,6 +1,7 @@
 /**
  * @file Harmony.cpp
  * @brief The harmony of a track (Harmony.h).
+ * @author Rene Weller
  */
 #include "parh/compose/Harmony.h"
 #include <algorithm>
@@ -10,7 +11,11 @@ namespace parh {
 
 namespace {
 
-/** @brief The scale whose triads the chords are built from (Harmony.h). */
+/**
+ * @brief The scale whose triads the chords are built from (Harmony.h).
+ * @param[in] scale  the mode
+ * @return the chords' scale
+ */
 int chordScale(int scale)
 {
     switch (static_cast<ScaleE>(scale)) {

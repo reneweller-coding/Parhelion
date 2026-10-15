@@ -7,6 +7,7 @@
  *     parh_pianoprobe --info [--instrument n]
  *     parh_pianoprobe --notes "60:0.7:2,36:1.0:4" --out notes.wav [--pedal 1] [--instrument n] [--lead s] [--gap s]
  *     parh_pianoprobe --measure
+ * @author Rene Weller
  */
 #include "parh/Dsp.h"
 #include "parh/Params.h"

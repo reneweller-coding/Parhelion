@@ -2,6 +2,7 @@
  * @file PluginEditor.cpp
  * @brief The plugin's panel.
  * @note Copied from Totality `Plugin/PluginEditor.cpp` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #include "PluginEditor.h"
 #include "EditorPerform.h"
@@ -25,7 +26,12 @@ const juce::Colour Accent = parhui::colour::Accent;     ///< the skin's accent
 const juce::Colour Onset = parhui::colour::Onset;       ///< the onsets' red
 const juce::Colour Sun = parhui::colour::Sun;   ///< the low sun: the energy, the drops
 
-/** @brief Colour of a block by its marker: the edges dark, the body brighter towards the peak, a reduction the motion's teal. */
+/**
+ * @brief Colour of a block by its marker: the edges dark, the body brighter towards the peak, a reduction the motion's
+ *        teal.
+ * @param[in] name  the block's marker
+ * @return its colour
+ */
 juce::Colour blockColour(const juce::String& name)
 {
     using parhui::Family;
@@ -37,10 +43,17 @@ juce::Colour blockColour(const juce::String& name)
     return tone(Family::SOURCE, 0.72f);
 }
 
-/** @brief The documents folder of Parhelion. */
+/**
+ * @brief The documents folder of Parhelion.
+ * @return the folder
+ */
 juce::File documents() { return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Parhelion"); }
 
-/** @brief The small tabs of a page: the page itself, or the first SubTabs inside it (the Mixer's MixerPage holds its). */
+/**
+ * @brief The small tabs of a page: the page itself, or the first SubTabs inside it (the Mixer's MixerPage holds its).
+ * @param[in,out] c  the page
+ * @return its small tabs, null when it has none
+ */
 frame::SubTabs* findSubTabs(juce::Component* c)
 {
     if (c == nullptr) return nullptr;
@@ -50,14 +63,26 @@ frame::SubTabs* findSubTabs(juce::Component* c)
     return nullptr;
 }
 
-/** @brief A synth's name in the presets' folder and the browser: its parameters' key without the lane's number ("bass", "perc"). */
+/**
+ * @brief A synth's name in the presets' folder and the browser: its parameters' key without the lane's number ("bass",
+ *        "perc").
+ * @param[in] s  the parameters
+ * @param[in] m  the synth
+ * @return its name for the presets
+ */
 juce::String synthKey(const ParamStore& s, ModuleE m)
 {
     const std::string& k = s.key(s.id(m, 0, 0));
     return juce::String(k.substr(0, k.find('.'))).trimCharactersAtEnd("0123456789");
 }
 
-/** @brief "perc3.decay" -> "Perc 3", "kick.tune" -> "Kick": the module instance a store id belongs to, for the palette and the info line. */
+/**
+ * @brief "perc3.decay" -> "Perc 3", "kick.tune" -> "Kick": the module instance a store id belongs to, for the palette
+ *        and the info line.
+ * @param[in] s   the parameters
+ * @param[in] id  the store id
+ * @return the module instance's label
+ */
 juce::String moduleLabel(const ParamStore& s, int id)
 {
     const std::string& k = s.key(id);
@@ -68,7 +93,12 @@ juce::String moduleLabel(const ParamStore& s, int id)
     return digits.isEmpty() ? nice : nice + " " + digits;
 }
 
-/** @brief Whether the knobs stand where @p values put them (within a thousandth of each one's range). */
+/**
+ * @brief Whether the knobs stand where @p values put them (within a thousandth of each one's range).
+ * @param[in] s       the parameters
+ * @param[in] values  the knobs and their values
+ * @return true when every knob stands there
+ */
 bool knobsAt(const ParamStore& s, const std::vector<std::pair<int, float>>& values)
 {
     for (const auto& [id, v] : values) {
@@ -78,10 +108,25 @@ bool knobsAt(const ParamStore& s, const std::vector<std::pair<int, float>>& valu
     return true;
 }
 
-/** @brief The player's presets of instance @p instance of synth @p m (the processor keeps them: Documents/Parhelion/Presets). */
+/**
+ * @brief The player's presets of instance @p instance of synth @p m (the processor keeps them:
+ *        Documents/Parhelion/Presets).
+ * @param[in,out] p         the processor
+ * @param[in]     m         the synth
+ * @param[in]     instance  its instance
+ * @return the preset files
+ */
 juce::Array<juce::File> userPresetFiles(ParhelionProcessor& p, ModuleE m, int instance) { return p.userPresets(m, instance); }
 
-/** @brief The knobs of menu id @p menuId of synth @p m (a factory preset's index + 1, or PresetBar::UserId + one of the player's). */
+/**
+ * @brief The knobs of menu id @p menuId of synth @p m (a factory preset's index + 1, or PresetBar::UserId + one of the
+ *        player's).
+ * @param[in,out] p         the processor
+ * @param[in]     m         the synth
+ * @param[in]     instance  its instance
+ * @param[in]     menuId    the menu id
+ * @return (parameter id, value) of the preset's knobs
+ */
 std::vector<std::pair<int, float>> knobsOf(ParhelionProcessor& p, ModuleE m, int instance, int menuId)
 {
     std::vector<std::pair<int, float>> out;
@@ -1648,7 +1693,7 @@ void ParhelionEditor::timerCallback()
     // moves the playhead there first.
     if (m_shotPath.isNotEmpty() && !m_proc.isComposing() && m_shotTicks == 0)
         if (const char* at = std::getenv("PARH_SHOT_AT")) m_proc.seekTo(std::atof(at));
-    // PARH_PAGE_REPORT=<file> (01.10.2026): how far every page reaches past the window, a line each (Frame.h, pageReport),
+    // PARH_PAGE_REPORT=\<file\> (01.10.2026): how far every page reaches past the window, a line each (Frame.h, pageReport),
     // then quit -- which page still scrolls at the usual size.
     if (const char* report = std::getenv("PARH_PAGE_REPORT"); report != nullptr && !m_proc.isComposing()) {
         static int reportTicks = 0;

@@ -42,6 +42,7 @@
  * @note Copied from Phosphene `Core/include/phos/Reverb.h` at 9a2f615 (24.09.2026); namespace eph, prefix EPH_.
  * @note Copied from Ephemeris `Core/include/eph/fx/Reverb.h` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/include/tot/fx/Reverb.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -52,55 +53,63 @@ namespace parh {
 /** @brief Stereo FDN reverb, wet output only. */
 class Reverb {
 public:
-    /** @brief Allocates for a sample rate. */
+    /**
+     * @brief Allocates for a sample rate.
+     * @param[in] sampleRate  the sample rate in Hz
+     */
     void prepare(double sampleRate);
     /** @brief Clears every line. */
     void reset();
     /**
      * @brief Sets the space.
-     * @param size          line-length scale, 0.3 .. 3 (1 = 30 to 90 ms lines)
-     * @param decaySeconds  T60 of the tail
-     * @param damping       0..1, high-frequency loss per loop
-     * @param preDelaySamples pre-delay
-     * @param lowCutHz      return low cut (at least 150 Hz)
-     * @param highCutHz     return high cut
+     * @param[in] size             line-length scale, 0.3 .. 3 (1 = 30 to 90 ms lines)
+     * @param[in] decaySeconds     T60 of the tail
+     * @param[in] damping          0..1, high-frequency loss per loop
+     * @param[in] preDelaySamples  pre-delay
+     * @param[in] lowCutHz         return low cut (at least 150 Hz)
+     * @param[in] highCutHz        return high cut
      */
     void set(float size, float decaySeconds, float damping, float preDelaySamples, float lowCutHz, float highCutHz);
     /**
      * @brief Processes a stereo send.
-     * @param inL,inR   send input
-     * @param outL,outR receives the wet return (replaced)
-     * @param n         samples
+     * @param[in]  inL   send input
+     * @param[in]  inR   send input
+     * @param[out] outL  receives the wet return (replaced)
+     * @param[out] outR  receives the wet return (replaced)
+     * @param[in]  n     samples
      */
     void process(const float* inL, const float* inR, float* outL, float* outR, int n);
 
     /**
      * @brief Configures the duck: an envelope follower on the send pulls the wet return down while the
      *        send is above @p thresholdDb, and lets it back up once the send falls quiet again.
-     * @param depth      0..1, how far the follower pulls the wet return down at full activity
-     * @param thresholdDb the send level, in dBFS peak, that counts as "the voice is sounding"
-     * @param attackS    seconds, how fast the duck engages once the send crosses the threshold
-     * @param releaseS   seconds, how fast it lets go once the send falls back under it -- this is the
-     *                   "opens as the voice's envelope releases" time constant the brief asks to report
+     * @param[in] depth        0..1, how far the follower pulls the wet return down at full activity
+     * @param[in] thresholdDb  the send level, in dBFS peak, that counts as "the voice is sounding"
+     * @param[in] attackS      seconds, how fast the duck engages once the send crosses the threshold
+     * @param[in] releaseS     seconds, how fast it lets go once the send falls back under it -- this is the "opens as
+     *                         the voice's envelope releases" time constant the brief asks to report
      */
     void setDuck(float depth, float thresholdDb, float attackS, float releaseS);
     /**
      * @brief Processes a stereo send through the network, then ducks the wet return by the send's own
      *        envelope (setDuck()). Does not apply the bar-line cut; see barGate().
-     * @param inL,inR   send input (also the duck's own sidechain)
-     * @param outL,outR receives the ducked wet return (replaced)
-     * @param n         samples
+     * @param[in]  inL   send input (also the duck's own sidechain)
+     * @param[in]  inR   send input (also the duck's own sidechain)
+     * @param[out] outL  receives the ducked wet return (replaced)
+     * @param[out] outR  receives the ducked wet return (replaced)
+     * @param[in]  n     samples
      */
     void processDucked(const float* inL, const float* inR, float* outL, float* outR, int n);
 
     /**
      * @brief How open a tempo-synced bar gate is at an absolute beat, 0..1. Stateless: a pure function
      *        of @p beat, like TranceGate::open, so it needs no `this` and no per-sample state.
-     * @param beat        beats since the start of the set
-     * @param closeBeats  how long, from the bar line, the raised-cosine close takes to reach @p floorGain
-     * @param holdBeats   how long the gate then stays at @p floorGain
-     * @param openBeats   how long it then takes to reopen (raised cosine) to unity
-     * @param floorGain   linear gain while closed (0 = full mute)
+     * @param[in] beat        beats since the start of the set
+     * @param[in] closeBeats  how long, from the bar line, the raised-cosine close takes to reach @p floorGain
+     * @param[in] holdBeats   how long the gate then stays at @p floorGain
+     * @param[in] openBeats   how long it then takes to reopen (raised cosine) to unity
+     * @param[in] floorGain   linear gain while closed (0 = full mute)
+     * @return how open the gate is, 0..1
      */
     static float barGate(double beat, double closeBeats, double holdBeats, double openBeats, float floorGain);
 
@@ -118,9 +127,17 @@ private:
     std::vector<float> m_preR;   ///< the right pre-delay ring
     int m_mask = 0;   ///< ring size - 1 for the lines, diffusers and pre-delays
     int m_w = 0;   ///< the write index, shared
-    /** @brief Delay line @p l. */
+    /**
+     * @brief Delay line @p l.
+     * @param[in] l  the line's index
+     * @return the line's buffer
+     */
     float* line(int l) { return m_lines.data() + static_cast<size_t>(l) * static_cast<size_t>(m_mask + 1); }
-    /** @brief Line @p l's scattering all-pass. */
+    /**
+     * @brief Line @p l's scattering all-pass.
+     * @param[in] l  the line's index
+     * @return the all-pass's buffer
+     */
     float* sc(int l) { return m_scs.data() + static_cast<size_t>(l) * static_cast<size_t>(m_mask + 1); }
     int m_apLen[Allpasses] = {};   ///< the input diffusers' lengths in samples (5.1 .. 13.7 ms)
     int m_scLen[Lines] = {};   ///< the scattering all-passes' lengths in samples (1.9 .. 7.1 ms, mutually prime)

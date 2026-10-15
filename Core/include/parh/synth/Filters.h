@@ -29,6 +29,12 @@
  * are slew-limited on purpose), the EDP Wasp (CMOS inverters as integrators, asymmetric), and a comb filter.
  * @note Copied from Ephemeris `Core/include/eph/synth/Filters.h` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/include/tot/synth/Filters.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
+ *
+ * @par Compile Flags:
+ *   @arg @c PARH_FORCE_INLINE - how the kernels' inner steps are forced inline (set here unless the build sets it)
+ *   @arg @c PARH_FILTER_NEWTON - Newton steps per sample of the nonlinear filter models (3 unless the build sets
+ *                                another number)
  */
 #pragma once
 #include "parh/Vec.h"
@@ -65,7 +71,11 @@ constexpr int Newton = PARH_FILTER_NEWTON;   ///< Newton iterations per sample (
  */
 constexpr int NewtonLight = 1;
 
-/** @brief tanh by Lambert's continued fraction (7th order), exact to 1e-7 inside +-4.97 and held there. */
+/**
+ * @brief tanh by Lambert's continued fraction (7th order), exact to 1e-7 inside +-4.97 and held there.
+ * @param[in] x  the argument
+ * @return tanh(x)
+ */
 template <class VT>
 PARH_FORCE_INLINE VT ftanh(VT x)
 {
@@ -77,7 +87,11 @@ PARH_FORCE_INLINE VT ftanh(VT x)
     return num / den;
 }
 
-/** @brief 2^x for |x| <= 3 (a cubic, never under 1/20): the audio-rate filter FM. */
+/**
+ * @brief 2^x for |x| <= 3 (a cubic, never under 1/20): the audio-rate filter FM.
+ * @param[in] x  the exponent, |x| <= 3
+ * @return 2^x
+ */
 template <class VT>
 PARH_FORCE_INLINE VT fpow2(VT x)
 {
@@ -89,10 +103,13 @@ PARH_FORCE_INLINE VT fpow2(VT x)
 /**
  * @brief The Moog transistor ladder (Huovilainen 2004; solved implicitly as D'Angelo and Välimäki 2014):
  *        v0' = w (tanh(x - k v3) - tanh v0), vi' = w (tanh v(i-1) - tanh vi).
- * @param v  the four stage voltages (in: the last sample's, the Newton start; out: this sample's)
- * @param s  the four trapezoidal states
- * @param x  input; @param g tan(pi fc / fs); @param k resonance feedback (4: self-oscillation)
- * @return   the fourth stage
+ * @param[in,out] v      the four stage voltages (in: the last sample's, the Newton start; out: this sample's)
+ * @param[in,out] s      the four trapezoidal states
+ * @param[in]     x      input;
+ * @param[in]     g      tan(pi fc / fs);
+ * @param[in]     k      resonance feedback (4: self-oscillation)
+ * @param[in]     iters  the Newton iterations
+ * @return the fourth stage
  */
 template <class VT>
 PARH_FORCE_INLINE VT ladderMoog(VT* v, VT* s, VT x, VT g, VT k, int iters = Newton)
@@ -125,6 +142,16 @@ PARH_FORCE_INLINE VT ladderMoog(VT* v, VT* s, VT x, VT g, VT k, int iters = Newt
  *        vi' = w tanh(d (ai - vi)) / d with a0 = x - k tanh(r v3) / r and ai = v(i-1); @p d the stages' drive (their
  *        saturation), @p r the resonance VCA's. With @p mix the Xpander's pole mixing (0..7: LP4 LP2 BP2 BP4 HP2 HP4
  *        notch phaser; the cascade's input a0 and its four stages), else the fourth stage.
+ * @param[in,out] v      the four stage voltages (in: the last sample's; out: this sample's)
+ * @param[in,out] s      the four integrator states
+ * @param[in]     x      the input sample
+ * @param[in]     g      the cutoff coefficient
+ * @param[in]     k      the resonance
+ * @param[in]     d      the stages' drive
+ * @param[in]     r      the resonance VCA's drive
+ * @param[in]     mix    the output's tap (0 the low pass)
+ * @param[in]     iters  the Newton iterations
+ * @return the output sample
  */
 template <class VT>
 PARH_FORCE_INLINE VT otaCascade(VT* v, VT* s, VT x, VT g, VT k, float d, float r, int mix = 0, int iters = Newton)
@@ -172,6 +199,17 @@ PARH_FORCE_INLINE VT otaCascade(VT* v, VT* s, VT x, VT g, VT k, float d, float r
  *        nothing changes in the small-signal range, and a loud input at full resonance stays within a few times itself.
  *        @p morph moves the output from low pass through notch to high pass (the SEM's knob), or low pass to band pass
  *        (@p toBand).
+ * @param[in,out] v       the two integrator voltages (in: the last sample's; out: this sample's)
+ * @param[in,out] s       the two integrator states
+ * @param[in]     x       the input sample
+ * @param[in]     g       the cutoff coefficient
+ * @param[in]     R       the damping
+ * @param[in]     L       the integrators' limit
+ * @param[in]     a       the integrators' asymmetry
+ * @param[in]     morph   the output's blend of low, band and high pass
+ * @param[in]     toBand  true for the band pass alone
+ * @param[in]     iters   the Newton iterations
+ * @return the output sample
  */
 template <class VT>
 PARH_FORCE_INLINE VT svfNonlinear(VT* v, VT* s, VT x, VT g, VT R, float L, float a, VT morph, bool toBand = false, int iters = Newton)
@@ -208,6 +246,13 @@ PARH_FORCE_INLINE VT svfNonlinear(VT* v, VT* s, VT x, VT g, VT R, float L, float
  *        of half the capacitance, u = x - k v3:
  *        v0' = w (T(u - v0) - T(v0 - v1)), v1' = w (T(v0 - v1) - T(v1 - v2)), v2' = w (T(v1 - v2) - T(v2 - v3)),
  *        v3' = 2 w T(v2 - v3). Linear, it oscillates at k = 17 and sqrt 2 times w: the caller passes w / sqrt 2.
+ * @param[in,out] v      the four node voltages (in: the last sample's; out: this sample's)
+ * @param[in,out] s      the four integrator states
+ * @param[in]     x      the input sample
+ * @param[in]     g      the cutoff coefficient
+ * @param[in]     k      the resonance
+ * @param[in]     iters  the Newton iterations
+ * @return the output sample
  */
 template <class VT>
 PARH_FORCE_INLINE VT diodeLadder(VT* v, VT* s, VT x, VT g, VT k, int iters = Newton)
@@ -252,6 +297,13 @@ PARH_FORCE_INLINE VT diodeLadder(VT* v, VT* s, VT x, VT g, VT k, int iters = New
  * @brief The Korg35 of the MS-20 (Stinchcombe): a Sallen-Key low pass, x -R- A -R- B, C2 from B to ground, C1 from A
  *        to the output, which is the gain K times B through the diode limiter D = tanh. With q0 the voltage on C1 and
  *        q1 = B: A = q0 + D(K q1), q0' = w (x - 2A + q1), q1' = w (A - q1). Linear, it oscillates at K = 3.
+ * @param[in,out] v      the two voltages (in: the last sample's; out: this sample's)
+ * @param[in,out] s      the two integrator states
+ * @param[in]     x      the input sample
+ * @param[in]     g      the cutoff coefficient
+ * @param[in]     K      the feedback gain
+ * @param[in]     iters  the Newton iterations
+ * @return the output sample
  */
 template <class VT>
 PARH_FORCE_INLINE VT korg35(VT* v, VT* s, VT x, VT g, VT K, int iters = Newton)
@@ -275,15 +327,38 @@ PARH_FORCE_INLINE VT korg35(VT* v, VT* s, VT x, VT g, VT K, int iters = Newton)
 
 /** @brief How a model reads the voice's resonance (0..1) and where its output sits: feedback, damping, gain. */
 struct FilterVoicing {
-    /** @brief The OTA cascades' stage drive and resonance-VCA saturation: the Prophet's feedback saturates before its
-     *         stages (its self-oscillation stays near the cutoff), the Juno's cleaner stages drive less. */
+    /**
+     * @brief The OTA cascades' stage drive and resonance-VCA saturation: the Prophet's feedback saturates before its
+     *         stages (its self-oscillation stays near the cutoff), the Juno's cleaner stages drive less.
+     * @param[in] m  the filter model
+     * @return its stage drive
+     */
     static float otaDrive(FilterModelE m) { return m == FilterModelE::JUNO ? 0.45f : 0.7f; }
-    static float otaRes(FilterModelE m) { return m == FilterModelE::JUNO ? 1.2f : 1.6f; }   ///< @copydoc otaDrive
-    /** @brief The state-variable filters' nonlinearity: the integrators' range L and asymmetry a (SEM, Polivoks, Wasp). */
+    /**
+     * @copybrief otaDrive
+     * @param[in] m  the filter model
+     * @return its resonance VCA's saturation
+     */
+    static float otaRes(FilterModelE m) { return m == FilterModelE::JUNO ? 1.2f : 1.6f; }
+    /**
+     * @brief The state-variable filters' nonlinearity: the integrators' range L and asymmetry a (SEM, Polivoks, Wasp).
+     * @param[in] m  the filter model
+     * @return its integrators' range L
+     */
     static float svfRange(FilterModelE m) { return m == FilterModelE::POLIVOKS ? 0.35f : (m == FilterModelE::WASP ? 0.6f : 1.5f); }
-    static float svfAsym(FilterModelE m) { return m == FilterModelE::WASP ? 0.35f : 0.0f; }   ///< @copydoc svfRange
-    /** @brief Resonance 0..1 as the model's feedback: 4 for the ladders and cascades, 17 for the diode ladder, 3 for
-     *         the Korg35 (their self-oscillation just at 1); for the state-variable filters the damping R (Q = 1 / 2R). */
+    /**
+     * @copybrief svfRange
+     * @param[in] m  the filter model
+     * @return its integrators' asymmetry a
+     */
+    static float svfAsym(FilterModelE m) { return m == FilterModelE::WASP ? 0.35f : 0.0f; }
+    /**
+     * @brief Resonance 0..1 as the model's feedback: 4 for the ladders and cascades, 17 for the diode ladder, 3 for
+     *         the Korg35 (their self-oscillation just at 1); for the state-variable filters the damping R (Q = 1 / 2R).
+     * @param[in] m    the filter model
+     * @param[in] res  the resonance, 0..1
+     * @return the model's feedback
+     */
     static float feedback(FilterModelE m, float res)
     {
         switch (m) {
@@ -296,7 +371,12 @@ struct FilterVoicing {
         default: return 0.97f * res;   // the comb's feedback
         }
     }
-    /** @brief The pass band's loss by the feedback, partly made good (the ladders and cascades lose 1 / (1 + k)). */
+    /**
+     * @brief The pass band's loss by the feedback, partly made good (the ladders and cascades lose 1 / (1 + k)).
+     * @param[in] m  the filter model
+     * @param[in] k  its feedback
+     * @return the pass band's makeup gain
+     */
     static float makeup(FilterModelE m, float k)
     {
         switch (m) {
@@ -309,7 +389,11 @@ struct FilterVoicing {
     }
 };
 
-/** @brief The Xpander's pole mixes (FilterModel::Xpander): weights of the cascade's input and its four stages. */
+/**
+ * @brief The Xpander's pole mixes (FilterModel::Xpander): weights of the cascade's input and its four stages.
+ * @param[in] mode  the Xpander mode
+ * @return the weights of the input and the four stages
+ */
 inline const float* poleMix(float mode)
 {
     static const float Mix[8][5] = { { 0, 0, 0, 0, 1 }, { 0, 0, 1, 0, 0 }, { 0, 2, -2, 0, 0 }, { 0, 0, 4, -8, 4 },
@@ -327,12 +411,23 @@ struct FilterLane {
     std::vector<float> m_line;   ///< the comb's line (allocate(); a power of two)
     int m_pos = 0;   ///< where the comb's line is written
     float m_damp = 0.0f;   ///< the comb's damping state
-    void allocate(int length) { m_line.assign(static_cast<size_t>(length), 0.0f); m_pos = 0; }   ///< not on the audio thread
+    /**
+     * not on the audio thread
+     * @param[in] length  the number of samples
+     * @pre not called on the audio thread
+     */
+    void allocate(int length) { m_line.assign(static_cast<size_t>(length), 0.0f); m_pos = 0; }
     /** @brief Silence: every state, the line. */
     void clear() { for (int i = 0; i < 4; ++i) m_v[i] = m_s[i] = 0.0f; std::fill(m_line.begin(), m_line.end(), 0.0f); m_damp = 0.0f; }
     /**
      * @brief One sample through model @p m: @p g tan(pi fc / fs), @p k the model's feedback (FilterVoicing::feedback),
      *        @p mode its mode; the pass band's makeup applied.
+     * @param[in] m     the filter model
+     * @param[in] x     the input sample
+     * @param[in] g     tan(pi fc / fs)
+     * @param[in] k     the model's feedback
+     * @param[in] mode  its mode
+     * @return the output sample
      */
     float tick(FilterModelE m, float x, float g, float k, float mode)
     {

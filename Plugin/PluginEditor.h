@@ -18,6 +18,7 @@
  *
  * @note After Ephemeris' Plugin/PluginEditor.h at d047d79 (27.09.2026).
  * @note Copied from Totality `Plugin/PluginEditor.h` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #pragma once
 #include "PluginProcessor.h"
@@ -34,22 +35,36 @@
  */
 class PresetBar final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The presets of instance @p instance of module @p m, chosen through @p p. */
+    /**
+     * @brief The presets of instance @p instance of module @p m, chosen through @p p.
+     * @param[in,out] p         the processor
+     * @param[in]     m         the module
+     * @param[in]     instance  its instance
+     */
     PresetBar(ParhelionProcessor& p, parh::ModuleE m, int instance);
     /** @brief The step buttons either side of the menu, the composed preset under them. */
     void resized() override;
-    /** @brief Nothing of its own: its children draw. */
+    /**
+     * @brief Nothing of its own: its children draw.
+     * @param[in,out] g  the graphics context to draw into
+     */
     void paint(juce::Graphics& g) override;
 
 private:
     /** @brief Follows the composer's choice while no other preset was chosen by hand. */
     void timerCallback() override;
-    /** @brief Applies preset @p index (an undo step) and shows it. */
+    /**
+     * @brief Applies preset @p index (an undo step) and shows it.
+     * @param[in] index  the preset's index
+     */
     void choose(int index);
     void rebuildMenu();   ///< the sixteen groups, the user's presets, "Save as user preset..."
     void askName();       ///< the name of a user preset, then saves it
 public:
-    /** @brief Shows menu item @p menuId as chosen (a factory preset's index + 1, or UserId + one of the player's). */
+    /**
+     * @brief Shows menu item @p menuId as chosen (a factory preset's index + 1, or UserId + one of the player's).
+     * @param[in] menuId  the menu id
+     */
     void chosen(int menuId);
     static constexpr int UserId = 10001;   ///< menu ids: the first user preset
     static constexpr int SaveId = 20000;   ///< menu ids: the save item
@@ -80,26 +95,50 @@ class ParamPage final : public juce::Component, public frame::Revealer {
 public:
     /**
      * @brief A page for the modules in @p groups.
-     * @param p         the processor
-     * @param groups    module and instance pairs, shown one after the other
-     * @param instances how many instances the modules have; above one, a selector picks the instance
-     * @param names     the instances' names for the selector (empty: 1, 2, 3 ...)
+     * @param[in,out] p          the processor
+     * @param[in]     groups     module and instance pairs, shown one after the other
+     * @param[in]     instances  how many instances the modules have; above one, a selector picks the instance
+     * @param[in]     names      the instances' names for the selector (empty: 1, 2, 3 ...)
      */
     ParamPage(ParhelionProcessor& p, std::vector<std::pair<parh::ModuleE, int>> groups, int instances = 1,
               std::vector<juce::String> names = {});
     void resized() override;                  ///< lays the groups out, flowing across the page
-    void paint(juce::Graphics& g) override;   ///< the group boxes and their titles
-    /** @brief The height the page needs at @p width (for a page in a viewport). */
+    /**
+     * the group boxes and their titles
+     * @param[in,out] g  the graphics context to draw into
+     */
+    void paint(juce::Graphics& g) override;
+    /**
+     * @brief The height the page needs at @p width (for a page in a viewport).
+     * @param[in] width  the page's width
+     * @return the height it needs
+     */
     int heightFor(int width) const;
-    /** @brief The height the page has in its window (the scrolling page around it says so before heightFor). */
+    /**
+     * @brief The height the page has in its window (the scrolling page around it says so before heightFor).
+     * @param[in] h  the height in pixels
+     */
     void setAvailableHeight(int h) { m_available = h; }
-    /** @brief The page's parameters in words, group by group (the help's topic for the tab). */
+    /**
+     * @brief The page's parameters in words, group by group (the help's topic for the tab).
+     * @return the description
+     */
     juce::String describe() const;
-    /** @brief The instance shown (the lane of the kit, the synth voice), 0 for a page of one. */
+    /**
+     * @brief The instance shown (the lane of the kit, the synth voice), 0 for a page of one.
+     * @return the instance shown, 0 for a page of one
+     */
     int instance() const { return m_instances > 1 ? m_selected : 0; }
-    /** @brief Shows the section holding @p part (the search found it there). */
+    /**
+     * @brief Shows the section holding @p part (the search found it there).
+     * @param[in,out] part  the control to bring into view
+     */
     void reveal(juce::Component& part) override;
-    /** @brief Shows the instance whose controls hold store id @p id (a lane, a voice); false when none of them does. */
+    /**
+     * @brief Shows the instance whose controls hold store id @p id (a lane, a voice); false when none of them does.
+     * @param[in] id  the store id
+     * @return false when no instance holds it
+     */
     bool bringId(int id) override;
 
 private:
@@ -147,12 +186,30 @@ private:
     int m_available = 0;   ///< the height of the window (setAvailableHeight)
     int m_plannedWidth = -1;   ///< the width the sections were planned for, -1 never
     int m_plannedAvailable = -1;   ///< the height the sections were planned for, -1 never
-    bool shown(size_t box) const;                 ///< the box is in the section shown (or being measured)
-    void plan(int width);                         ///< the sections of a page @p width wide in m_available
+    /**
+     * the box is in the section shown (or being measured)
+     * @param[in] box  the box's index
+     * @return true when it is in the section shown
+     */
+    bool shown(size_t box) const;
+    /**
+     * the sections of a page @p width wide in m_available
+     * @param[in] width  the page's width
+     */
+    void plan(int width);
     void applySection();                          ///< the controls of the section shown, the others hidden
     void refit();                                 ///< laid out again, and the scrolling page around it measures again
-    int top() const;   ///< height of the instance bar
-    /** @brief Places the boxes and their cells in @p area (@p apply: move the components too); returns the height used. */
+    /**
+     * height of the instance bar
+     * @return the height of the instance bar
+     */
+    int top() const;
+    /**
+     * @brief Places the boxes and their cells in @p area (@p apply: move the components too); returns the height used.
+     * @param[in] area   where the boxes go
+     * @param[in] apply  true to move the components too
+     * @return the height used
+     */
     int layoutBoxes(juce::Rectangle<int> area, bool apply);
     std::vector<std::unique_ptr<juce::SliderParameterAttachment>> m_sliders;   ///< the knobs on their parameters
     std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> m_combos;   ///< the menus on their parameters
@@ -162,11 +219,23 @@ private:
 /** @brief A component in a viewport: it scrolls when it needs more height than the tab gives. */
 class ScrollingPage final : public juce::Component {
 public:
-    explicit ScrollingPage(std::unique_ptr<ParamPage> page);   ///< takes the page over
+    /**
+     * takes the page over
+     * @param[in] page  the page, taken over
+     */
+    explicit ScrollingPage(std::unique_ptr<ParamPage> page);
     void resized() override;                                   ///< the page as wide as the view, as tall as it needs
-    /** @brief How tall the page is at @p width (a page that should not scroll takes that much). */
+    /**
+     * @brief How tall the page is at @p width (a page that should not scroll takes that much).
+     * @param[in] width  the width in pixels
+     * @return the height in pixels
+     */
     int contentHeight(int width) const { return m_page->heightFor(width); }
-    const ParamPage& page() const { return *m_page; }           ///< the page (the help describes it)
+    /**
+     * the page (the help describes it)
+     * @return the page
+     */
+    const ParamPage& page() const { return *m_page; }
 private:
     juce::Viewport m_view;   ///< scrolls the page
     std::unique_ptr<ParamPage> m_page;   ///< the page
@@ -179,21 +248,66 @@ private:
  */
 class ArrangeView final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer {
 public:
-    /** @brief Shows @p p's score; @p detailed adds the names of the layers and a larger matrix (the Arrange tab). */
+    /**
+     * @brief Shows @p p's score; @p detailed adds the names of the layers and a larger matrix (the Arrange tab).
+     * @param[in,out] p         the processor
+     * @param[in]     detailed  true for the Arrange tab's view
+     */
     ArrangeView(ParhelionProcessor& p, bool detailed);
-    void paint(juce::Graphics& g) override;                     ///< the tracks or sections, the matrix, the energy, the ruler, the playhead
-    void mouseDown(const juce::MouseEvent& e) override;         ///< jumps there (zoomed: on release, if it was no drag)
-    void mouseDrag(const juce::MouseEvent& e) override;         ///< moves a zoomed view along
-    void mouseUp(const juce::MouseEvent& e) override;           ///< the jump of a zoomed view
-    void mouseDoubleClick(const juce::MouseEvent& e) override;  ///< the whole length again
-    /** @brief Zooms around the pointer; the wheel sideways, or with Shift, moves along. */
+    /**
+     * the tracks or sections, the matrix, the energy, the ruler, the playhead
+     * @param[in,out] g  the graphics context to draw into
+     */
+    void paint(juce::Graphics& g) override;
+    /**
+     * jumps there (zoomed: on release, if it was no drag)
+     * @param[in] e  the mouse event
+     */
+    void mouseDown(const juce::MouseEvent& e) override;
+    /**
+     * moves a zoomed view along
+     * @param[in] e  the mouse event
+     */
+    void mouseDrag(const juce::MouseEvent& e) override;
+    /**
+     * the jump of a zoomed view
+     * @param[in] e  the mouse event
+     */
+    void mouseUp(const juce::MouseEvent& e) override;
+    /**
+     * the whole length again
+     * @param[in] e  the mouse event
+     */
+    void mouseDoubleClick(const juce::MouseEvent& e) override;
+    /**
+     * @brief Zooms around the pointer; the wheel sideways, or with Shift, moves along.
+     * @param[in] e      the mouse event
+     * @param[in] wheel  the wheel's movement
+     */
     void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
-    void mouseMagnify(const juce::MouseEvent& e, float scale) override;   ///< a trackpad's pinch zooms
-    /** @brief The beats shown, @p from to @p to; false while the view shows the whole length. */
+    /**
+     * a trackpad's pinch zooms
+     * @param[in] e      the mouse event
+     * @param[in] scale  the pinch's factor
+     */
+    void mouseMagnify(const juce::MouseEvent& e, float scale) override;
+    /**
+     * @brief The beats shown, @p from to @p to; false while the view shows the whole length.
+     * @param[out] from  receives the first beat shown
+     * @param[out] to    receives the last beat shown
+     * @return false while the whole length is shown
+     */
     bool zoomed(double& from, double& to) const;
-    /** @brief Shows the beats @p from to @p to (once a score is there; the screenshots' PARH_SHOT_ZOOM). */
+    /**
+     * @brief Shows the beats @p from to @p to (once a score is there; the screenshots' PARH_SHOT_ZOOM).
+     * @param[in] from  the first beat to show
+     * @param[in] to    the last beat to show
+     */
     void zoomTo(double from, double to) { m_wanted = { from, to }; }
-    /** @brief Another view whose zoomed window this one marks (the strip on top marks the Arrange tab's). */
+    /**
+     * @brief Another view whose zoomed window this one marks (the strip on top marks the Arrange tab's).
+     * @param[in] detail  the view whose window this one marks, or null
+     */
     void setDetail(const ArrangeView* detail) { m_detail = detail; }
 
 private:
@@ -206,10 +320,30 @@ private:
     static constexpr double Narrowest = 16.0;   ///< the least the view shows, in beats (four bars)
     void timerCallback() override;               ///< pages on with the playhead, repaints while it is shown
     void rebuild();                              ///< a copy of a new score, its notes sorted onto the matrix's rows
-    void show(double from, double span);         ///< the window, kept inside the length (all of it: not zoomed)
-    void zoomAround(float x, double factor);     ///< the window times @p factor, the beat under @p x staying put
-    void window(double& from, double& to) const; ///< the beats shown
-    double beatAt(float x) const;                ///< the beat under @p x
+    /**
+     * the window, kept inside the length (all of it: not zoomed)
+     * @param[in] from  the first beat
+     * @param[in] span  how many beats
+     */
+    void show(double from, double span);
+    /**
+     * the window times @p factor, the beat under @p x staying put
+     * @param[in] x       the pointer's position
+     * @param[in] factor  the zoom factor
+     */
+    void zoomAround(float x, double factor);
+    /**
+     * the beats shown
+     * @param[out] from  receives the first beat shown
+     * @param[out] to    receives the last beat shown
+     */
+    void window(double& from, double& to) const;
+    /**
+     * the beat under @p x
+     * @param[in] x  the position in pixels
+     * @return the beat there
+     */
+    double beatAt(float x) const;
     ParhelionProcessor& m_proc;   ///< the processor: what plays, where it is
     bool m_detailed;   ///< the Arrange tab's view: the operations' names, a larger matrix
     int m_version = -1;                    ///< the score the copy was taken of
@@ -234,13 +368,23 @@ private:
  */
 class ArrangePage final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The tab for @p p. */
+    /**
+     * @brief The tab for @p p.
+     * @param[in,out] p  the processor
+     */
     explicit ArrangePage(ParhelionProcessor& p);
     /** @brief The view large, the rerolls under it. */
     void resized() override;
-    /** @brief The background and the headings. */
+    /**
+     * @brief The background and the headings.
+     * @param[in,out] g  the graphics context to draw into
+     */
     void paint(juce::Graphics& g) override;
-    ArrangeView& view() { return m_view; }   ///< the large view (the strip on top marks its window)
+    /**
+     * the large view (the strip on top marks its window)
+     * @return the large view
+     */
+    ArrangeView& view() { return m_view; }
 
 private:
     /** @brief Shows the track under the playhead and its rerolls. */
@@ -258,16 +402,26 @@ private:
 /** @brief The Export tab (PLAN 10.1): the files, what each holds, the OSC cues' settings. */
 class ExportPage final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The tab for @p p. */
+    /**
+     * @brief The tab for @p p.
+     * @param[in,out] p  the processor
+     */
     explicit ExportPage(ParhelionProcessor& p);
     /** @brief The buttons, the status, the cue settings under them. */
     void resized() override;
-    /** @brief The background and what each file holds. */
+    /**
+     * @brief The background and what each file holds.
+     * @param[in,out] g  the graphics context to draw into
+     */
     void paint(juce::Graphics& g) override;
 
 private:
 public:
-    void exportWith(int extras);   ///< asks for a file, then exports (Ctrl+E: plain)
+    /**
+     * asks for a file, then exports (Ctrl+E: plain)
+     * @param[in] extras  what goes with the audio (0: plain)
+     */
+    void exportWith(int extras);
     void save();                   ///< asks for a file, then saves the set (Ctrl+S)
     void load();                   ///< asks for a set, then loads it (Ctrl+O)
 
@@ -294,30 +448,56 @@ class EditorBody final : public juce::Component {
 public:
     std::function<void(juce::Graphics&)> m_painter;   ///< draws the background and the logo
     std::function<void()> m_onResize;                 ///< lays the controls out
-    /** @brief Draws through painter. */
+    /**
+     * @brief Draws through painter.
+     * @param[in,out] g  the graphics context to draw into
+     */
     void paint(juce::Graphics& g) override { if (m_painter) m_painter(g); }
     /** @brief Lays out through onResize. */
     void resized() override { if (m_onResize) m_onResize(); }
 };
 
-/** @brief The logo (Deploy/make_icon.py, drawn as vectors): the moon's dark disc, its rim, the corona in streamers. */
+/**
+ * @brief The logo (Deploy/make_icon.py, drawn as vectors): the sun, its 22-degree halo and the two sun dogs on it.
+ * @param[in,out] g  the graphics context to draw into
+ * @param[in]     r  where the logo goes
+ */
 void drawLogo(juce::Graphics& g, juce::Rectangle<float> r);
 
 /** @brief The editor: the frame's header and keys, the arrange strip, the tabs, the help over them. */
 class ParhelionEditor final : public juce::AudioProcessorEditor, private juce::Timer, private juce::ChangeListener {
 public:
-    explicit ParhelionEditor(ParhelionProcessor& p);           ///< builds the panel for @p p
+    /**
+     * builds the panel for @p p
+     * @param[in,out] p  the processor
+     */
+    explicit ParhelionEditor(ParhelionProcessor& p);
     ~ParhelionEditor() override;                           ///< stops the refresh timer
-    void paint(juce::Graphics& g) override;            ///< the background
+    /**
+     * the background
+     * @param[in,out] g  the graphics context
+     */
+    void paint(juce::Graphics& g) override;
     void resized() override;                           ///< scales the body to the window
     void parentHierarchyChanged() override;            ///< the standalone's title bar gets a maximise button, the window its place
-    bool keyPressed(const juce::KeyPress& key) override;   ///< the frame's keys (frame::handleKey)
+    /**
+     * the frame's keys (frame::handleKey)
+     * @param[in] key  the key
+     * @return true when the key was used
+     */
+    bool keyPressed(const juce::KeyPress& key) override;
     /**
      * @brief Opens the preset browser on instance @p instance of synth @p m; @p chosen hears the menu id taken (a factory
      *        preset's index + 1, or PresetBar::UserId + one of the player's).
+     * @param[in] m         the synth
+     * @param[in] instance  its instance
+     * @param[in] chosen    called with the menu id taken
      */
     void browsePresets(parh::ModuleE m, int instance, std::function<void(int)> chosen);
-    /** @brief Shows a line in the info line (an Alt-drag's depth). */
+    /**
+     * @brief Shows a line in the info line (an Alt-drag's depth).
+     * @param[in] text  the line
+     */
     void say(const juce::String& text) { if (m_info != nullptr) m_info->showText(text); }
 
 private:
@@ -326,18 +506,53 @@ private:
     void changeListenerCallback(juce::ChangeBroadcaster*) override;   ///< the settings changed (the backdrop)
     void layoutBody();                                 ///< the top bar, the arrange strip, the tabs, at the design scale
     void toggleFullScreen();                           ///< the standalone's window full screen and back
-    bool fullScreen() const;                           ///< whether it is
-    bool standalone() const;                           ///< the editor sits in the standalone's window
-    void showLength(bool mix);                         ///< the length slider for a track's minutes or a mix's
-    void showHelp(bool on);                            ///< the help over the tabs (F1)
+    /**
+     * whether it is
+     * @return true in full screen
+     */
+    bool fullScreen() const;
+    /**
+     * the editor sits in the standalone's window
+     * @return true in the standalone's window
+     */
+    bool standalone() const;
+    /**
+     * the length slider for a track's minutes or a mix's
+     * @param[in] mix  true for a mix's minutes, false for a track's
+     */
+    void showLength(bool mix);
+    /**
+     * the help over the tabs (F1)
+     * @param[in] on  true to show it
+     */
+    void showHelp(bool on);
     void showSettings();                               ///< the settings menu
-    ExportPage* exportPage() const;                    ///< the Export tab's page
+    /**
+     * the Export tab's page
+     * @return the page
+     */
+    ExportPage* exportPage() const;
     void openPalette();                                ///< the command palette (Ctrl+K)
-    std::vector<frame::CommandPalette::Command> paletteCommands();   ///< what the palette can do: actions, pages, controls, presets
+    /**
+     * what the palette can do: actions, pages, controls, presets
+     * @return the palette's commands
+     */
+    std::vector<frame::CommandPalette::Command> paletteCommands();
     void startTour();                                  ///< the first steps, from the first
-    /** @brief The info line's words for store id @p id: its name, its value, its range, what moves it, its key. */
+    /**
+     * @brief The info line's words for store id @p id: its name, its value, its range, what moves it, its key.
+     * @param[in]  id    the store id
+     * @param[out] name  the control's name
+     * @param[out] text  its value, range, mover and key
+     * @return false when no page has the control
+     */
     bool describeControl(int id, juce::String& name, juce::String& text);
-    /** @brief Shows the control of store id @p id (its tab, sub-tab, section, voice) and lights it; false when no page has it. */
+    /**
+     * @brief Shows the control of store id @p id (its tab, sub-tab, section, voice) and lights it; false when no page
+     *        has it.
+     * @param[in] id  the store id
+     * @return false when no page has the control
+     */
     bool revealId(int id);
     ParhelionProcessor& m_proc;   ///< the processor
     frame::LookAndFeel m_lnf{ parhui::skin() };          ///< first, so it outlives every component that uses it
@@ -380,7 +595,7 @@ private:
     std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> m_combos;   ///< the header's menus on their parameters
     ArrangeView m_arrange;   ///< the arrange strip on top
     juce::TabbedComponent m_tabs{ juce::TabbedButtonBar::TabsAtTop };   ///< the pages
-    juce::String m_shotPath;   ///< TOT_SHOT: where the screenshot goes, empty none
+    juce::String m_shotPath;   ///< PARH_SHOT: where the screenshot goes, empty none
     int m_shotTicks = 0;   ///< ticks until the screenshot is taken
     bool m_shotHands = false;                           ///< PARH_SHOT_HEADSET: the headset's hands kept alive
     /** @brief The command palette's button (Ctrl+K). */

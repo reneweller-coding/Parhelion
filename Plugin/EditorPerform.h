@@ -4,6 +4,7 @@
  *        and faders of the decks, the master filter, the echo throw, each learnable from a MIDI controller -- and Mixer,
  *        the meters of the decks and the output beside the mix's and the master's knobs.
  * @note Copied from Totality `Plugin/EditorPerform.h` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #pragma once
 #include "PluginEditor.h"
@@ -14,10 +15,18 @@
 /** @brief A small button that binds the next MIDI controller to a parameter (right click: forget it). */
 class LearnButton final : public juce::TextButton {
 public:
-    /** @brief A learn button for store id @p id of @p p. */
+    /**
+     * @brief A learn button for store id @p id of @p p.
+     * @param[in,out] p   the processor
+     * @param[in]     id  the store id
+     */
     LearnButton(ParhelionProcessor& p, int id);
     void refresh();                                         ///< shows the binding, or that it listens
-    void mouseUp(const juce::MouseEvent& e) override;       ///< right click forgets
+    /**
+     * right click forgets
+     * @param[in] e  the mouse event
+     */
+    void mouseUp(const juce::MouseEvent& e) override;
 
 private:
     ParhelionProcessor& m_proc;   ///< the processor: its controller map
@@ -27,11 +36,17 @@ private:
 /** @brief The Perform tab. */
 class PerformPage final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The tab for @p p. */
+    /**
+     * @brief The tab for @p p.
+     * @param[in,out] p  the processor
+     */
     explicit PerformPage(ParhelionProcessor& p);
     /** @brief The mutes, the filter and the throw, the decks' strips, the learn buttons, the keyboard and the headset's group. */
     void resized() override;
-    /** @brief The groups' boxes and titles, the hands of a headset. */
+    /**
+     * @brief The groups' boxes and titles, the hands of a headset.
+     * @param[in,out] g  the graphics context to draw into
+     */
     void paint(juce::Graphics& g) override;
 
 private:
@@ -79,13 +94,25 @@ private:
 /** @brief The Decks sub-page: the decks' meters beside their channels' knobs. */
 class DecksPage final : public juce::Component {
 public:
-    /** @brief The sub-page for @p p. */
+    /**
+     * @brief The sub-page for @p p.
+     * @param[in,out] p  the processor
+     */
     explicit DecksPage(ParhelionProcessor& p);
     /** @brief The meters left, the knobs right. */
     void resized() override;
-    /** @brief The meters with their held peaks, the output and its loudness. */
+    /**
+     * @brief The meters with their held peaks, the output and its loudness.
+     * @param[in,out] g  the graphics context to draw into
+     */
     void paint(juce::Graphics& g) override;
-    /** @brief A new reading of the decks and the output. */
+    /**
+     * @brief A new reading of the decks and the output.
+     * @param[in] peak  each deck's peak
+     * @param[in] rms   each deck's RMS
+     * @param[in] out   the output's peak
+     * @param[in] lufs  the output's loudness in LUFS
+     */
     void meter(const float* peak, const float* rms, float out, float lufs);
 
 private:
@@ -103,11 +130,17 @@ private:
  */
 class MixerPage final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The tab for @p p. */
+    /**
+     * @brief The tab for @p p.
+     * @param[in,out] p  the processor
+     */
     explicit MixerPage(ParhelionProcessor& p);
     /** @brief The sub-tabs over the whole page. */
     void resized() override;
-    /** @brief The background. */
+    /**
+     * @brief The background.
+     * @param[in,out] g  the graphics context to draw into
+     */
     void paint(juce::Graphics& g) override;
 
 private:

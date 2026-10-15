@@ -3,6 +3,7 @@
  * @brief Counts of the local trance MIDI corpus (Tools/corpus/build_corpus.py, generated -- do not edit): per role
  *        the scale-step successions of order 0, 1 and 2, the onsets on two bars' sixteenths, the note lengths, the
  *        303's accents and slides. Statistics only; no loop can be read back from them.
+ * @author Rene Weller
  */
 #include "parh/compose/Corpus.h"
 

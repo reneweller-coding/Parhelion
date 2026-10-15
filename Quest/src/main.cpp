@@ -57,6 +57,7 @@
  *   quality=desktop     everything (default here: quest, PLAN 10: fewer unison oscillators, voices and players)
  *   knobs=compose.key=D;set.dramaturgy=Sunrise     any knobs, repeatable
  * @endcode
+ * @author Rene Weller
  */
 
 #include <android/log.h>
@@ -118,10 +119,18 @@ struct Vec3 {
     float m_z;   ///< back (towards the viewer)
 };
 
-/** @brief The identity matrix. */
+/**
+ * @brief The identity matrix.
+ * @return the identity matrix
+ */
 Mat4 identity() { Mat4 r{}; r.m_m[0] = r.m_m[5] = r.m_m[10] = r.m_m[15] = 1.0f; return r; }
 
-/** @brief The product @p a times @p b (b applied first). */
+/**
+ * @brief The product @p a times @p b (b applied first).
+ * @param[in] a  the left factor
+ * @param[in] b  the right factor, applied first
+ * @return the product
+ */
 Mat4 multiply(const Mat4& a, const Mat4& b)
 {
     Mat4 r{};
@@ -132,7 +141,13 @@ Mat4 multiply(const Mat4& a, const Mat4& b)
     return r;
 }
 
-/** @brief Asymmetric projection from OpenXR's four half-angles. */
+/**
+ * @brief Asymmetric projection from OpenXR's four half-angles.
+ * @param[in] fov    the four half-angles
+ * @param[in] nearZ  the near plane's distance
+ * @param[in] farZ   the far plane's distance
+ * @return the projection matrix
+ */
 Mat4 projectionFromFov(const XrFovf& fov, float nearZ, float farZ)
 {
     const float l = std::tan(fov.angleLeft), r = std::tan(fov.angleRight);
@@ -147,7 +162,11 @@ Mat4 projectionFromFov(const XrFovf& fov, float nearZ, float farZ)
     return p;
 }
 
-/** @brief The rotation of unit quaternion @p q as a matrix. */
+/**
+ * @brief The rotation of unit quaternion @p q as a matrix.
+ * @param[in] q  the unit quaternion
+ * @return the rotation matrix
+ */
 Mat4 rotationFromQuat(const XrQuaternionf& q)
 {
     const float x = q.x, y = q.y, z = q.z, w = q.w;
@@ -158,7 +177,12 @@ Mat4 rotationFromQuat(const XrQuaternionf& q)
     return r;
 }
 
-/** @brief Vector @p v rotated by @p q. */
+/**
+ * @brief Vector @p v rotated by @p q.
+ * @param[in] q  the unit quaternion
+ * @param[in] v  the vector
+ * @return the rotated vector
+ */
 Vec3 rotate(const XrQuaternionf& q, Vec3 v)
 {
     const Mat4 r = rotationFromQuat(q);
@@ -167,7 +191,11 @@ Vec3 rotate(const XrQuaternionf& q, Vec3 v)
              r.m_m[2] * v.m_x + r.m_m[6] * v.m_y + r.m_m[10] * v.m_z };
 }
 
-/** @brief The view matrix of an eye pose: the inverse of the pose. */
+/**
+ * @brief The view matrix of an eye pose: the inverse of the pose.
+ * @param[in] pose  the eye's pose
+ * @return the view matrix
+ */
 Mat4 viewFromPose(const XrPosef& pose)
 {
     const Mat4 r = rotationFromQuat(pose.orientation);
@@ -178,7 +206,11 @@ Mat4 viewFromPose(const XrPosef& pose)
     return multiply(rt, t);
 }
 
-/** @brief @p x limited to 0 .. 1. */
+/**
+ * @brief @p x limited to 0 .. 1.
+ * @param[in] x  the value
+ * @return the value limited to 0 .. 1
+ */
 float clamp01(float x) { return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x); }
 
 // ---------------------------------------------------------------- 5x7 point font
@@ -189,6 +221,8 @@ float clamp01(float x) { return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x); }
  * Text on the panel is drawn as points, like everything else: no texture, no atlas, one draw call
  * for the whole picture. (Table taken from Noctuary's Quest app, where it was measured legible at
  * arm's length; extended by '%', '#' and '*'.)
+ * @param[in] c  the character
+ * @return its seven rows
  */
 const unsigned char* glyph(char c)
 {
@@ -243,7 +277,11 @@ struct Config {
     bool m_quest = true;              ///< the Quest's quality (Engine::Quality); `quality=desktop` plays all
 };
 
-/** @brief Reads `<dir>/parh.cfg`; every key is optional. */
+/**
+ * @brief Reads `<dir>/parh.cfg`; every key is optional.
+ * @param[in] dir  the folder of tot.cfg
+ * @return the configuration
+ */
 Config readConfig(const char* dir)
 {
     Config c;
@@ -290,7 +328,11 @@ struct Now {
     std::vector<double> m_starts;   ///< set beat of each track's first bar
     std::vector<double> m_swaps;   ///< set beats of each track's first bar and of its swap
     std::vector<int> m_decks;   ///< the deck each track plays on
-    /** @brief The track that owns the low end at @p beat. */
+    /**
+     * @brief The track that owns the low end at @p beat.
+     * @param[in] beat  the position in beats
+     * @return the track's index
+     */
     int trackAt(double beat) const
     {
         int t = 0;
@@ -319,7 +361,13 @@ enum class NowStateE : int { NONE = 0, PENDING, TOO_LATE, NOT_IN_SET, NO_ROOM };
  */
 class TrackPlayer {
 public:
-    /** @brief Composes the first track and loads it. Composer thread, before the audio stream starts. */
+    /**
+     * @brief Composes the first track and loads it. Composer thread, before the audio stream starts.
+     * @param[in] sampleRate  the sample rate in Hz
+     * @param[in] block       the largest block
+     * @param[in] cfg         the configuration
+     * @pre called on the composer thread
+     */
     void prepare(int sampleRate, int block, const Config& cfg)
     {
         m_muted = cfg.m_mute;
@@ -350,7 +398,13 @@ public:
         LOGI("ready: seed %llu, %.0f s", static_cast<unsigned long long>(m_seed), m_engines[0]->lengthSeconds());
     }
 
-    /** @brief Renders one block. Audio thread only. */
+    /**
+     * @brief Renders one block. Audio thread only.
+     * @param[out] L  receives the left channel
+     * @param[out] R  receives the right channel
+     * @param[in]  n  how many samples
+     * @pre called on the audio thread
+     */
     void process(float* L, float* R, int n)
     {
         if (!m_ready.load(std::memory_order_acquire)) {
@@ -418,17 +472,33 @@ public:
         if (now->seconds() > now->lengthSeconds() + 8.0) m_nextRequest.store(true, std::memory_order_relaxed);
     }
 
-    /** @brief Binds the cue sender (Cue.h); null leaves the cues off. Call before the audio stream starts. */
+    /**
+     * @brief Binds the cue sender (Cue.h); null leaves the cues off. Call before the audio stream starts.
+     * @param[in,out] sender  the cue sender, null for none
+     * @pre called before the
+     */
     void setCueSender(CueSender* sender) { m_cues = sender; }
-    /** @brief Play or stop (any thread; takes effect over the fade). */
+    /**
+     * @brief Play or stop (any thread; takes effect over the fade).
+     * @param[in] on  true to play
+     */
     void setPlaying(bool on) { m_playing.store(on, std::memory_order_relaxed); }
-    /** @brief Whether play is on. */
+    /**
+     * @brief Whether play is on.
+     * @return true while play is on
+     */
     bool playing() const { return m_playing.load(std::memory_order_relaxed); }
     /** @brief Asks for the next track or set (any thread). */
     void requestNext() { m_nextRequest.store(true, std::memory_order_relaxed); }
-    /** @brief Asks for "Breakdown now" or "Drop now" (any thread). */
+    /**
+     * @brief Asks for "Breakdown now" or "Drop now" (any thread).
+     * @param[in] kind  a breakdown or a drop
+     */
     void requestNow(SectionKindE kind) { m_nowRequest.store(static_cast<int>(kind), std::memory_order_relaxed); }
-    /** @brief One round of composer work: a next track, a "now", else the loudness of what plays. Composer thread. */
+    /**
+     * @brief One round of composer work: a next track, a "now", else the loudness of what plays. Composer thread.
+     * @pre called on the composer thread
+     */
     void pump()
     {
         if (m_nextRequest.exchange(false, std::memory_order_relaxed)) next();
@@ -438,28 +508,78 @@ public:
     /** @brief Breaks off the composer's work (the app closes). */
     void quit() { m_quit.store(true, std::memory_order_relaxed); }
 
-    /** @brief Where the audio thread is, in beats and seconds (render thread). */
+    /**
+     * @brief Where the audio thread is, in beats and seconds (render thread).
+     * @return the position in beats
+     * @pre called on the render thread
+     */
     double beat() const { return m_beat.load(std::memory_order_relaxed); }
-    double seconds() const { return m_seconds.load(std::memory_order_relaxed); }   ///< @copydoc beat
-    /** @brief The output's mean square, smoothed over 300 ms, as dBFS (render thread). */
+    /**
+     * @brief Where the audio thread is, in seconds (render thread).
+     * @return the position in seconds
+     * @pre called on the render thread
+     */
+    double seconds() const { return m_seconds.load(std::memory_order_relaxed); }
+    /**
+     * @brief The output's mean square, smoothed over 300 ms, as dBFS (render thread).
+     * @return the output's level in dBFS
+     * @pre called on the render thread
+     */
     float levelDb() const { const float l = m_level.load(std::memory_order_relaxed); return l > 1.0e-10f ? 10.0f * std::log10(l) : -100.0f; }
-    /** @brief What plays (render thread): an immutable copy. */
+    /**
+     * @brief What plays (render thread): an immutable copy.
+     * @return what plays
+     * @pre called on the render thread
+     */
     std::shared_ptr<const Now> now() const { std::lock_guard<std::mutex> lock(m_nowMutex); return m_now; }
-    /** @brief Which track or set plays, from 1. */
+    /**
+     * @brief Which track or set plays, from 1.
+     * @return the number of the track or set, from 1
+     */
     int number() const { return m_number.load(std::memory_order_relaxed); }
-    /** @brief The knobs of the engine that plays (read only; the ids are the same in both). */
+    /**
+     * @brief The knobs of the engine that plays (read only; the ids are the same in both).
+     * @return the knobs
+     */
     const ParamStore& params() const { return m_engines[m_front.load(std::memory_order_acquire)]->params(); }
-    /** @brief Sets a knob in both engines (any thread): the hands' controls stay with whichever plays. */
+    /**
+     * @brief Sets a knob in both engines (any thread): the hands' controls stay with whichever plays.
+     * @param[in] id     the parameter
+     * @param[in] value  the real value
+     */
     void setKnob(int id, float value) { for (auto& e : m_engines) e->params().set(id, value); }
-    /** @brief Whether prepare() has finished. */
+    /**
+     * @brief Whether prepare() has finished.
+     * @return true once prepare() has finished
+     */
     bool ready() const { return m_ready.load(std::memory_order_acquire); }
-    /** @brief Whether the output is muted by the config. */
+    /**
+     * @brief Whether the output is muted by the config.
+     * @return true when the config mutes the output
+     */
     bool muted() const { return m_muted; }
-    /** @brief The performer's "now": its state, the bar it begins at and what it is (render thread). */
+    /**
+     * @brief The performer's "now": its state, the bar it begins at and what it is (render thread).
+     * @return the now's state
+     * @pre called on the render thread
+     */
     NowStateE nowState() const { return static_cast<NowStateE>(m_nowState.load(std::memory_order_relaxed)); }
-    int nowBar() const { return m_nowBar.load(std::memory_order_relaxed); }                                              ///< @copydoc nowState
-    SectionKindE nowKind() const { return static_cast<SectionKindE>(m_nowKind.load(std::memory_order_relaxed)); }          ///< @copydoc nowState
-    /** @brief Seconds on the steady clock when the state last changed (the panel lets a message stand a while). */
+    /**
+     * @brief The bar the performer's "now" begins at (render thread).
+     * @return the bar the now begins at
+     * @pre called on the render thread
+     */
+    int nowBar() const { return m_nowBar.load(std::memory_order_relaxed); }
+    /**
+     * @brief What the performer's "now" is (render thread).
+     * @return what the now is: a breakdown or a drop
+     * @pre called on the render thread
+     */
+    SectionKindE nowKind() const { return static_cast<SectionKindE>(m_nowKind.load(std::memory_order_relaxed)); }
+    /**
+     * @brief Seconds on the steady clock when the state last changed (the panel lets a message stand a while).
+     * @return the steady clock's seconds at the last change
+     */
     double nowSince() const { return m_nowSince.load(std::memory_order_relaxed); }
 
 private:
@@ -468,12 +588,20 @@ private:
     /** @brief The pre-roll: the second engine starts this many bars before where the first one plays. */
     static constexpr int PrerollBars = 4;
 
-    /** @brief The steady clock, seconds. */
+    /**
+     * @brief The steady clock, seconds.
+     * @return the steady clock's seconds
+     */
     static double clockSeconds()
     {
         return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     }
-    /** @brief Sets the performer's "now" to state @p s at bar @p bar for a section of @p kind (render thread reads it). */
+    /**
+     * @brief Sets the performer's "now" to state @p s at bar @p bar for a section of @p kind (render thread reads it).
+     * @param[in] s     the state
+     * @param[in] bar   the bar it begins at
+     * @param[in] kind  a breakdown or a drop
+     */
     void setNow(NowStateE s, int bar, SectionKindE kind)
     {
         m_nowBar.store(bar, std::memory_order_relaxed);
@@ -481,7 +609,10 @@ private:
         m_nowState.store(static_cast<int>(s), std::memory_order_relaxed);
         m_nowSince.store(clockSeconds(), std::memory_order_relaxed);
     }
-    /** @brief Waits until the audio thread has made engine @p f the front (after a swap or a handover). */
+    /**
+     * @brief Waits until the audio thread has made engine @p f the front (after a swap or a handover).
+     * @param[in] f  the engine
+     */
     void waitFront(int f)
     {
         while (m_front.load(std::memory_order_acquire) != f && !m_quit.load(std::memory_order_relaxed))
@@ -511,6 +642,7 @@ private:
      *        build, a drop) or a drop at once, in the back engine, and handed over on a beat before the two tracks play
      *        a note differently. Its level corrections go with it until the Leveler has measured the new one. A set is
      *        not rewritten (its next blend would have to move with it).
+     * @param[in] kind  a breakdown or a drop
      */
     void rewrite(SectionKindE kind)
     {
@@ -593,17 +725,29 @@ private:
         LOGI("%d: loudness corrected", number());
     }
 
-    /** @brief Hands @p s to the render thread (now()) under the mutex. */
+    /**
+     * @brief Hands @p s to the render thread (now()) under the mutex.
+     * @param[in] s  what plays
+     */
     void publish(std::shared_ptr<const Now> s) { std::lock_guard<std::mutex> lock(m_nowMutex); m_now = std::move(s); }
 
-    /** @brief Loads @p now into engine @p e: a set, or the one track. */
+    /**
+     * @brief Loads @p now into engine @p e: a set, or the one track.
+     * @param[in,out] e    the engine
+     * @param[in]     now  what plays
+     */
     static void load(Engine& e, const Now& now)
     {
         if (now.m_isSet) e.loadSet(now.m_set);
         else e.load(now.m_set.m_decks[0]);
     }
 
-    /** @brief A track, or with set_minutes a set. Composer thread. */
+    /**
+     * @brief A track, or with set_minutes a set. Composer thread.
+     * @param[in] seed  the seed
+     * @return what was composed
+     * @pre called on the composer thread
+     */
     Now composeFor(uint64_t seed)
     {
         const ParamStore& p = params();
@@ -672,10 +816,16 @@ private:
 /** @brief Oboe output stream: a low-latency float stream straight into TrackPlayer::process. */
 class Audio : public oboe::AudioStreamDataCallback {
 public:
-    /** @brief A stream that will play @p p (open() and start() it). */
+    /**
+     * @brief A stream that will play @p p (open() and start() it).
+     * @param[in,out] p  the player
+     */
     explicit Audio(TrackPlayer& p) : m_player(p) {}
 
-    /** @brief Opens a low-latency stereo float stream at 48 kHz (or what the device gives); false if it cannot. */
+    /**
+     * @brief Opens a low-latency stereo float stream at 48 kHz (or what the device gives); false if it cannot.
+     * @return false when the stream cannot be opened
+     */
     bool open()
     {
         oboe::AudioStreamBuilder b;
@@ -695,18 +845,30 @@ public:
         LOGI("Oboe: %d Hz, burst %d", m_sampleRate, m_burst);
         return true;
     }
-    /** @brief Starts the stream; false if it does not. */
+    /**
+     * @brief Starts the stream; false if it does not.
+     * @return false when the stream does not start
+     */
     bool start() { return m_stream && m_stream->requestStart() == oboe::Result::OK; }
     /** @brief Stops and closes the stream. */
     void stop() { if (m_stream) { m_stream->requestStop(); m_stream->close(); m_stream.reset(); } }
-    /** @brief The rate the device gave, Hz. */
+    /**
+     * @brief The rate the device gave, Hz.
+     * @return the sample rate in Hz
+     */
     int sampleRate() const { return m_sampleRate; }
-    /** @brief The device's burst, frames. */
+    /**
+     * @brief The device's burst, frames.
+     * @return the burst in frames
+     */
     int burst() const { return m_burst; }
 
     /**
      * @brief Oboe's callback: renders @p frames through the player in pieces of at most 4096 and interleaves them into @p
      *        data.
+     * @param[out] data    receives the interleaved stereo frames
+     * @param[in]  frames  how many frames
+     * @return Continue
      */
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream*, void* data, int32_t frames) override
     {
@@ -764,8 +926,8 @@ void main() {
 /** @brief One soft round point: the only primitive the scene has. */
 struct Point {
     float m_x;      ///< position in the room, metres
-    float m_y;      ///< @copydoc x
-    float m_z;      ///< @copydoc x
+    float m_y;      ///< height in the room, metres
+    float m_z;      ///< depth in the room, metres
     float m_r;      ///< red 0..1
     float m_g;      ///< green 0..1
     float m_b;      ///< blue 0..1
@@ -780,7 +942,12 @@ struct Panel {
     Vec3 m_up;       ///< one metre up along the panel
 };
 
-/** @brief A shader of @p type compiled from @p src; a failure is logged. */
+/**
+ * @brief A shader of @p type compiled from @p src; a failure is logged.
+ * @param[in] type  the shader's type
+ * @param[in] src   its source
+ * @return the shader, 0 on failure
+ */
 GLuint compile(GLenum type, const char* src)
 {
     const GLuint s = glCreateShader(type);
@@ -803,7 +970,10 @@ public:
     /** @brief Display pixels per radian on the Quest 2's render target (about 1830 px over 90 deg). */
     static constexpr float PixelsPerRadian = 1150.0f;
 
-    /** @brief Links the shaders and sets up the point buffer; false if the program does not link. */
+    /**
+     * @brief Links the shaders and sets up the point buffer; false if the program does not link.
+     * @return false when the program does not link
+     */
     bool init()
     {
         m_program = glCreateProgram();
@@ -828,13 +998,33 @@ public:
     /** @brief Starts a new picture: forgets the points of the last frame. */
     void begin() { m_points.clear(); }
 
-    /** @brief One point in world space. */
+    /**
+     * @brief One point in world space.
+     * @param[in] x     x in metres
+     * @param[in] y     y in metres
+     * @param[in] z     z in metres
+     * @param[in] r     red, 0..1
+     * @param[in] g     green, 0..1
+     * @param[in] b     blue, 0..1
+     * @param[in] a     brightness, 0..1
+     * @param[in] size  the diameter in pixels at one metre
+     */
     void add(float x, float y, float z, float r, float g, float b, float a, float size)
     {
         m_points.push_back({ x, y, z, r, g, b, a, size });
     }
 
-    /** @brief One point on a panel, at panel coordinates @p u (right) and @p v (up). */
+    /**
+     * @brief One point on a panel, at panel coordinates @p u (right) and @p v (up).
+     * @param[in] p     the panel
+     * @param[in] u     metres to the right
+     * @param[in] v     metres up
+     * @param[in] r     red, 0..1
+     * @param[in] g     green, 0..1
+     * @param[in] b     blue, 0..1
+     * @param[in] a     brightness, 0..1
+     * @param[in] size  the diameter in pixels at one metre
+     */
     void addOn(const Panel& p, float u, float v, float r, float g, float b, float a, float size)
     {
         add(p.m_origin.m_x + p.m_right.m_x * u + p.m_up.m_x * v,
@@ -848,6 +1038,15 @@ public:
      * The point size is `cell * PixelsPerRadian / w`: a cell of `cell` metres at `w` metres
      * subtends `cell / w` radians, and the Quest 2 renders about 1150 pixels per radian (roughly
      * 1830 pixels over 90 degrees per eye), so the dots of a glyph just touch at any distance.
+     * @param[in] p     the panel
+     * @param[in] u     metres to the right
+     * @param[in] v     metres up
+     * @param[in] cell  the pitch of one font pixel in metres
+     * @param[in] text  the text
+     * @param[in] r     red, 0..1
+     * @param[in] g     green, 0..1
+     * @param[in] b     blue, 0..1
+     * @param[in] a     brightness, 0..1
      */
     void addText(const Panel& p, float u, float v, float cell, const char* text,
                  float r, float g, float b, float a)
@@ -870,7 +1069,12 @@ public:
         glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(m_points.size() * sizeof(Point)), m_points.data(), GL_DYNAMIC_DRAW);
     }
 
-    /** @brief Draws the points for one eye with view-projection @p vp into a @p width by @p height target. */
+    /**
+     * @brief Draws the points for one eye with view-projection @p vp into a @p width by @p height target.
+     * @param[in] vp      the view-projection matrix
+     * @param[in] width   the target's width
+     * @param[in] height  the target's height
+     */
     void draw(const Mat4& vp, int width, int height)
     {
         glViewport(0, 0, width, height);
@@ -919,7 +1123,13 @@ public:
         bool m_everSeen = false;  ///< this hand has been tracked at least once
     };
 
-    /** @brief Feeds one hand; @p headY is the head's height in the same space. */
+    /**
+     * @brief Feeds one hand; @p headY is the head's height in the same space.
+     * @param[in] h             the hand, 0 left, 1 right
+     * @param[in] palm          the palm's position
+     * @param[in] thumbToIndex  the distance of thumb and index tips
+     * @param[in] headY         the head's height
+     */
     void setHand(int h, const XrVector3f& palm, float thumbToIndex, float headY)
     {
         Hand& s = m_hand[h];
@@ -931,17 +1141,18 @@ public:
         else if (thumbToIndex > 0.038f) s.m_closed = false;
         s.m_height = clamp01((palm.y - (headY - 1.0f)) / 0.8f);
     }
-    /** @brief Marks a hand as not tracked this frame (its macro then holds its value). */
+    /**
+     * @brief Marks a hand as not tracked this frame (its macro then holds its value).
+     * @param[in] h  the hand, 0 left, 1 right
+     */
     void lost(int h) { m_hand[h].m_valid = false; m_hand[h].m_closed = false; }
 
     /**
      * @brief Advances the smoothing and reports the two rising pinch edges.
-     * @param dt         seconds since the last frame
-     * @param leftPinch  receives true on the frame the left hand closes
-     * @param rightPinch receives true on the frame the right hand closes
-     *
-     * A macro follows its hand only while that hand is open: the pinch that starts a track must not
-     * also drag the gain with it.
+     * @param[in]  dt          seconds since the last frame
+     * @param[out] leftPinch   receives true on the frame the left hand closes
+     * @param[out] rightPinch  receives true on the frame the right hand closes A macro follows its hand only while that
+     *                         hand is open: the pinch that starts a track must not also drag the gain with it.
      */
     void update(double dt, bool& leftPinch, bool& rightPinch)
     {
@@ -958,7 +1169,11 @@ public:
         m_wasClosed[1] = m_hand[1].m_closed;
     }
 
-    /** @brief Hand @p h: 0 left, 1 right. */
+    /**
+     * @brief Hand @p h: 0 left, 1 right.
+     * @param[in] h  the hand, 0 left, 1 right
+     * @return the hand
+     */
     const Hand& hand(int h) const { return m_hand[h]; }
 
 private:
@@ -982,7 +1197,12 @@ public:
     HandBridge(const HandBridge&) = delete;
     HandBridge& operator=(const HandBridge&) = delete;
     ~HandBridge() { close(); }
-    /** @brief Opens the UDP socket to @p host (a dotted IPv4 address, no names) and @p port; false if it cannot. */
+    /**
+     * @brief Opens the UDP socket to @p host (a dotted IPv4 address, no names) and @p port; false if it cannot.
+     * @param[in] host  the dotted IPv4 address
+     * @param[in] port  the UDP port
+     * @return false when the socket cannot be opened
+     */
     bool open(const std::string& host, int port)
     {
         close();
@@ -996,9 +1216,17 @@ public:
     }
     /** @brief Closes the socket; send() then does nothing. */
     void close() { if (m_sock >= 0) ::close(m_sock); m_sock = -1; }
-    /** @brief Whether the bridge is on. */
+    /**
+     * @brief Whether the bridge is on.
+     * @return true while the bridge is on
+     */
     bool ok() const { return m_sock >= 0; }
-    /** @brief Sends the hands, at most 30 times a second; @p dt the seconds since the last frame (render thread). */
+    /**
+     * @brief Sends the hands, at most 30 times a second; @p dt the seconds since the last frame (render thread).
+     * @param[in] hands  the hands
+     * @param[in] dt     the seconds since the last frame
+     * @pre called on the render thread
+     */
     void send(const Hands& hands, double dt)
     {
         if (m_sock < 0) return;
@@ -1055,12 +1283,16 @@ struct SwapchainTarget {
 /** @brief The Quest app: OpenXR session, hands, panel, and the track player with its composer thread and audio stream. */
 class App {
 public:
-    /** @brief The app on the native activity @p app. */
+    /**
+     * @brief The app on the native activity @p app.
+     * @param[in,out] app  the native activity
+     */
     explicit App(android_app* app) : m_app(app) {}
 
     /**
      * @brief Reads parh.cfg, opens the cue sender and the bridge, sets up OpenXR, EGL, the hands, the scene and the audio
      *        stream, and starts the composer thread; false where something essential failed.
+     * @return false where something essential failed
      */
     bool init()
     {
@@ -1151,7 +1383,10 @@ private:
 
     // ------------------------------------------------ OpenXR setup
 
-    /** @brief Initialises Android's OpenXR loader. */
+    /**
+     * @brief Initialises Android's OpenXR loader.
+     * @return false when the loader fails
+     */
     bool initLoader()
     {
         PFN_xrInitializeLoaderKHR initLoader = nullptr;
@@ -1163,7 +1398,11 @@ private:
         return XR_SUCCEEDED(initLoader(reinterpret_cast<const XrLoaderInitInfoBaseHeaderKHR*>(&li)));
     }
 
-    /** @brief Creates the OpenXR instance with GLES and hand tracking and finds the headset; notes whether it tracks hands. */
+    /**
+     * @brief Creates the OpenXR instance with GLES and hand tracking and finds the headset; notes whether it tracks
+     *        hands.
+     * @return false when there is no instance or no headset
+     */
     bool initInstance()
     {
         const char* exts[] = { XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME,
@@ -1192,7 +1431,10 @@ private:
         return true;
     }
 
-    /** @brief An EGL context for GLES 3 on a small pbuffer, as OpenXR's GLES binding needs. */
+    /**
+     * @brief An EGL context for GLES 3 on a small pbuffer, as OpenXR's GLES binding needs.
+     * @return false when there is no context
+     */
     bool initEgl()
     {
         PFN_xrGetOpenGLESGraphicsRequirementsKHR getReq = nullptr;
@@ -1217,7 +1459,11 @@ private:
         return true;
     }
 
-    /** @brief The session, the room (stage, else local) and head spaces, and a swapchain with framebuffer and depth per eye. */
+    /**
+     * @brief The session, the room (stage, else local) and head spaces, and a swapchain with framebuffer and depth per
+     *        eye.
+     * @return false when the session or the swapchains fail
+     */
     bool initSession()
     {
         XrGraphicsBindingOpenGLESAndroidKHR gb{ XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR };
@@ -1275,7 +1521,10 @@ private:
         return true;
     }
 
-    /** @brief A hand tracker per hand; false where the headset or runtime does not track hands. */
+    /**
+     * @brief A hand tracker per hand; false where the headset or runtime does not track hands.
+     * @return false where the hands are not tracked
+     */
     bool initHands()
     {
         if (!m_handsSupported) return false;
@@ -1326,7 +1575,10 @@ private:
 
     // ------------------------------------------------ per frame
 
-    /** @brief The head pose at @p time (m_headPose, m_headValid). */
+    /**
+     * @brief The head pose at @p time (m_headPose, m_headValid).
+     * @param[in] time  the predicted display time
+     */
     void updateHead(XrTime time)
     {
         m_headValid = false;
@@ -1339,7 +1591,10 @@ private:
         m_headValid = true;
     }
 
-    /** @brief Locates both hands at @p time and feeds their palms and pinches to m_hands. */
+    /**
+     * @brief Locates both hands at @p time and feeds their palms and pinches to m_hands.
+     * @param[in] time  the predicted display time
+     */
     void updateHands(XrTime time)
     {
         for (int h = 0; h < 2; ++h) {
@@ -1401,7 +1656,10 @@ private:
     static constexpr int LineChars = 20;           ///< the longest line
     static constexpr double LongPinch = 0.6;       ///< seconds the right pinch is held for "now"
 
-    /** @brief The head-locked panel: in front of the eyes, following the yaw only. */
+    /**
+     * @brief The head-locked panel: in front of the eyes, following the yaw only.
+     * @return the panel
+     */
     Panel headPanel() const
     {
         Panel p;
@@ -1419,7 +1677,12 @@ private:
         return p;
     }
 
-    /** @brief The section of @p s at @p beat, or null. */
+    /**
+     * @brief The section of @p s at @p beat, or null.
+     * @param[in] s     the score
+     * @param[in] beat  the position in beats
+     * @return the block's name
+     */
     static const Section* sectionAt(const Score& s, double beat)
     {
         const Section* out = nullptr;
@@ -1427,7 +1690,12 @@ private:
         return out;
     }
 
-    /** @brief The plan's energy at @p beat, 0..1: the section's, from its start to its end (a continuous curve). */
+    /**
+     * @brief The plan's energy at @p beat, 0..1: the section's, from its start to its end (a continuous curve).
+     * @param[in] s     the score
+     * @param[in] beat  the position in beats
+     * @return the energy, 0..1
+     */
     static float energyAt(const Score& s, double beat)
     {
         const Section* x = sectionAt(s, beat);
@@ -1442,7 +1710,13 @@ private:
         std::vector<std::pair<float, float>> m_onsets;     ///< position in the bar 0..1 and velocity of each onset
     };
 
-    /** @brief The onsets of bar @p bar of @p s, per part (the kick apart, the ghost left out), in part order. */
+    /**
+     * @brief The onsets of bar @p bar of @p s, per part (the kick apart, the ghost left out), in part order.
+     * @param[in]  s      the score
+     * @param[in]  bar    the bar
+     * @param[out] rings  receives the parts' onsets
+     * @param[out] kick   receives the kick's onsets
+     */
     static void gatherBar(const Score& s, int bar, std::vector<Beads>& rings, std::vector<float>& kick)
     {
         rings.clear();
@@ -1465,7 +1739,13 @@ private:
         std::sort(rings.begin(), rings.end(), [](const Beads& a, const Beads& b) { return a.m_part < b.m_part; });
     }
 
-    /** @brief A part's colour in the sky: the drums the sun's white, the low end blue, the voices the halo's colours. */
+    /**
+     * @brief A part's colour in the sky: the drums the sun's white, the low end blue, the voices the halo's colours.
+     * @param[in]  part  the part
+     * @param[out] r     receives red, 0..1
+     * @param[out] g     receives green, 0..1
+     * @param[out] b     receives blue, 0..1
+     */
     static void partColour(int part, float& r, float& g, float& b)
     {
         switch (static_cast<PartE>(part)) {
@@ -1482,7 +1762,13 @@ private:
         }
     }
 
-    /** @brief A section's colour on the parhelic circle: the drops warm, the breakdowns blue, the rest dim. */
+    /**
+     * @brief A section's colour on the parhelic circle: the drops warm, the breakdowns blue, the rest dim.
+     * @param[in]  k  the section's kind
+     * @param[out] r  red, 0..1
+     * @param[out] g  green, 0..1
+     * @param[out] b  blue, 0..1
+     */
     static void sectionColour(SectionKindE k, float& r, float& g, float& b)
     {
         switch (k) {
@@ -1494,7 +1780,18 @@ private:
         }
     }
 
-    /** @brief A glow of points: a disc of radius @p r at (@p u, @p v) on @p p, brighter to the middle. */
+    /**
+     * @brief A glow of points: a disc of radius @p r at (@p u, @p v) on @p p, brighter to the middle.
+     * @param[in] p     the panel
+     * @param[in] u     the centre's horizontal place on the panel
+     * @param[in] v     its vertical place
+     * @param[in] r     the disc's radius
+     * @param[in] cr    red, 0..1
+     * @param[in] cg    green, 0..1
+     * @param[in] cb    blue, 0..1
+     * @param[in] a     the brightness, 0..1
+     * @param[in] size  the points' size
+     */
     void addGlow(const Panel& p, float u, float v, float r, float cr, float cg, float cb, float a, float size)
     {
         for (int ring = 0; ring < 4; ++ring) {
@@ -1510,6 +1807,10 @@ private:
     /**
      * @brief The logo (Deploy/make_icon.py) in points of light: the sun, the halo round it, the two sun dogs with their
      *        tails outwards and the parhelic circle through all three; centred at (@p u, @p v), @p size across.
+     * @param[in] p     the panel
+     * @param[in] u     metres to the right
+     * @param[in] v     metres up
+     * @param[in] size  the logo's diameter in metres
      */
     void addLogo(const Panel& p, float u, float v, float size)
     {
@@ -1535,6 +1836,8 @@ private:
     /**
      * @brief The parhelion in the sky (the file comment): ahead of the player and above, tilted towards them, anchored
      *        where the head was when the session began -- it never moves with the head or the audio.
+     * @param[in] now   what plays
+     * @param[in] beat  the position in beats
      */
     void addSky(const Now& now, double beat)
     {
@@ -1618,6 +1921,10 @@ private:
      * @brief The parhelic circle through the sun and the sun dogs: the track from left to right (a set's current track),
      *        its sections as ticks in their colours, the part played brighter, the playhead a light on it, and a
      *        performer's "now" a mark at its bar.
+     * @param[in] now   what plays
+     * @param[in] s     the score
+     * @param[in] t     the track
+     * @param[in] beat  the position in beats
      */
     void addTimeline(const Now& now, const Score& s, int t, double beat)
     {
@@ -1666,7 +1973,10 @@ private:
         m_skyAnchored = true;
     }
 
-    /** @brief A line of the panel, cut to LineChars and upper case (the font's). */
+    /**
+     * @brief A line of the panel, cut to LineChars and upper case (the font's).
+     * @param[in,out] line  the line, cut in place
+     */
     static void fit(char* line)
     {
         line[LineChars] = 0;
@@ -1786,6 +2096,7 @@ private:
      *        -- the next track, once, while neither then counts as a single pinch. Left alone: play / stop; right alone:
      *        kick out / kick in; right held LongPinch: "now" -- a breakdown from a groove or a drop, a drop from a
      *        breakdown, a break or a build -- and its release does nothing more.
+     * @param[in] dt  the seconds since the last frame
      */
     void gestures(double dt)
     {
@@ -1953,7 +2264,10 @@ void handleCmd(android_app*, int32_t) {}
 
 } // namespace
 
-/** @brief NativeActivity entry point (android_native_app_glue). */
+/**
+ * @brief NativeActivity entry point (android_native_app_glue).
+ * @param[in,out] app  the native activity
+ */
 void android_main(android_app* app)
 {
     app->onAppCmd = handleCmd;

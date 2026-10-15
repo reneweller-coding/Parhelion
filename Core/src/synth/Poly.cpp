@@ -2,6 +2,7 @@
  * @file Poly.cpp
  * @brief Polyphonic engine: voice allocation, supersaw coefficients, rendering.
  * @note Copied from Phosphene `Core/src/Poly.cpp` at 76f7100 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/synth/Poly.h"
 #include "parh/Params.h"
@@ -29,6 +30,8 @@ constexpr double UnisonPan[PolyUnison] = { -1.0, 0.67, -0.33, 0.0, 0.33, -0.67, 
  * anyone hears. A pow() per slot per note would be correct to the last bit and would also be fine
  * here; the expansion is kept because it is the same arithmetic on every platform and no library's
  * pow() is.
+ * @param[in] cents  the drift in cents
+ * @return the frequency factor
  */
 inline double driftFactor(double cents) { return 1.0 + cents * (0.6931471805599453 / 1200.0); }
 
@@ -61,6 +64,8 @@ constexpr double Osc2Spread = 0.25;
  * each chord tone carried partials at 0.91 and 2.91 times itself, a quarter tone off every note of
  * the key, 7 dB under the chord. Every pitched voice plays chords or lines in a key; the metallic FM
  * of the set lives in the percussion (the rim, the zap: perc.fm_ratio is not rounded).
+ * @param[in] knob  poly.fm_ratio
+ * @return the ratio played
  */
 inline double harmonicFmRatio(double knob) { return std::max(0.5, std::round(knob * 2.0) * 0.5); }
 
@@ -829,8 +834,9 @@ struct TableLanes {
 /**
  * @brief Catmull-Rom reads of eight lanes, as WaveTable::sample: x = phase * len in double, the index truncated and held
  *        inside the cycle, t = float(x - index), then y1 + t (a + t (b + t d)) in the scalar read's order.
- * @param data the table's samples; @p off each lane's cycle start (the index of its element 0)
- * @param idx,t out: each lane's index and fraction (a second frame reads at the same place)
+ * @param[in]  l    the eight lanes: phase, step and cycle length
+ * @param[out] idx  each lane's index (a second frame reads at the same place)
+ * @param[out] t    each lane's fraction
  */
 inline void tablePlace(const TableLanes& l, __m256i& idx, __m256& t)
 {

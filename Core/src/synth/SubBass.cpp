@@ -2,6 +2,7 @@
  * @file SubBass.cpp
  * @brief The sub bass voice.
  * @note Copied from Totality `Core/src/synth/SubBass.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/synth/SubBass.h"
 #include "parh/Params.h"

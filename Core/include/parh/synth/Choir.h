@@ -20,6 +20,7 @@
  * from the singers' tables of the formant-synthesis tradition (Csound's FOF tables after Peterson and Barney and
  * Sundberg) for bass, tenor, alto and soprano on "a", "o" and "u"; the vowel knob glides between them. A note's singers
  * share two tracts, one a little shorter and one a little longer (the section's spread, and its stereo).
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -37,31 +38,77 @@ class Choir {
 public:
     static constexpr int MaxBlock = 32;   ///< the longest block process() renders at once
 
-    /** @brief Sets the sample rate and the seed of the singers' streams, solves the LF table, falls silent. */
+    /**
+     * @brief Sets the sample rate and the seed of the singers' streams, solves the LF table, falls silent.
+     * @param[in] sampleRate  the sample rate
+     * @param[in] seed        the seed of the singers' streams
+     */
     void prepare(double sampleRate, uint64_t seed);
-    /** @brief Reads the effective parameter values (indexed by choir::). */
+    /**
+     * @brief Reads the effective parameter values (indexed by choir::).
+     * @param[in] v  the effective parameter values
+     */
     void update(const float* v);
-    /** @brief Starts @p pitch at @p velocity (0..1), @p late samples after its ideal start; @p unused is not read. */
+    /**
+     * @brief Starts @p pitch at @p velocity (0..1), @p late samples after its ideal start; @p unused is not read.
+     * @param[in] pitch     the MIDI note
+     * @param[in] velocity  the velocity, 0..1
+     * @param[in] unused    not read
+     * @param[in] late      samples after the ideal start
+     */
     void noteOn(int pitch, float velocity, bool unused, double late);
-    /** @brief Releases the note of @p pitch. */
+    /**
+     * @brief Releases the note of @p pitch.
+     * @param[in] pitch  the MIDI note
+     */
     void noteOff(int pitch);
     /** @brief Silence: every note and singer off. */
     void reset();
-    /** @brief Singers on a note (1 .. ChoirSingers, at most the quality's limit): the knob, through update(). */
+    /**
+     * @brief Singers on a note (1 .. ChoirSingers, at most the quality's limit): the knob, through update().
+     * @param[in] n  the singers per note
+     */
     void setSingers(int n) { m_singers = n < 1 ? 1 : (n > m_singerLimit ? m_singerLimit : n); }
-    /** @brief The quality's limit on the singers (Deck::setQuest), as StringSection::setPlayerLimit. */
+    /**
+     * @brief The quality's limit on the singers (Deck::setQuest), as StringSection::setPlayerLimit.
+     * @param[in] n  the most singers per note
+     */
     void setSingerLimit(int n) { m_singerLimit = n < 1 ? 1 : (n > ChoirSingers ? ChoirSingers : n); }
-    /** @brief Renders @p n samples, replacing @p L and @p R (scalar: nothing to split into lanes). */
+    /**
+     * @brief Renders @p n samples, replacing @p L and @p R (scalar: nothing to split into lanes).
+     * @param[out] L  the left channel
+     * @param[out] R  the right channel
+     * @param[in]  n  the block's samples
+     */
     void process(float* L, float* R, int n);
-    /** @brief How many singers sing now (for the tests and the meters). */
+    /**
+     * @brief How many singers sing now (for the tests and the meters).
+     * @return the singers singing
+     */
     int activeSingers() const;
-    /** @brief The voice a pitch is sung by: 0 bass, 1 tenor, 2 alto, 3 soprano. */
+    /**
+     * @brief The voice a pitch is sung by: 0 bass, 1 tenor, 2 alto, 3 soprano.
+     * @param[in] pitch  the MIDI note
+     * @return 0 bass, 1 tenor, 2 alto, 3 soprano
+     */
     static int voiceOf(int pitch);
-    /** @brief One period of the LF source at @p rd, @p n samples (normalised to Ee = 1; for the tests). */
+    /**
+     * @brief One period of the LF source at @p rd, @p n samples (normalised to Ee = 1; for the tests).
+     * @param[in]  rd   the LF shape parameter
+     * @param[in]  n    the samples of the period
+     * @param[out] out  the period
+     */
     void lfPeriod(double rd, int n, float* out) const;
-    /** @brief The deck's shared modulation sources (Modulation.h). */
+    /**
+     * @brief The deck's shared modulation sources (Modulation.h).
+     * @param[in] g  the shared sources
+     */
     void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
-    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    /**
+     * @brief The beat now and the beats per sample (the synced LFOs).
+     * @param[in] beat            the beat now
+     * @param[in] beatsPerSample  the beats per sample
+     */
     void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
 
 private:
@@ -126,15 +173,31 @@ private:
         float m_panR = 1.0f;   ///< the pan's gain, right
         double m_pitchSt = 0.0;   ///< the pitch offset, semitones
     };
-    /** @brief Starts singer @p g's next period of note @p n, @p tInto seconds into it: its length, amplitude and LF shape. */
+    /**
+     * @brief Starts singer @p g's next period of note @p n, @p tInto seconds into it: its length, amplitude and LF
+     *        shape.
+     * @param[in,out] g      the singer
+     * @param[in]     n      the note
+     * @param[in]     tInto  seconds into the period
+     */
     void startPeriod(Singer& g, const Note& n, double tInto);
-    /** @brief Sets note @p n's formants for its voice, vowel and formant factor. */
+    /**
+     * @brief Sets note @p n's formants for its voice, vowel and formant factor.
+     * @param[in,out] n  the note
+     */
     void setFormants(Note& n);
     /** @brief Every sounding note's modulation at this cell (every 32 samples of the choir's own count). */
     void modCell();
-    /** @brief Note @p s's modulation now. */
+    /**
+     * @brief Note @p s's modulation now.
+     * @param[in] s  the note's slot
+     */
     void modNote(int s);
-    /** @brief The LF shape for @p rd, in time normalised to the period. */
+    /**
+     * @brief The LF shape for @p rd, in time normalised to the period.
+     * @param[in] rd  the LF shape parameter
+     * @return the LF shape
+     */
     static LfShape solveLf(double rd);
 
     double m_sr = 48000.0;   ///< the sample rate, Hz

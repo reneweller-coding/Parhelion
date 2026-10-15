@@ -5,6 +5,7 @@
  * @note Built from Totality `Core/src/compose/Set.cpp` at 4d3c0d2 (29.09.2026): the tempo map, the decks, the knobs
  *       homed between tracks and the mixer's gestures are its; the dramaturgies, the keys, the placement and the
  *       tease are trance's.
+ * @author Rene Weller
  */
 #include "parh/compose/Set.h"
 #include "parh/Dsp.h"
@@ -23,7 +24,11 @@ namespace {
 constexpr double Bar = 4.0;   ///< beats per bar
 constexpr double PiD = 3.14159265358979323846;   ///< pi
 
-/** @brief The FNV-1a hash of @p s. */
+/**
+ * @brief The FNV-1a hash of @p s.
+ * @param[in] s  the text
+ * @return its FNV-1a hash
+ */
 uint64_t hashName(const std::string& s)
 {
     uint64_t h = 1469598103934665603ull;   // FNV-1a
@@ -31,7 +36,11 @@ uint64_t hashName(const std::string& s)
     return h;
 }
 
-/** @brief The style ladder (Set.h), a place on it morphed between neighbours. */
+/**
+ * @brief The style ladder (Set.h), a place on it morphed between neighbours.
+ * @param[in] x  the place on the ladder, 0..4
+ * @return the profile
+ */
 StyleProfile ladderProfile(float x)
 {
     static const StyleE Ladder[5] = { StyleE::DEEP, StyleE::PROGRESSIVE, StyleE::DREAM_HOUSE, StyleE::UPLIFTING, StyleE::ACID };
@@ -40,7 +49,13 @@ StyleProfile ladderProfile(float x)
     return morphProfile(styleProfile(Ladder[i]), styleProfile(Ladder[i + 1]), x - static_cast<float>(i));
 }
 
-/** @brief A minor mode after the profile's weights (Ionian left out), or Ionian for a major key. */
+/**
+ * @brief A minor mode after the profile's weights (Ionian left out), or Ionian for a major key.
+ * @param[in] prof   the profile
+ * @param[in] minor  true for a minor key
+ * @param[in] u      a uniform draw, 0..1
+ * @return the mode
+ */
 int scaleFor(const StyleProfile& prof, bool minor, float u)
 {
     if (!minor) return static_cast<int>(ScaleE::IONIAN);
@@ -52,7 +67,12 @@ int scaleFor(const StyleProfile& prof, bool minor, float u)
     return drawWeighted(w.data(), 6, u);
 }
 
-/** @brief Appends @p src, moved @p offset beats later, to @p dst (tempo and length are the caller's). */
+/**
+ * @brief Appends @p src, moved @p offset beats later, to @p dst (tempo and length are the caller's).
+ * @param[in,out] dst     the score, appended to
+ * @param[in]     src     the score appended
+ * @param[in]     offset  how many beats later it goes
+ */
 void appendShifted(Score& dst, const Score& src, double offset)
 {
     for (NoteEvent n : src.m_notes) { n.m_beat += offset; dst.m_notes.push_back(n); }
@@ -65,7 +85,14 @@ void appendShifted(Score& dst, const Score& src, double offset)
     for (LayerBlock b : src.m_layers) { b.m_beat += offset; dst.m_layers.push_back(b); }
 }
 
-/** @brief A step of knob @p id to @p value at @p beat, as an offset from the knob in @p p. */
+/**
+ * @brief A step of knob @p id to @p value at @p beat, as an offset from the knob in @p p.
+ * @param[in] p      the knobs
+ * @param[in] id     the knob
+ * @param[in] beat   where the step is
+ * @param[in] value  the value it steps to
+ * @return the gesture
+ */
 Gesture stepOf(const ParamStore& p, int id, double beat, float value)
 {
     Gesture g;
@@ -77,7 +104,18 @@ Gesture stepOf(const ParamStore& p, int id, double beat, float value)
     return g;
 }
 
-/** @brief A ramp of knob @p id from @p beat over @p length beats, @p from to @p to in @p shape, as offsets from the knob. */
+/**
+ * @brief A ramp of knob @p id from @p beat over @p length beats, @p from to @p to in @p shape, as offsets from the
+ *        knob.
+ * @param[in] p       the knobs
+ * @param[in] id      the knob
+ * @param[in] beat    where the ramp begins
+ * @param[in] length  its length in beats
+ * @param[in] from    the value it starts at
+ * @param[in] to      the value it ends at
+ * @param[in] shape   the curve's shape
+ * @return the gesture
+ */
 Gesture rampOf(const ParamStore& p, int id, double beat, double length, float from, float to, GestureShapeE shape)
 {
     Gesture g;
@@ -93,6 +131,10 @@ Gesture rampOf(const ParamStore& p, int id, double beat, double length, float fr
 /**
  * @brief Before each piece on a deck, every knob any piece on that deck moves goes back to the knob (a Step to offset 0
  *        at the piece's start, written before the piece's own), so no piece inherits the last one's automation.
+ * @param[in,out] deck      the deck's score, appended to
+ * @param[in]     pieces    the pieces on the deck: their start and their gestures
+ * @param[in]     mixFirst  the first mixer parameter
+ * @param[in]     mixEnd    one past the last
  */
 void homeBetween(Score& deck, const std::vector<std::pair<double, std::vector<Gesture>>>& pieces, int mixFirst, int mixEnd)
 {
@@ -111,7 +153,11 @@ void homeBetween(Score& deck, const std::vector<std::pair<double, std::vector<Ge
     }
 }
 
-/** @brief Whether scale @p scale is a minor one (all but Ionian). */
+/**
+ * @brief Whether scale @p scale is a minor one (all but Ionian).
+ * @param[in] scale  the mode
+ * @return true for a minor mode
+ */
 bool minorScale(int scale) { return scale != static_cast<int>(ScaleE::IONIAN); }
 
 } // namespace

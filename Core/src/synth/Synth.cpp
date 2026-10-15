@@ -2,6 +2,7 @@
  * @file Synth.cpp
  * @brief The mono synth.
  * @note Copied from Totality `Core/src/synth/Synth.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/synth/Synth.h"
 #include "parh/Params.h"

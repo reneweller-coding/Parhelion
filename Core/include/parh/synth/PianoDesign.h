@@ -45,6 +45,7 @@
  *
  * Computing a design allocates and takes a fraction of a second: never on the audio thread. Designs are cached per
  * specification and rate.
+ * @author Rene Weller
  */
 #pragma once
 #include <complex>
@@ -101,7 +102,10 @@ struct PianoSpec {
     float m_highBank = 7.95f;       ///< dB on the high bank (the board above its computed modes) against the modes
     float m_boardLoss = 0.539f;     ///< factor on the board's loss factor (less: the body rings longer)
     /** @} */
-    /** @brief Whether two specs build the same design (the cache). */
+    /**
+     * @brief Whether two specs build the same design (the cache).
+     * @return true when they do
+     */
     bool operator==(const PianoSpec&) const = default;
 };
 
@@ -113,7 +117,10 @@ struct PianoModes {
     std::vector<float> m_pi;   ///< ... imaginary part
     std::vector<float> m_gr;   ///< (e^(lambda T) - 1) / lambda, the input's gain: real part
     std::vector<float> m_gi;   ///< ... imaginary part
-    /** @brief Room for @p n modes, padded to a multiple of 8 with silent ones. */
+    /**
+     * @brief Room for @p n modes, padded to a multiple of 8 with silent ones.
+     * @param[in] n  the modes
+     */
     void resize(int n);
 };
 
@@ -206,15 +213,35 @@ struct PianoDesign {
     float m_outGain = 1.0f;              ///< the radiated velocity to full scale
 };
 
-/** @brief The design for @p spec at @p sampleRate (cached; allocates, never on the audio thread). */
+/**
+ * @brief The design for @p spec at @p sampleRate (cached; allocates, never on the audio thread).
+ * @param[in] spec        the piano's specification
+ * @param[in] sampleRate  the sample rate
+ * @return the design
+ */
 std::shared_ptr<const PianoDesign> designPiano(const PianoSpec& spec, double sampleRate);
 
-/** @brief The bridge's admittance at key @p key (0 .. 87) and frequency @p hz, s/kg, as the design uses it. */
+/**
+ * @brief The bridge's admittance at key @p key (0 .. 87) and frequency @p hz, s/kg, as the design uses it.
+ * @param[in] d    the design
+ * @param[in] key  the key, 0..87
+ * @param[in] hz   the frequency
+ * @return the admittance in s/kg
+ */
 std::complex<double> pianoAdmittance(const PianoDesign& d, int key, double hz);
 
 /**
  * @brief The soundboard alone, for the tests: the first @p count natural frequencies of a plain rectangular orthotropic
  *        plate (a x b, simply supported, no ribs, no bridge) as the Rayleigh-Ritz solver finds them.
+ * @param[in] a            the plate's width in metres
+ * @param[in] b            its depth in metres
+ * @param[in] dx           the bending stiffness along x
+ * @param[in] dy           the bending stiffness along y
+ * @param[in] d12          the coupling stiffness
+ * @param[in] d66          the torsional stiffness
+ * @param[in] massPerArea  the mass per area
+ * @param[in] count        the frequencies wanted
+ * @return the natural frequencies in Hz
  */
 std::vector<double> pianoPlateTest(double a, double b, double dx, double dy, double d12, double d66, double massPerArea, int count);
 

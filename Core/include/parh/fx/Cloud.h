@@ -18,6 +18,7 @@
  *
  * Every decision is per sample (the onsets from one stream, the grains in a fixed pool), so the host's blocks change no
  * bit; with Level at -60 dB no grain starts, and once the last has ended the pool is skipped.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -30,14 +31,28 @@ namespace parh {
 class GrainCloud {
 public:
     static constexpr int MaxGrains = 24;   ///< grains at once; an onset beyond them is dropped
-    /** @brief Allocates the history and seeds the stream (not for the audio thread). */
+    /**
+     * @brief Allocates the history and seeds the stream (not for the audio thread).
+     * @param[in] sampleRate  the sample rate in Hz
+     * @param[in] seed        the seed of the grain stream
+     * @pre not called on the audio thread
+     */
     void prepare(double sampleRate, uint64_t seed);
     /** @brief Silence, the stream from its seed again. */
     void reset();
-    /** @brief Reads the effective parameter values (indexed by cloud::). */
+    /**
+     * @brief Reads the effective parameter values (indexed by cloud::).
+     * @param[in] v  the effective parameter values, indexed by cloud::
+     */
     void update(const float* v);
     /**
-     * @brief Writes @p n samples of @p inL / @p inR into the history and renders the grains into @p L / @p R (replaced).
+     * @brief Writes @p n samples of @p inL / @p inR into the history and renders the grains into @p L / @p R
+     *        (replaced).
+     * @param[in]  inL  the left input
+     * @param[in]  inR  the right input
+     * @param[out] L    receives the left output (replaced)
+     * @param[out] R    receives the right output (replaced)
+     * @param[in]  n    how many samples
      */
     void process(const float* inL, const float* inR, float* L, float* R, int n);
 

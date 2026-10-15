@@ -1,6 +1,7 @@
 /**
  * @file Style.cpp
  * @brief The five style profiles (Style.h).
+ * @author Rene Weller
  */
 #include "parh/compose/Style.h"
 #include <algorithm>
@@ -77,11 +78,23 @@ const StyleProfile Profiles[static_cast<int>(StyleE::COUNT)] = {
       .m_hallBreakS = 9.0f, .m_hallDropS = 3.0f, .m_bassDuckDb = 3.0f, .m_padDuckDb = 2.0f, .m_targetLufs = -9.0f, .m_mix = MxT{ 0, 0, 0, 0, 1 } },
 };
 
-/** @brief @p a to @p b at @p t. */
+/**
+ * @brief @p a to @p b at @p t.
+ * @param[in] a  the start
+ * @param[in] b  the end
+ * @param[in] t  the position, 0..1
+ * @return the value between
+ */
 float lerp(float a, float b, float t) { return a + (b - a) * t; }
 
 template <size_t N>
-/** @brief @p a to @p b at @p t, element by element. */
+/**
+ * @brief @p a to @p b at @p t, element by element.
+ * @param[in] a  the values at 0
+ * @param[in] b  the values at 1
+ * @param[in] t  the place between, 0..1
+ * @return the values between
+ */
 std::array<float, N> mixArrays(const std::array<float, N>& a, const std::array<float, N>& b, float t)
 {
     std::array<float, N> o{};

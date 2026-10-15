@@ -14,6 +14,7 @@
  * takes 0.716 s and passes the gain four times, so gain = 0.001^(0.179 / T60).
  * @note Copied from Ephemeris `Core/include/eph/fx/Plate.h` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/include/tot/fx/Plate.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include <cstddef>
@@ -25,20 +26,30 @@ namespace parh {
 /** @brief The plate; takes a stereo send, adds a stereo return. */
 class Plate {
 public:
-    /** @brief Sample rate; allocates the lines. */
+    /**
+     * @brief Sample rate; allocates the lines.
+     * @param[in] sampleRate  the sample rate in Hz
+     */
     void prepare(double sampleRate);
     /** @brief Silences the tank. */
     void reset();
     /**
      * @brief The plate's settings; call at every 32-sample cell.
-     * @param decaySeconds    T60
-     * @param damping         0 bright .. 1 dark (the tank's low pass)
-     * @param preDelaySamples before the plate
-     * @param lowCutHz        the return's high pass
-     * @param highCutHz       the input's band limit
+     * @param[in] decaySeconds     T60
+     * @param[in] damping          0 bright .. 1 dark (the tank's low pass)
+     * @param[in] preDelaySamples  before the plate
+     * @param[in] lowCutHz         the return's high pass
+     * @param[in] highCutHz        the input's band limit
      */
     void set(float decaySeconds, float damping, float preDelaySamples, float lowCutHz, float highCutHz);
-    /** @brief Adds the plate's return of @p inL, @p inR to @p outL, @p outR. */
+    /**
+     * @brief Adds the plate's return of @p inL, @p inR to @p outL, @p outR.
+     * @param[in]     inL   the left input
+     * @param[in]     inR   the right input
+     * @param[in,out] outL  the left output, added to
+     * @param[in,out] outR  the right output, added to
+     * @param[in]     n     how many samples
+     */
     void process(const float* inL, const float* inR, float* outL, float* outR, int n);
 
 private:
@@ -48,15 +59,36 @@ private:
         size_t m_mask = 0;   ///< its size - 1
         size_t m_write = 0;   ///< where the next sample goes
         int m_length = 1;   ///< the delay, samples
-        /** @brief Allocates for a delay of @p len samples and clears it. */
+        /**
+         * @brief Allocates for a delay of @p len samples and clears it.
+         * @param[in] len  the delay in samples
+         */
         void init(int len);
-        float at(int d) const { return m_buf[(m_write - static_cast<size_t>(d)) & m_mask]; }   ///< @p d samples ago
-        /** @brief Writes sample @p x. */
+        /**
+         * @p d samples ago
+         * @param[in] d  how many samples ago
+         * @return the sample then
+         */
+        float at(int d) const { return m_buf[(m_write - static_cast<size_t>(d)) & m_mask]; }
+        /**
+         * @brief Writes sample @p x.
+         * @param[in] x  the sample
+         */
         void push(float x) { m_buf[m_write] = x; m_write = (m_write + 1) & m_mask; }
-        /** @brief The sample length ago. */
+        /**
+         * @brief The sample length ago.
+         * @return the sample the line's length ago
+         */
         float out() const { return at(m_length); }
     };
-    /** @brief The all-pass w = x + g w[-D], y = w[-D] - g w (Dattorro's form). */
+    /**
+     * @brief The all-pass w = x + g w[-D], y = w[-D] - g w (Dattorro's form).
+     * @param[in,out] l        the all-pass's delay line
+     * @param[in]     x        the input sample
+     * @param[in]     g        the all-pass gain
+     * @param[in]     delayed  w[-D], the line's output
+     * @return the all-pass output
+     */
     static float allpass(Line& l, float x, float g, float delayed);
     double m_sr = 48000.0;   ///< the sample rate, Hz
     Line m_pre;   ///< the pre-delay

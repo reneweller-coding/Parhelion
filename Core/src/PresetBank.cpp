@@ -5,6 +5,7 @@
  * @note The builder follows Phosphene `Core/src/PresetBank.cpp` at 76f7100 (29.09.2026): the grid, the axes in the
  *       normalised space, the recipes' '@' (the next free LFO) and '#' (the next free slot); new are the lists (a knob
  *       drawn from a few values), the kit's roles and the banks of the physical voices.
+ * @author Rene Weller
  */
 #include "parh/Presets.h"
 #include "parh/synth/Modulation.h"
@@ -56,7 +57,13 @@ struct Bank {
 
 namespace {
 
-/** @brief Replaces every @p from in @p s with the number @p to. */
+/**
+ * @brief Replaces every @p from in @p s with the number @p to.
+ * @param[in] s     the text
+ * @param[in] from  the character replaced
+ * @param[in] to    the number
+ * @return the text replaced
+ */
 std::string replaceAll(const std::string& s, char from, int to)
 {
     std::string out;
@@ -67,7 +74,11 @@ std::string replaceAll(const std::string& s, char from, int to)
     return out;
 }
 
-/** @brief The values of a "list:a,b,c" spec. */
+/**
+ * @brief The values of a "list:a,b,c" spec.
+ * @param[in] spec  the spec
+ * @return its values
+ */
 std::vector<float> listOf(const char* spec)
 {
     std::vector<float> out;
@@ -85,7 +96,11 @@ std::vector<float> listOf(const char* spec)
     return out;
 }
 
-/** @brief The key prefix of a bank's knobs ("lead.", "perc1.", "bass."). */
+/**
+ * @brief The key prefix of a bank's knobs ("lead.", "perc1.", "bass.").
+ * @param[in] b  the bank
+ * @return its key prefix
+ */
 std::string prefixOf(const Bank& b)
 {
     if (b.m_module == ModuleE::POLY) return std::string(PolyInstanceNames[b.m_instance]) + ".";
@@ -93,7 +108,17 @@ std::string prefixOf(const Bank& b)
     return std::string(b.m_label) + ".";
 }
 
-/** @brief Sets knob @p key to what its range (or list) and axis give at row @p row, column @p col. */
+/**
+ * @brief Sets knob @p key to what its range (or list) and axis give at row @p row, column @p col.
+ * @param[in,out] p       the parameters written to
+ * @param[in]     prefix  the bank's key prefix
+ * @param[in]     key     the knob's key
+ * @param[in]     k       the knob's range or list
+ * @param[in]     row     the grid's row
+ * @param[in]     col     the grid's column
+ * @param[in,out] rng     the random stream
+ * @return false when the key is unknown
+ */
 bool setKnob(ParamStore& p, const std::string& prefix, const std::string& key, const Knob& k, int row, int col, Rng& rng)
 {
     const int id = p.find(prefix + key);
@@ -124,7 +149,12 @@ bool setKnob(ParamStore& p, const std::string& prefix, const std::string& key, c
     return true;
 }
 
-/** @brief The presets of one bank. */
+/**
+ * @brief The presets of one bank.
+ * @param[in] b      the bank
+ * @param[in] index  its index
+ * @return its presets
+ */
 std::vector<SoundPreset> build(const Bank& b, int index)
 {
     std::vector<SoundPreset> out;
@@ -179,7 +209,12 @@ std::vector<SoundPreset> build(const Bank& b, int index)
     return out;
 }
 
-/** @brief The bank of instance @p instance of module @p m, null for one without presets. */
+/**
+ * @brief The bank of instance @p instance of module @p m, null for one without presets.
+ * @param[in] m         the module
+ * @param[in] instance  its instance
+ * @return the bank, or null
+ */
 const Bank* bankOf(ModuleE m, int instance)
 {
     for (const Bank& b : banks())

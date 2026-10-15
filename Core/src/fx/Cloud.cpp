@@ -1,6 +1,7 @@
 /**
  * @file Cloud.cpp
  * @brief The granular cloud (Cloud.h).
+ * @author Rene Weller
  */
 #include "parh/fx/Cloud.h"
 #include "parh/Params.h"

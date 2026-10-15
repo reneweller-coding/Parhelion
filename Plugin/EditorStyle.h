@@ -7,6 +7,7 @@
  *        are calibrated against (Tools/calibrate.py).
  * @note The frame (a page that follows the knobs on a timer) after Totality `Plugin/EditorStyle.h` at 4d3c0d2
  *       (29.09.2026); the axes and the table are Parhelion's.
+ * @author Rene Weller
  */
 #pragma once
 #include "PluginEditor.h"
@@ -16,11 +17,17 @@
 /** @brief The Style tab. */
 class StylePage final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The tab for @p p. */
+    /**
+     * @brief The tab for @p p.
+     * @param[in,out] p  the processor
+     */
     explicit StylePage(ParhelionProcessor& p);
     /** @brief The profile's numbers and the button on top, the custom style's knobs under them. */
     void resized() override;
-    /** @brief The style's profile beside the references' medians. */
+    /**
+     * @brief The style's profile beside the references' medians.
+     * @param[in,out] g  the graphics context to draw into
+     */
     void paint(juce::Graphics& g) override;
 
 private:

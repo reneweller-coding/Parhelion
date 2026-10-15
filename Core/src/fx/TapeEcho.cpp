@@ -3,6 +3,7 @@
  * @brief The tape echo.
  * @note Copied from Ephemeris `Core/src/fx/TapeEcho.cpp` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/src/fx/TapeEcho.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/fx/TapeEcho.h"
 #include <algorithm>

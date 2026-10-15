@@ -1,6 +1,7 @@
 /**
  * @file Melody.cpp
  * @brief The melodic voices (Melody.h).
+ * @author Rene Weller
  */
 #include "parh/compose/Melody.h"
 #include "parh/compose/Corpus.h"
@@ -48,7 +49,11 @@ struct StepFrame {
     bool m_pent = false;   ///< the minor pentatonic: the second and the sixth degree left out
 };
 
-/** @brief The scale the melody's steps run in for harmony @p h: its own minor or Aeolian, the tonic, the pentatonic. */
+/**
+ * @brief The scale the melody's steps run in for harmony @p h: its own minor or Aeolian, the tonic, the pentatonic.
+ * @param[in] h  the harmony
+ * @return the steps' frame
+ */
 StepFrame frameOf(const Harmony& h)
 {
     StepFrame f;
@@ -61,11 +66,22 @@ StepFrame frameOf(const Harmony& h)
     return f;
 }
 
-/** @brief @p bar kept inside the harmony. */
+/**
+ * @brief @p bar kept inside the harmony.
+ * @param[in] h    the harmony
+ * @param[in] bar  the bar
+ * @return the bar inside the harmony
+ */
 int clampBar(const Harmony& h, int bar) { return std::clamp(bar, 0, static_cast<int>(h.m_bars.size()) - 1); }
 
-/** @brief The frame's degrees at @p bar: a chord tone the mode lacks (harmonic minor's major V) replaces the degree a
- *         semitone from it. */
+/**
+ * @brief The frame's degrees at @p bar: a chord tone the mode lacks (harmonic minor's major V) replaces the degree a
+ *         semitone from it.
+ * @param[in] f    the frame
+ * @param[in] h    the harmony
+ * @param[in] bar  the bar
+ * @return the degrees
+ */
 ScaleDef scaleAt(const StepFrame& f, const Harmony& h, int bar)
 {
     ScaleDef s = f.m_scale;
@@ -79,7 +95,13 @@ ScaleDef scaleAt(const StepFrame& f, const Harmony& h, int bar)
     return s;
 }
 
-/** @brief The pitch of step index @p idx (index 7 is the tonic at @p base) in the degrees @p s. */
+/**
+ * @brief The pitch of step index @p idx (index 7 is the tonic at @p base) in the degrees @p s.
+ * @param[in] idx   the step index
+ * @param[in] base  the tonic's note
+ * @param[in] s     the degrees
+ * @return the MIDI note
+ */
 int stepPitch(int idx, int base, const ScaleDef& s)
 {
     const int st = idx + CorpusStepMin;
@@ -87,10 +109,20 @@ int stepPitch(int idx, int base, const ScaleDef& s)
     return base + 12 * o + s.m_steps[st - 7 * o];
 }
 
-/** @brief The degree (0 .. 6) of step index @p idx. */
+/**
+ * @brief The degree (0 .. 6) of step index @p idx.
+ * @param[in] idx  the step index
+ * @return the degree, 0..6
+ */
 int degreeOf(int idx) { return ((idx + CorpusStepMin) % 7 + 7) % 7; }
 
-/** @brief Whether @p pitch is a tone of the chord at @p bar. */
+/**
+ * @brief Whether @p pitch is a tone of the chord at @p bar.
+ * @param[in] h      the harmony
+ * @param[in] bar    the bar
+ * @param[in] pitch  the MIDI note
+ * @return true for a chord tone
+ */
 bool chordHas(const Harmony& h, int bar, int pitch)
 {
     const int pc = (pitch % 12 + 12) % 12;
@@ -104,7 +136,12 @@ struct Motif {
     std::vector<int> m_steps;   ///< step indices
 };
 
-/** @brief How good a motif is by the rules of Dok. 4 (higher is better). */
+/**
+ * @brief How good a motif is by the rules of Dok. 4 (higher is better).
+ * @param[in] m       the motif
+ * @param[in] anthem  true for an anthem
+ * @return the score
+ */
 double motifScore(const Motif& m, bool anthem)
 {
     if (m.m_steps.size() < 3) return -1e9;
@@ -141,7 +178,12 @@ const std::vector<std::vector<int>> AnthemRhythms = {
     { 0, 3, 6, 10, 12, 16, 19, 22, 26 },           // the syncopated call
 };
 
-/** @brief The lead once, from its two streams (writeLead draws again on a memorisation hit). */
+/**
+ * @brief The lead once, from its two streams (writeLead draws again on a memorisation hit).
+ * @param[in] c          the melody's context
+ * @param[in] motifSeed  the stream motif
+ * @param[in] leadSeed   the stream lead
+ */
 void writeLeadOnce(const MelodyContext& c, uint64_t motifSeed, uint64_t leadSeed)
 {
     const Plan& plan = *c.m_plan;
@@ -338,7 +380,14 @@ void writeLeadOnce(const MelodyContext& c, uint64_t motifSeed, uint64_t leadSeed
     }
 }
 
-/** @brief The top voice of @p part from note @p from on: a pitch per sixteenth (-1: no onset). */
+/**
+ * @brief The top voice of @p part from note @p from on: a pitch per sixteenth (-1: no onset).
+ * @param[in] sc    the score
+ * @param[in] from  the first note
+ * @param[in] part  the part
+ * @param[in] bars  the bars
+ * @return a pitch per sixteenth, -1 for no onset
+ */
 std::vector<int> topVoice(const Score& sc, size_t from, PartE part, int bars)
 {
     std::vector<int> top(static_cast<size_t>(bars) * 16, -1);

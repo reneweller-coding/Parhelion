@@ -10,6 +10,7 @@
  * a copy let through), and "no" for every window that is not there. Hashes only: no window can be read back.
  *
  * A window counts with at least five notes and three distinct pitches; fewer is a figure every track shares.
+ * @author Rene Weller
  */
 #pragma once
 #include <cstdint>
@@ -28,12 +29,23 @@ extern const uint64_t MemoProbeHash;
 
 /**
  * @brief The hash of the window of two bars from sixteenth @p start of @p top (a pitch per sixteenth, -1: no onset).
+ * @param[in]  top    a pitch per sixteenth, -1 for no onset
+ * @param[in]  start  the window's first sixteenth
+ * @param[out] hash   the hash
  * @return false if the window is too thin to count (@p hash untouched)
  */
 bool memoWindowHash(const std::vector<int>& top, int start, uint64_t& hash);
-/** @brief Whether @p hash is (maybe) a transcription's window. */
+/**
+ * @brief Whether @p hash is (maybe) a transcription's window.
+ * @param[in] hash  the window's hash
+ * @return true when it may be a transcription's
+ */
 bool memoContains(uint64_t hash);
-/** @brief Whether any window of @p top that starts on a bar is (maybe) a transcription's. */
+/**
+ * @brief Whether any window of @p top that starts on a bar is (maybe) a transcription's.
+ * @param[in] top  a pitch per sixteenth, -1 for no onset
+ * @return true when a window may be a transcription's
+ */
 bool memoHitsAnyBar(const std::vector<int>& top);
 
 } // namespace parh

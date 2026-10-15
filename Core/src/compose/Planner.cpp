@@ -1,6 +1,7 @@
 /**
  * @file Planner.cpp
  * @brief The planner (Planner.h): form grammar, lengths, the layer matrix, the energy.
+ * @author Rene Weller
  */
 #include "parh/compose/Planner.h"
 #include <algorithm>
@@ -20,7 +21,11 @@ struct Spec {
     int m_bars;    ///< how long, bars
 };
 
-/** @brief The kind of section role @p r is (SectionKind). */
+/**
+ * @brief The kind of section role @p r is (SectionKind).
+ * @param[in] r  the section role
+ * @return its kind
+ */
 SectionKindE kindOf(RoleE r)
 {
     switch (r) {
@@ -35,7 +40,12 @@ SectionKindE kindOf(RoleE r)
     return SectionKindE::GROOVE;
 }
 
-/** @brief The energy at a role's start and end (Dok. 6, table). */
+/**
+ * @brief The energy at a role's start and end (Dok. 6, table).
+ * @param[in]  r     the section role
+ * @param[out] from  the energy at its start
+ * @param[out] to    the energy at its end
+ */
 void energyOf(RoleE r, float& from, float& to)
 {
     switch (r) {
@@ -56,14 +66,27 @@ void energyOf(RoleE r, float& from, float& to)
     }
 }
 
-/** @brief One of @p options, drawn from @p r. */
+/**
+ * @brief One of @p options, drawn from @p r.
+ * @param[in,out] r        the random stream
+ * @param[in]     options  the options
+ * @return the option drawn
+ */
 int pick(Rng& r, std::initializer_list<int> options)
 {
     const int n = static_cast<int>(options.size());
     return *(options.begin() + r.below(n));
 }
 
-/** @brief The sections of a template, lengths drawn (Planner.h). */
+/**
+ * @brief The sections of a template, lengths drawn (Planner.h).
+ * @param[in]     prof     the profile
+ * @param[in]     form     the template
+ * @param[in,out] r        the random stream
+ * @param[in]     mixable  true for a DJ's track
+ * @param[in]     opener   true for a set's first track
+ * @return the sections
+ */
 std::vector<Spec> drawSpecs(const StyleProfile& prof, FormTemplateE form, Rng& r, bool mixable, bool opener = false)
 {
     std::vector<Spec> s;
@@ -146,7 +169,11 @@ std::vector<Spec> drawSpecs(const StyleProfile& prof, FormTemplateE form, Rng& r
     return s;
 }
 
-/** @brief The bars of every section of @p s together. */
+/**
+ * @brief The bars of every section of @p s together.
+ * @param[in] s  the sections
+ * @return their bars
+ */
 int totalBars(const std::vector<Spec>& s)
 {
     int n = 0;
@@ -158,6 +185,8 @@ int totalBars(const std::vector<Spec>& s)
  * @brief Brings the total to a multiple of 32 bars: the outro gives or takes first (16 to 64 bars), then the first groove
  *        takes what is left -- never the intro, which would keep the DJ waiting (the first version lengthened it and a
  *        Progressive track ran 104 bars before its groove).
+ * @param[in,out] s         the sections
+ * @param[in]     minOutro  the outro's fewest bars
  */
 void fitTo32(std::vector<Spec>& s, int minOutro)
 {
@@ -190,14 +219,32 @@ struct Cast {
     bool m_bassInBreaks = false;   ///< Dream House: the bass never leaves (measured, PLAN 13.4)
 };
 
-/** @brief Every layer off. */
+/**
+ * @brief Every layer off.
+ * @return the layer states
+ */
 std::array<LayerStateE, NumLayers> none() { return std::array<LayerStateE, NumLayers>{}; }
-/** @brief Sets layer @p l of @p a to @p s. */
+/**
+ * @brief Sets layer @p l of @p a to @p s.
+ * @param[in,out] a  the layer states
+ * @param[in]     l  the layer
+ * @param[in]     s  its state
+ */
 void set(std::array<LayerStateE, NumLayers>& a, LayerE l, LayerStateE s) { a[static_cast<size_t>(l)] = s; }
-/** @brief Layer @p l of @p a. */
+/**
+ * @brief Layer @p l of @p a.
+ * @param[in] a  the layer states
+ * @param[in] l  the layer
+ * @return its state
+ */
 LayerStateE get(const std::array<LayerStateE, NumLayers>& a, LayerE l) { return a[static_cast<size_t>(l)]; }
 
-/** @brief The rhythm section: kick, the low end, the hats, the clap, the percussion. */
+/**
+ * @brief The rhythm section: kick, the low end, the hats, the clap, the percussion.
+ * @param[in,out] a        the layer states
+ * @param[in]     c        the cast
+ * @param[in]     withLow  true with the low end
+ */
 void rhythm(std::array<LayerStateE, NumLayers>& a, const Cast& c, bool withLow = true)
 {
     if (!c.m_beatless) set(a, LayerE::KICK, LayerStateE::ON);
@@ -232,7 +279,11 @@ struct Scatter {
     int m_vacuum = 0;           ///< a drop's vacuum before it: the last beat, two beats, the bar, the kick alone on 4
 };
 
-/** @brief A section's variations, every field drawn from @p r. */
+/**
+ * @brief A section's variations, every field drawn from @p r.
+ * @param[in,out] r  the random stream
+ * @return the variations
+ */
 Scatter drawScatter(Rng& r)
 {
     Scatter s;
@@ -254,7 +305,17 @@ Scatter drawScatter(Rng& r)
     return s;
 }
 
-/** @brief The layer states of block @p k of @p n in a section of role @p role. */
+/**
+ * @brief The layer states of block @p k of @p n in a section of role @p role.
+ * @param[in] role  the section role
+ * @param[in] k     the block
+ * @param[in] n     the section's blocks
+ * @param[in] c     the cast
+ * @param[in] bd    the breakdown's parts, or null
+ * @param[in] bar   the block's first bar
+ * @param[in] v     the section's variations
+ * @return the layer states
+ */
 std::array<LayerStateE, NumLayers> blockStates(RoleE role, int k, int n, const Cast& c, const BreakdownParts* bd, int bar, const Scatter& v)
 {
     using ST = LayerStateE;
@@ -384,7 +445,15 @@ std::array<LayerStateE, NumLayers> blockStates(RoleE role, int k, int n, const C
     return a;
 }
 
-/** @brief The whole plan from a list of sections; the matrix's and the energy's streams from @p stream. */
+/**
+ * @brief The whole plan from a list of sections; the matrix's and the energy's streams from @p stream.
+ * @param[in] prof    the profile
+ * @param[in] form    the template
+ * @param[in] specs   the sections
+ * @param[in] cast    the cast
+ * @param[in] stream  the units' seeds
+ * @return the plan
+ */
 Plan buildPlan(const StyleProfile& prof, FormTemplateE form, const std::vector<Spec>& specs, const Cast& cast, const UnitStreamT& stream)
 {
     Plan p;
@@ -535,7 +604,12 @@ Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed, bool mixable)
 
 namespace {
 
-/** @brief The specs cut at @p bar and a breakdown (build, drop) or a drop at once after it, then the outro. */
+/**
+ * @brief The specs cut at @p bar and a breakdown (build, drop) or a drop at once after it, then the outro.
+ * @param[in,out] s     the sections
+ * @param[in]     bar   the bar of the cut
+ * @param[in]     kind  a breakdown or a drop
+ */
 void rewriteSpecs(std::vector<Spec>& s, int bar, SectionKindE kind)
 {
     std::vector<Spec> out;

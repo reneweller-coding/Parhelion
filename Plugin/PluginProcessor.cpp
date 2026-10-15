@@ -2,6 +2,7 @@
  * @file PluginProcessor.cpp
  * @brief The plugin's processor.
  * @note Copied from Totality `Plugin/PluginProcessor.cpp` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
@@ -91,7 +92,20 @@ float StoreParameter::getValueForText(const juce::String& text) const
 
 namespace {
 
-/** @brief An RBJ biquad (normalised by a0), for the K-weighting of the loudness meter. */
+/**
+ * @brief An RBJ biquad (normalised by a0), for the K-weighting of the loudness meter.
+ * @param[in]  b0   the analogue numerator's b0
+ * @param[in]  b1   its b1
+ * @param[in]  b2   its b2
+ * @param[in]  a0   the denominator's a0
+ * @param[in]  a1   its a1
+ * @param[in]  a2   its a2
+ * @param[out] ob0  receives the normalised b0
+ * @param[out] ob1  receives b1
+ * @param[out] ob2  receives b2
+ * @param[out] oa1  receives a1
+ * @param[out] oa2  receives a2
+ */
 void designBiquad(double b0, double b1, double b2, double a0, double a1, double a2, double& ob0, double& ob1, double& ob2,
                   double& oa1, double& oa2)
 {
@@ -508,7 +522,7 @@ void ParhelionProcessor::timerCallback()
     // The family jam (02.10.2026, Jam.h): the role from the settings; a follower composes its next track in the
     // leader's key and mode.
     m_jam.setRole(frame::Settings::of("Parhelion").jamRole());
-    // FAMILY_JAM_LOG=<file>: what the jam does here, a line whenever it changes (a test aid).
+    // FAMILY_JAM_LOG=\<file\>: what the jam does here, a line whenever it changes (a test aid).
     if (const char* logFile = std::getenv("FAMILY_JAM_LOG")) {
         const juce::String line = m_jam.status() + "; transposed " + juce::String(m_jamTransposeOut.load());
         if (line != m_jamLogged) {
@@ -1463,5 +1477,8 @@ void ParhelionProcessor::pollHeadset()
 
 juce::AudioProcessorEditor* ParhelionProcessor::createEditor() { return new ParhelionEditor(*this); }
 
-/** @brief The plugin's factory, called by the JUCE wrappers. */
+/**
+ * @brief The plugin's factory, called by the JUCE wrappers.
+ * @return a new processor
+ */
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new ParhelionProcessor(); }

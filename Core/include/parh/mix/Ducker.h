@@ -10,6 +10,7 @@
  * @note Copied from Phosphene `Core/include/phos/Ducker.h` at 76f7100 (27.09.2026); namespace parh. Added: amount(), the
  *       curve itself, which the rumble uses to gate its sub (Rumble.h).
  * @note Copied from Totality `Core/include/tot/mix/Ducker.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -19,16 +20,19 @@ namespace parh {
 /** @brief Gain envelope triggered by events. */
 class Ducker {
 public:
-    /** @brief Sets the sample rate. */
+    /**
+     * @brief Sets the sample rate.
+     * @param[in] sr  the sample rate in Hz
+     */
     void prepare(double sr) { m_sr = sr; reset(); }
     /** @brief Back to unity, idle. */
     void reset() { m_amount = 0.0f; m_stage = StageE::IDLE; }
     /**
      * @brief Shape of the duck.
-     * @param depth     0..1, how far the gain falls (1 = silence)
-     * @param attackMs  time to full depth
-     * @param holdMs    time held at full depth
-     * @param releaseMs time back to unity
+     * @param[in] depth      0..1, how far the gain falls (1 = silence)
+     * @param[in] attackMs   time to full depth
+     * @param[in] holdMs     time held at full depth
+     * @param[in] releaseMs  time back to unity
      */
     void set(float depth, float attackMs, float holdMs, float releaseMs)
     {
@@ -39,12 +43,15 @@ public:
     }
     /**
      * @brief Starts a duck.
-     * @param late how many samples ago the trigger ideally happened (0 <= late < 1): the curve is
-     *             evaluated that much further along, so it keeps the same shape relative to the kick
-     *             whatever the kick's position between samples
+     * @param[in] late  how many samples ago the trigger ideally happened (0 <= late < 1): the curve is evaluated that
+     *                  much further along, so it keeps the same shape relative to the kick whatever the kick's position
+     *                  between samples
      */
     void trigger(double late = 0.0) { m_stage = StageE::ATTACK; m_pos = 0; m_from = m_amount; m_late = static_cast<float>(late); }
-    /** @brief Next gain factor. */
+    /**
+     * @brief Next gain factor.
+     * @return the next gain factor
+     */
     inline float next()
     {
         switch (m_stage) {
@@ -63,7 +70,10 @@ public:
         }
         return 1.0f - m_depth * m_amount;
     }
-    /** @brief The curve without its depth: 0 at rest, 1 through the hold. (Added in Totality.) */
+    /**
+     * @brief The curve without its depth: 0 at rest, 1 through the hold. (Added in Totality.)
+     * @return the curve without its depth: 0 at rest, 1 through the hold
+     */
     float amount() const { return m_amount; }
 private:
     /** @brief The curve's stages. */

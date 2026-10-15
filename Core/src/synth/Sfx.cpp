@@ -2,6 +2,7 @@
  * @file Sfx.cpp
  * @brief Effect voices.
  * @note Copied from Phosphene `Core/src/Sfx.cpp` at 76f7100 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/synth/Sfx.h"
 #include "parh/Params.h"
@@ -53,7 +54,12 @@ constexpr float TypeGainDb[] = {
      0.0f,    // Space shot (27.09.2026): played by the Field track's FieldShot, not by this generator
 };
 static_assert(sizeof(TypeGainDb) / sizeof(TypeGainDb[0]) == NumSfxTypes, "one gain per effect type");
-/** @brief Band-pass output of an SVF at unity gain in the centre. */
+/**
+ * @brief Band-pass output of an SVF at unity gain in the centre.
+ * @param[in,out] f  the filter
+ * @param[in]     x  the input sample
+ * @return the band-pass sample
+ */
 inline float bandPass(Svf& f, float x)
 {
     float lp, bp, hp;
@@ -78,7 +84,11 @@ void Sfx::reset()
 }
 
 namespace {
-/** @brief The b2 or the leading tone over the key's root (Phosphene's Harmony.h). */
+/**
+ * @brief The b2 or the leading tone over the key's root (Phosphene's Harmony.h).
+ * @param[in] pcFromKey  the pitch class above the key's root
+ * @return true for the b2 or the leading tone
+ */
 inline bool rubsTonic(int pcFromKey) { const int pc = ((pcFromKey % 12) + 12) % 12; return pc == 1 || pc == 11; }
 }
 

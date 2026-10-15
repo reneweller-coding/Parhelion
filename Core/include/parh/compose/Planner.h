@@ -34,6 +34,7 @@
  * the stab, the percussion, the ride and the counter enter, the intro's order, the mini-break) on `section<n>` (n from 1)
  * together with `matrix`. None of the scattered choices touches the kick or the low end, so the breakdown share, and with
  * it the candidate the form keeps, is the form's alone: a rerolled matrix or section leaves the form as it was.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -53,8 +54,8 @@ struct BreakdownParts {
     int m_end = 0;      ///< the build's first bar (the breakdown's end)
 };
 
-/** @brief The silence before a drop (rule 5): from beat @ref from of bar @ref bar to the drop, the kick alone on the bar's
- *         last beat where @ref kickOn4. */
+/** @brief The silence before a drop (rule 5): from beat @ref m_from of bar @ref m_bar to the drop, the kick alone on the
+ *         bar's last beat where @ref m_kickOn4. */
 struct Vacuum {
     int m_bar = 0;            ///< the bar before the drop
     double m_from = 3.0;      ///< the beat in the bar where the silence begins (3: the last beat, 2: the last two, 0: the bar)
@@ -75,27 +76,47 @@ struct Plan {
     int m_bassPattern = 0;                   ///< BassPattern (Acid where the 303 carries the bass)
     std::vector<int> m_miniBreaks;           ///< bars in which the kick rests (Dok. 6: "Kick raus fuer 1 Takt")
     std::vector<Vacuum> m_vacuums;           ///< the silence before every drop (rule 5)
-    /** @brief The section of bar @p bar (index), -1 past the end. */
+    /**
+     * @brief The section of bar @p bar (index), -1 past the end.
+     * @param[in] bar  the bar
+     * @return the section's index, -1 past the end
+     */
     int sectionAt(int bar) const;
-    /** @brief The state of @p l in bar @p bar. */
+    /**
+     * @brief The state of @p l in bar @p bar.
+     * @param[in] bar  the bar
+     * @param[in] l    the layer
+     * @return the layer's state
+     */
     LayerStateE at(int bar, LayerE l) const;
-    /** @brief The energy (0..10) at bar @p bar, interpolated inside its section. */
+    /**
+     * @brief The energy (0..10) at bar @p bar, interpolated inside its section.
+     * @param[in] bar  the bar
+     * @return the energy, 0..10
+     */
     float energyAt(int bar) const;
 };
 
 /** @brief A unit's seed by its name ("form", "matrix", "section3"; Composer.h). */
 using UnitStreamT = std::function<uint64_t(const std::string&)>;
 
-/** @brief The seed of unit @p name of a track's @p seed after @p rerolls rerolls (SetFile.h, Curation). */
+/**
+ * @brief The seed of unit @p name of a track's @p seed after @p rerolls rerolls (SetFile.h, Curation).
+ * @param[in] seed     the track's seed
+ * @param[in] name     the unit
+ * @param[in] rerolls  the rerolls
+ * @return the unit's seed
+ */
 uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls = 0);
 
 /**
  * @brief Plans a track.
- * @param prof  the profile
- * @param bars  the length asked for (the plan comes as near as the grammar allows, a multiple of 32)
- * @param stream   the units' seeds (see above)
- * @param mixable  a DJ's track (a set, PLAN 6.8): an intro and an outro of 32 bars at least, both with the beat -- no
- *                 ambient intro or outro, never beatless -- so a blend can lie over them
+ * @param[in] prof     the profile
+ * @param[in] bars     the length asked for (the plan comes as near as the grammar allows, a multiple of 32)
+ * @param[in] stream   the units' seeds (see above)
+ * @param[in] mixable  a DJ's track (a set, PLAN 6.8): an intro and an outro of 32 bars at least, both with the beat --
+ *                     no ambient intro or outro, never beatless -- so a blend can lie over them
+ * @return the plan
  */
 Plan planTrack(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable = false);
 // (A mixable track that opens a mix -- TrackRequest::opener -- may have the ambient intro a track alone may have.)
@@ -112,6 +133,13 @@ struct Rewrite {
  *        a drop after it) or a drop at once, then the outro. A drop after the main drop is the final drop, a breakdown
  *        after it the second break. The units' streams are the plan's own, so everything before @p bar stays as it was --
  *        but a drop's approach: the harmony turns towards it over the eight bars before (VI-VII-i, PLAN 6.5).
+ * @param[in] prof     the profile
+ * @param[in] bars     the length asked for
+ * @param[in] stream   the units' seeds
+ * @param[in] mixable  true for a DJ's track
+ * @param[in] bar      the bar of the cut
+ * @param[in] kind     a breakdown or a drop
+ * @return the plan
  */
 Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable, int bar, SectionKindE kind);
 
@@ -119,14 +147,32 @@ Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& s
  * @brief The same for several "now"s one after the other (Phase 7, 30.09.2026: a second "now" keeps the first): each
  *        rewrites the plan the ones before it left, from its own line on, so the plan up to the last line is the plan
  *        that was played up to it. The lines rise; one that does not is left out.
+ * @param[in] prof      the profile
+ * @param[in] bars      the length asked for
+ * @param[in] stream    the units' seeds
+ * @param[in] mixable   true for a DJ's track
+ * @param[in] rewrites  the nows, in order
+ * @param[in] opener    true for a set's first track
+ * @return the plan
  */
 Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable, const std::vector<Rewrite>& rewrites,
                         bool opener = false);
 
-/** @brief Plans a track from a track's seed without rerolls (as composeTrack does). */
+/**
+ * @brief Plans a track from a track's seed without rerolls (as composeTrack does).
+ * @param[in] prof     the profile
+ * @param[in] bars     the length asked for
+ * @param[in] seed     the track's seed
+ * @param[in] mixable  true for a DJ's track
+ * @return the plan
+ */
 Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed, bool mixable = false);
 
-/** @brief The share of @p plan's bars in breaks, breakdowns and builds. */
+/**
+ * @brief The share of @p plan's bars in breaks, breakdowns and builds.
+ * @param[in] plan  the plan
+ * @return the share, 0..1
+ */
 float breakdownShare(const Plan& plan);
 
 } // namespace parh

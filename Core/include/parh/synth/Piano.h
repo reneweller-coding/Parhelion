@@ -43,6 +43,7 @@
  * voice's force on the bridge (the level) and where on the bridge it drives (the pan: its region moved by up to four of
  * the sixteen, so its image moves with it). No strike point: the action's hammer line is fixed, and the design keeps
  * the modes' response at that line only.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -60,33 +61,80 @@ public:
     static constexpr int Voices = 24;       ///< voices at most (the Quest: fewer)
     static constexpr int MaxBlock = 32;     ///< samples per call at most (the engine's raster)
 
-    /** @brief Sets the rate; the design follows with setSpec(). */
+    /**
+     * @brief Sets the rate; the design follows with setSpec().
+     * @param[in] sampleRate  the sample rate
+     */
     void prepare(double sampleRate);
-    /** @brief Builds or fetches the design for @p spec (allocates) and silences everything. */
+    /**
+     * @brief Builds or fetches the design for @p spec (allocates) and silences everything.
+     * @param[in] spec  the piano's specification
+     */
     void setSpec(const PianoSpec& spec);
-    /** @brief The playing knobs (the piano:: parameters, in their order). */
+    /**
+     * @brief The playing knobs (the piano:: parameters, in their order).
+     * @param[in] v  the piano's knob values
+     */
     void update(const float* v);
-    /** @brief Strikes @p pitch (transposed by octaves into A0 .. C8) at @p velocity, @p late samples ago (0 <= late < 1). */
+    /**
+     * @brief Strikes @p pitch (transposed by octaves into A0 .. C8) at @p velocity, @p late samples ago (0 <= late <
+     *        1).
+     * @param[in] pitch     the MIDI note
+     * @param[in] velocity  the velocity, 0..1
+     * @param[in] late      samples ago, 0..1
+     */
     void noteOn(int pitch, float velocity, double late);
-    /** @brief Releases @p pitch (the damper falls unless the pedal holds it). */
+    /**
+     * @brief Releases @p pitch (the damper falls unless the pedal holds it).
+     * @param[in] pitch  the MIDI note
+     */
     void noteOff(int pitch);
     /** @brief Silence, every key up. */
     void reset();
-    /** @brief The Quest's limits: fewer voices. */
+    /**
+     * @brief The Quest's limits: fewer voices.
+     * @param[in] voices  the most voices
+     */
     void setVoiceLimit(int voices) { m_voiceLimit = std::clamp(voices, 1, Voices); }
-    /** @brief Renders @p n samples, replacing @p L and @p R. */
+    /**
+     * @brief Renders @p n samples, replacing @p L and @p R.
+     * @param[out] L  the left channel
+     * @param[out] R  the right channel
+     * @param[in]  n  the block's samples
+     */
     void process(float* L, float* R, int n);
-    /** @brief Renders with a chosen lane type (float: the scalar reference), for the vector tests. */
+    /**
+     * @brief Renders with a chosen lane type (float: the scalar reference), for the vector tests.
+     * @param[out] L  the left channel
+     * @param[out] R  the right channel
+     * @param[in]  n  the block's samples
+     */
     template <class VT> void processWith(float* L, float* R, int n);
-    /** @brief Voices sounding. */
+    /**
+     * @brief Voices sounding.
+     * @return the voices sounding
+     */
     int activeVoices() const;
-    /** @brief The design (the tests). */
+    /**
+     * @brief The design (the tests).
+     * @return the design
+     */
     const PianoDesign* design() const { return m_design.get(); }
-    /** @brief A voice's relative frequency rise from the tension, the largest now sounding (the tests). */
+    /**
+     * @brief A voice's relative frequency rise from the tension, the largest now sounding (the tests).
+     * @return the largest relative frequency rise
+     */
     float maxTensionRise() const;
-    /** @brief The deck's shared modulation sources (Modulation.h). */
+    /**
+     * @brief The deck's shared modulation sources (Modulation.h).
+     * @param[in] g  the shared sources
+     */
     void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
-    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    /**
+     * @brief The beat now and the beats per sample (the synced LFOs).
+     * @param[in] beat            the beat now
+     * @param[in] beatsPerSample  the beats per sample
+     */
     void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
 
 private:
@@ -125,7 +173,11 @@ private:
         float m_w0 = 1.0f;   ///< its share in the region
         float m_w1 = 0.0f;   ///< its share in the next region
     };
-    /** @brief Voice @p i's modulation now; @p strike: its hammer is about to fly (the hardness). */
+    /**
+     * @brief Voice @p i's modulation now; @p strike: its hammer is about to fly (the hardness).
+     * @param[in] i       the voice
+     * @param[in] strike  true when its hammer is about to fly
+     */
     void modVoice(int i, bool strike);
     /** @brief The board's states: its modes and the high bank. */
     struct BoardState {
@@ -135,24 +187,68 @@ private:
         std::vector<float> m_hzi;   ///< ... imaginary part
     };
 
-    /** @brief The voice for @p key: the one already on it, else a free one, else the oldest. */
+    /**
+     * @brief The voice for @p key: the one already on it, else a free one, else the oldest.
+     * @param[in] key  the key
+     * @return the voice's index
+     */
     int voiceFor(int key);
-    /** @brief Throws the hammer of voice @p v at @p key with @p velocity, @p late samples ago. */
+    /**
+     * @brief Throws the hammer of voice @p v at @p key with @p velocity, @p late samples ago.
+     * @param[in,out] v         the voice
+     * @param[in]     key       the key
+     * @param[in]     velocity  the velocity, 0..1
+     * @param[in]     late      samples ago
+     */
     void startVoice(Voice& v, int key, float velocity, double late);
-    /** @brief Voice @p v's poles for the next @p n samples: the tension's rise, the bend, the damper. */
+    /**
+     * @brief Voice @p v's poles for the next @p n samples: the tension's rise, the bend, the damper.
+     * @param[in,out] v  the voice
+     * @param[in]     n  the samples
+     */
     void blockCoefficients(Voice& v, int n);
-    /** @brief @p n samples of voice @p v while the hammer touches: its modes on sub-steps, the bridge force into @p force. */
+    /**
+     * @brief @p n samples of voice @p v while the hammer touches: its modes on sub-steps, the bridge force into @p
+     *        force.
+     * @param[in,out] v      the voice
+     * @param[out]    force  the bridge force
+     * @param[in]     n      the samples
+     */
     void contactBlock(Voice& v, float* force, int n);
-    /** @brief @p n samples of voice @p v's free strings, the bridge force into @p force. */
+    /**
+     * @brief @p n samples of voice @p v's free strings, the bridge force into @p force.
+     * @param[in,out] v      the voice
+     * @param[in,out] force  the bridge force, added to
+     * @param[in]     n      the samples
+     */
     template <class VT> void stringBlock(Voice& v, float* force, int n);
-    /** @brief @p n samples within one grid cell (@p cellStart, @p cellEnd: it begins or ends one) into @p L and @p R. */
+    /**
+     * @brief @p n samples within one grid cell (@p cellStart, @p cellEnd: it begins or ends one) into @p L and @p R.
+     * @param[in,out] L          the left channel, added to
+     * @param[in,out] R          the right channel, added to
+     * @param[in]     n          the samples
+     * @param[in]     cellStart  true when the segment begins a cell
+     * @param[in]     cellEnd    true when it ends one
+     */
     template <class VT> void renderSegment(float* L, float* R, int n, bool cellStart, bool cellEnd);
     /**
      * @brief @p n samples of board @p s driven by the @p region forces into @p L and @p R; @p wantAccel: its acceleration
      *        too.
+     * @param[in,out] s          the board's state
+     * @param[in]     region     the forces per region
+     * @param[in,out] L          the left channel, added to
+     * @param[in,out] R          the right channel, added to
+     * @param[in]     wantAccel  true for the acceleration too
+     * @param[in]     n          the samples
      */
     template <class VT> void boardBlock(BoardState& s, const float (*region)[MaxBlock], float* L, float* R, bool wantAccel, int n);
-    /** @brief @p n samples of the sympathetic strings (@p sounding: anything drives them) within a grid cell. */
+    /**
+     * @brief @p n samples of the sympathetic strings (@p sounding: anything drives them) within a grid cell.
+     * @param[in] n          the samples
+     * @param[in] sounding   true when anything drives them
+     * @param[in] cellStart  true when the segment begins a cell
+     * @param[in] cellEnd    true when it ends one
+     */
     template <class VT> void symBlock(int n, bool sounding, bool cellStart, bool cellEnd);
 
     std::shared_ptr<const PianoDesign> m_design;   ///< the design: the modes of every key and of the board

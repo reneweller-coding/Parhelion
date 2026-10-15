@@ -15,6 +15,7 @@
  * barsPerChordBreak in breakdowns; the last two bars before a drop hold VII and the drop resolves to i on its first beat
  * (Dok. 4: "Halten der bVII ueber die letzten zwei Takte"). Acid: one chord for 16 bars, a fourth or a fifth away every
  * 16 (Dok. 4). Cinematic: after the second breakdown a minor third up (the "Epic" key change), by the profile's chance.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -30,7 +31,10 @@ namespace parh {
 struct Chord {
     int m_degree = 0;       ///< scale degree of the root (0-based)
     int m_tones[3] = {};    ///< semitones above the key's root
-    /** @brief The root, semitones above the key's root. */
+    /**
+     * @brief The root, semitones above the key's root.
+     * @return the root in semitones above the key's root
+     */
     int root() const { return m_tones[0]; }
 };
 
@@ -42,21 +46,57 @@ struct Harmony {
     std::vector<Chord> m_bars;           ///< the chord of every bar
     std::vector<int> m_shift;            ///< the key change in semitones from each bar on (0, or 3 after the Cinematic change)
     int m_changeBar = -1;                ///< where the key changes (-1: never)
-    /** @brief The absolute pitch class of the chord's tone @p i at @p bar. */
+    /**
+     * @brief The absolute pitch class of the chord's tone @p i at @p bar.
+     * @param[in] bar  the bar
+     * @param[in] i    the chord tone's index
+     * @return its pitch class
+     */
     int pc(int bar, int i) const;
 };
 
-/** @brief Draws a key and a mode from the profile; @p key and @p scale are set (compose.auto). */
+/**
+ * @brief Draws a key and a mode from the profile; @p key and @p scale are set (compose.auto).
+ * @param[in]     prof   the profile
+ * @param[in,out] r      the random stream
+ * @param[out]    key    the key's root
+ * @param[out]    scale  the mode
+ */
 void drawKey(const StyleProfile& prof, Rng& r, int& key, int& scale);
-/** @brief The chord on @p degree of @p scale (triads in thirds on the chord scale described above). */
+/**
+ * @brief The chord on @p degree of @p scale (triads in thirds on the chord scale described above).
+ * @param[in] scale      the mode
+ * @param[in] degree     the degree
+ * @param[in] majorFive  true for a major chord on the fifth
+ * @return the chord
+ */
 Chord chordOn(int scale, int degree, bool majorFive = false);
-/** @brief The harmony of @p plan in @p key and @p scale, from the stream @p seed. */
+/**
+ * @brief The harmony of @p plan in @p key and @p scale, from the stream @p seed.
+ * @param[in] plan   the plan
+ * @param[in] prof   the profile
+ * @param[in] key    the key's root
+ * @param[in] scale  the mode
+ * @param[in] seed   the stream's seed
+ * @return the harmony
+ */
 Harmony composeHarmony(const Plan& plan, const StyleProfile& prof, int key, int scale, uint64_t seed);
-/** @brief The pitch of pitch class @p pc at or above @p floor. */
+/**
+ * @brief The pitch of pitch class @p pc at or above @p floor.
+ * @param[in] pc     the pitch class
+ * @param[in] floor  the lowest note
+ * @return the MIDI note
+ */
 int atOrAbove(int pc, int floor);
 /**
  * @brief The pad's four voices over the chord of @p bar: the third or the fifth at the bottom from about E3 (Dok. 4:
  *        "tiefste Stimme Terz oder Quinte, nicht der Grundton"), the smallest movement from @p prev.
+ * @param[in] h      the harmony
+ * @param[in] bar    the bar
+ * @param[in] prev   the voices before
+ * @param[in] first  true for the first chord
+ * @param[in] floor  the lowest note
+ * @return the four voices
  */
 std::array<int, 4> voicePad(const Harmony& h, int bar, const std::array<int, 4>& prev, bool first, int floor = 52);
 

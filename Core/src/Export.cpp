@@ -1,6 +1,7 @@
 /**
  * @file Export.cpp
  * @brief The cues and the DJ loops of an export (Export.h).
+ * @author Rene Weller
  */
 #include "parh/Export.h"
 #include "parh/Engine.h"
@@ -16,7 +17,11 @@ namespace parh {
 
 namespace {
 
-/** @brief @p s escaped for a JSON string. */
+/**
+ * @brief @p s escaped for a JSON string.
+ * @param[in] s  the text
+ * @return the text escaped for a JSON string
+ */
 std::string jsonEscape(const std::string& s)
 {
     std::string o;
@@ -28,7 +33,11 @@ std::string jsonEscape(const std::string& s)
     return o;
 }
 
-/** @brief @p s escaped for XML. */
+/**
+ * @brief @p s escaped for XML.
+ * @param[in] s  the text
+ * @return the text escaped for XML
+ */
 std::string xmlEscape(const std::string& s)
 {
     std::string o;
@@ -44,7 +53,11 @@ std::string xmlEscape(const std::string& s)
     return o;
 }
 
-/** @brief A file URI as rekordbox writes them: file://localhost/G:/dir/name.wav, reserved characters percent-encoded. */
+/**
+ * @brief A file URI as rekordbox writes them: file://localhost/G:/dir/name.wav, reserved characters percent-encoded.
+ * @param[in] path  the file's path
+ * @return its file URI
+ */
 std::string fileUri(const std::string& path)
 {
     std::error_code ec;

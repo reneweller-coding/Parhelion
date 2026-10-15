@@ -1,6 +1,7 @@
 /**
  * @file Piano.cpp
  * @brief The physical piano in real time (Piano.h).
+ * @author Rene Weller
  */
 #include "parh/synth/Piano.h"
 #include "parh/Params.h"
@@ -29,7 +30,11 @@ constexpr float LongCoupling = 0.08f; ///< the longitudinal force's share in the
  */
 constexpr float SymDrive = 0.017f;
 
-/** @brief The damper's contact for a released key at pedal @p p (0 up .. 1 down; the middle is the half pedal). */
+/**
+ * @brief The damper's contact for a released key at pedal @p p (0 up .. 1 down; the middle is the half pedal).
+ * @param[in] p  the pedal, 0..1
+ * @return the damper's contact, 0..1
+ */
 float damperContact(float p)
 {
     const float q = clampv(1.0f - p, 0.0f, 1.0f);
@@ -39,7 +44,18 @@ float damperContact(float p)
 /**
  * @brief A bank of complex one-poles, eight modes side by side: z = p z + g in, out += Re(c z). The outputs of the
  *        eight lanes go to eight accumulators per sample (acc[i * 8 + lane]), so every lane width sums alike.
- * @param in  the input per sample, or null (no input)
+ * @param[in]     pr      the poles' real parts
+ * @param[in]     pi      the poles' imaginary parts
+ * @param[in]     gr      the input gains' real parts
+ * @param[in]     gi      the input gains' imaginary parts
+ * @param[in,out] zr      the states' real parts
+ * @param[in,out] zi      the states' imaginary parts
+ * @param[in]     cr      the output gains' real parts
+ * @param[in]     ci      the output gains' imaginary parts
+ * @param[in]     padded  the modes, a multiple of 8
+ * @param[in]     in      the input per sample, or null (no input)
+ * @param[in,out] acc     the accumulators, added to
+ * @param[in]     n       the samples
  */
 template <class VT>
 void resonate(const float* pr, const float* pi, const float* gr, const float* gi, float* zr, float* zi, const float* cr, const float* ci,
@@ -77,7 +93,12 @@ void resonate(const float* pr, const float* pi, const float* gr, const float* gi
         }
 }
 
-/** @brief The eight accumulators of sample @p i, added in order. */
+/**
+ * @brief The eight accumulators of sample @p i, added in order.
+ * @param[in] acc  the accumulators
+ * @param[in] i    the sample
+ * @return the sum
+ */
 inline float sum8(const float* acc, int i)
 {
     const float* a = acc + i * 8;

@@ -31,6 +31,13 @@
  * @note Copied from Phosphene `Core/include/phos/Vec.h` at 9a2f615 (24.09.2026); namespace eph, prefix EPH_.
  * @note Copied from Ephemeris `Core/include/eph/Vec.h` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/include/tot/Vec.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
+ *
+ * @par Compile Flags:
+ *   @arg @c PARH_FORCE_SCALAR - the scalar path whatever the target can do (the vector tests' reference)
+ *   @arg @c PARH_NEON_SHIM - the NEON path on x86 through Tests/neonshim, so the four-lane code is tested on the
+ *                            desktop
+ *   @arg @c PARH_NEON_BENCH - the NEON path on SSE lanes, for timing only (the CMake option of the same name)
  */
 #pragma once
 #include <cmath>
@@ -56,25 +63,119 @@ namespace parh {
 // Scalar lane: always available, so every template can be instantiated with float on any path.
 // ------------------------------------------------------------------------------------------------
 
-/** @brief Lane count of a lane type: 1 for float, the register width for VecF. */
+/**
+ * @brief Lane count of a lane type: 1 for float, the register width for VecF.
+ * @return the lane count of the lane type
+ */
 template <class VT> constexpr int laneWidth() { return static_cast<int>(sizeof(VT) / sizeof(float)); }
 
-inline float vset1(float x, float) { return x; }                                       ///< constant (overload tag: float)
-inline float vloadAs(const float* p, float) { return *p; }                             ///< load one lane (tag: float)
-inline void  vstore(float* p, float a) { *p = a; }                                     ///< store one lane
-inline float vfmadd(float a, float b, float c) { return std::fma(a, b, c); }           ///< a*b + c, fused
-inline float vfnmadd(float a, float b, float c) { return std::fma(-a, b, c); }         ///< c - a*b, fused
-inline float vmin(float a, float b) { return a < b ? a : b; }                          ///< minimum
-inline float vmax(float a, float b) { return a > b ? a : b; }                          ///< maximum
-inline float vsqrt(float a) { return std::sqrt(a); }                                   ///< square root
-inline float vabs(float a) { return std::fabs(a); }                                    ///< absolute value
-inline float vfloor(float a) { return std::floor(a); }                                 ///< floor
-inline bool  vlt(float a, float b) { return a < b; }                                   ///< a < b
-inline bool  vgt(float a, float b) { return a > b; }                                   ///< a > b
-inline bool  vge(float a, float b) { return a >= b; }                                  ///< a >= b
-inline float vselect(bool m, float t, float f) { return m ? t : f; }                   ///< m ? t : f
-inline float sumOrdered(float a) { return a; }                                         ///< lanes added in order
-inline float laneOf(float a, int) { return a; }                                        ///< one lane's value
+/**
+ * constant (overload tag: float)
+ * @param[in] x  the value
+ * @return x in every lane
+ */
+inline float vset1(float x, float) { return x; }
+/**
+ * load one lane (tag: float)
+ * @param[in] p  where the value is read
+ * @return the value
+ */
+inline float vloadAs(const float* p, float) { return *p; }
+/**
+ * store one lane
+ * @param[out] p  where the value is written
+ * @param[in]  a  the value
+ */
+inline void  vstore(float* p, float a) { *p = a; }
+/**
+ * a*b + c, fused
+ * @param[in] a  the first factor
+ * @param[in] b  the second factor
+ * @param[in] c  the addend
+ * @return a*b + c
+ */
+inline float vfmadd(float a, float b, float c) { return std::fma(a, b, c); }
+/**
+ * c - a*b, fused
+ * @param[in] a  the first factor
+ * @param[in] b  the second factor
+ * @param[in] c  the minuend
+ * @return c - a*b
+ */
+inline float vfnmadd(float a, float b, float c) { return std::fma(-a, b, c); }
+/**
+ * minimum
+ * @param[in] a  the first value
+ * @param[in] b  the second value
+ * @return the smaller
+ */
+inline float vmin(float a, float b) { return a < b ? a : b; }
+/**
+ * maximum
+ * @param[in] a  the first value
+ * @param[in] b  the second value
+ * @return the larger
+ */
+inline float vmax(float a, float b) { return a > b ? a : b; }
+/**
+ * square root
+ * @param[in] a  the value
+ * @return its square root
+ */
+inline float vsqrt(float a) { return std::sqrt(a); }
+/**
+ * absolute value
+ * @param[in] a  the value
+ * @return its absolute value
+ */
+inline float vabs(float a) { return std::fabs(a); }
+/**
+ * floor
+ * @param[in] a  the value
+ * @return its floor
+ */
+inline float vfloor(float a) { return std::floor(a); }
+/**
+ * a < b
+ * @param[in] a  the first value
+ * @param[in] b  the second value
+ * @return a < b
+ */
+inline bool  vlt(float a, float b) { return a < b; }
+/**
+ * a > b
+ * @param[in] a  the first value
+ * @param[in] b  the second value
+ * @return a > b
+ */
+inline bool  vgt(float a, float b) { return a > b; }
+/**
+ * a >= b
+ * @param[in] a  the first value
+ * @param[in] b  the second value
+ * @return a >= b
+ */
+inline bool  vge(float a, float b) { return a >= b; }
+/**
+ * m ? t : f
+ * @param[in] m  the mask
+ * @param[in] t  the value where the mask is true
+ * @param[in] f  the value where it is false
+ * @return m ? t : f
+ */
+inline float vselect(bool m, float t, float f) { return m ? t : f; }
+/**
+ * lanes added in order
+ * @param[in] a  the lanes
+ * @return their sum, added in lane order
+ */
+inline float sumOrdered(float a) { return a; }
+/**
+ * one lane's value
+ * @param[in] a  the lanes
+ * @return the lane's value
+ */
+inline float laneOf(float a, int) { return a; }
 
 #if PARH_VEC_PATH == 1
 // ------------------------------------------------------------------------------------------------
@@ -180,14 +281,23 @@ using VecF = float;   ///< one lane
 using MaskF = bool;   ///< one lane mask
 #endif
 
-/** @brief A constant in lane type @p V. */
+/**
+ * @brief A constant in lane type @p V.
+ * @param[in] x  the value
+ * @return x in every lane
+ */
 template <class VT> inline VT lanes(float x) { return vset1(x, VT{}); }
-/** @brief Loads laneWidth<V>() floats from @p p. */
+/**
+ * @brief Loads laneWidth\<V\>() floats from @p p.
+ * @param[in] p  where the floats are read
+ * @return the lanes
+ */
 template <class VT> inline VT loadLanes(const float* p) { return vloadAs(p, VT{}); }
 
 /**
  * @brief Array length rounded up to the widest register, so lane arrays work on every path.
- * @param n number of lanes actually used
+ * @param[in] n  number of lanes actually used
+ * @return the array length, rounded up to the widest register
  */
 constexpr int paddedLanes(int n) { return (n + 7) & ~7; }
 

@@ -6,6 +6,7 @@
  *
  *     parh_orchprobe --strings "45:0.7:3,64:0.7:3" --out strings.wav
  *     parh_orchprobe --measure
+ * @author Rene Weller
  */
 #include "parh/Dsp.h"
 #include "parh/Params.h"

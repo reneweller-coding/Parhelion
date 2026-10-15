@@ -9,6 +9,7 @@
  * ever ruled out or forced. (Totality rated its archetypes; Parhelion's kinds are its form templates.) The ratings live in a file of the player's (the plugin: Documents/Parhelion/ratings.tsv, one
  * rating a line); a saved set does not carry them, so it plays back the same only with use_ratings off.
  * @note Copied from Totality `Core/include/tot/Preferences.h` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #pragma once
 #include <map>
@@ -30,7 +31,11 @@ struct Rating {
 struct Preferences {
     float m_form[5] = { 1, 1, 1, 1, 1 };               ///< a factor per FormTemplate (Anthem, Dream, Acid, Plateau, Drift)
     std::map<std::string, float> m_groups;             ///< a factor per preset group (1 where absent)
-    /** @brief The factor of preset group @p name. */
+    /**
+     * @brief The factor of preset group @p name.
+     * @param[in] name  the preset group
+     * @return its factor
+     */
     float group(const std::string& name) const
     {
         const auto it = m_groups.find(name);
@@ -38,13 +43,26 @@ struct Preferences {
     }
 };
 
-/** @brief The preferences @p ratings give (Preferences.h). */
+/**
+ * @brief The preferences @p ratings give (Preferences.h).
+ * @param[in] ratings  the ratings
+ * @return the weights
+ */
 Preferences preferencesFrom(const std::vector<Rating>& ratings);
 
-/** @brief Reads the ratings from @p path (none if it does not exist). */
+/**
+ * @brief Reads the ratings from @p path (none if it does not exist).
+ * @param[in] path  the ratings file
+ * @return the ratings, empty when the file is missing
+ */
 std::vector<Rating> loadRatings(const std::string& path);
 
-/** @brief Appends @p r to the ratings in @p path. */
+/**
+ * @brief Appends @p r to the ratings in @p path.
+ * @param[in] path  the ratings file
+ * @param[in] r     the rating
+ * @return false when the file cannot be written
+ */
 bool appendRating(const std::string& path, const Rating& r);
 
 } // namespace parh

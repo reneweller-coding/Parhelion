@@ -2,6 +2,7 @@
  * @file MemoFilter.cpp
  * @brief The Bloom filter of the transcriptions' two-bar windows (Tools/corpus/memorisation.py --emit,
  *        generated -- do not edit). Hashes only; no window can be read back from them.
+ * @author Rene Weller
  */
 #include "parh/compose/Memo.h"
 

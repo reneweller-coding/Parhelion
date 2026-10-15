@@ -1,6 +1,7 @@
 /**
  * @file Study.cpp
  * @brief The study of Phases 1 and 2 (Study.h): a fixed Uplifting form with its layer matrix, harmony, pump and automation.
+ * @author Rene Weller
  */
 #include "parh/compose/Study.h"
 #include "parh/Dsp.h"
@@ -15,7 +16,11 @@ namespace {
 
 constexpr int Bars = 104;   ///< the study's length, bars
 constexpr int Blocks = Bars / 8;   ///< its blocks of eight bars
-/** @brief The beat bar @p bar begins on. */
+/**
+ * @brief The beat bar @p bar begins on.
+ * @param[in] bar  the bar
+ * @return its first beat
+ */
 constexpr double beatOf(int bar) { return 4.0 * bar; }
 
 using LT = LayerE;   ///< The layers, shortly.
@@ -28,7 +33,11 @@ struct BlockPlan {
     float m_energy;   ///< the block's energy
 };
 
-/** @brief Every layer off but those @p on names. */
+/**
+ * @brief Every layer off but those @p on names.
+ * @param[in] on  the layers on and their states
+ * @return the layer states
+ */
 std::array<ST, NumLayers> states(std::initializer_list<std::pair<LT, ST>> on)
 {
     std::array<ST, NumLayers> a{};
@@ -36,7 +45,10 @@ std::array<ST, NumLayers> states(std::initializer_list<std::pair<LT, ST>> on)
     return a;
 }
 
-/** @brief The study's blocks: the layers in and out, the energy, as Study.h tells it. */
+/**
+ * @brief The study's blocks: the layers in and out, the energy, as Study.h tells it.
+ * @return the blocks
+ */
 std::vector<BlockPlan> studyPlan()
 {
     const ST on = ST::ON, fi = ST::FILTERED;
@@ -68,7 +80,12 @@ struct Chord {
     int m_tones[3];   ///< root, third, fifth, in semitones
 };
 
-/** @brief The triad on scale degree @p degree of @p sc. */
+/**
+ * @brief The triad on scale degree @p degree of @p sc.
+ * @param[in] sc      the scale
+ * @param[in] degree  the degree
+ * @return the triad
+ */
 Chord chordOn(const ScaleDef& sc, int degree)
 {
     Chord c{};
@@ -80,7 +97,12 @@ Chord chordOn(const ScaleDef& sc, int degree)
     return c;
 }
 
-/** @brief The pitch of pitch class @p pc (semitones above C) at or above @p floor. */
+/**
+ * @brief The pitch of pitch class @p pc (semitones above C) at or above @p floor.
+ * @param[in] pc     the pitch class
+ * @param[in] floor  the lowest note
+ * @return the MIDI note
+ */
 int atOrAbove(int pc, int floor)
 {
     int p = floor - ((floor - pc) % 12 + 12) % 12;
@@ -88,7 +110,15 @@ int atOrAbove(int pc, int floor)
     return p;
 }
 
-/** @brief The pad's four voices over @p c: third or fifth at the bottom from about A3, the smallest movement from @p prev. */
+/**
+ * @brief The pad's four voices over @p c: third or fifth at the bottom from about A3, the smallest movement from @p
+ *        prev.
+ * @param[in] c      the chord
+ * @param[in] key    the key's root
+ * @param[in] prev   the voices before
+ * @param[in] first  true for the first chord
+ * @return the four voices
+ */
 std::array<int, 4> voicePad(const Chord& c, int key, const std::array<int, 4>& prev, bool first)
 {
     std::array<int, 4> best{};
@@ -109,7 +139,13 @@ std::array<int, 4> voicePad(const Chord& c, int key, const std::array<int, 4>& p
     return best;
 }
 
-/** @brief @p v moved by up to @p amount of itself either way, kept in 0.05 .. 1. */
+/**
+ * @brief @p v moved by up to @p amount of itself either way, kept in 0.05 .. 1.
+ * @param[in,out] r       the random stream
+ * @param[in]     v       the value
+ * @param[in]     amount  the share it moves by
+ * @return the value moved
+ */
 float humanised(Rng& r, float v, float amount)
 {
     return clampv(v * (1.0f + amount * r.bipolar()), 0.05f, 1.0f);

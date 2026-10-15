@@ -5,6 +5,7 @@
  *       from Ephemeris; the tables of kick, sub, kit, mono synth, mix, master and DJ mixer are Totality's, the
  *       polyphonic voice's is Phosphene's `Core/src/Params.cpp` at 76f7100 (the voice's modulation insert, its hall gate
  *       and its distance cue left out: nothing here plays them); compose, pump and sends are Parhelion's own.
+ * @author Rene Weller
  */
 #include "parh/Params.h"
 #include "parh/fx/Disperser.h"
@@ -37,20 +38,32 @@ const char* const ChoirModDestNames[] = { "Off", "Pitch", "Vowel", "Tension", "B
 const char* const BrassModDestNames[] = { "Off", "Pitch", "Breath", "Brassiness", "Vibrato", "Level", "Pan" };
 const char* const TimpaniModDestNames[] = { "Off", "Pitch", "Hardness", "Strike", "Decay", "Level", "Pan" };
 
-/// The modulation block's core as rows (Phase 5b): the modulation envelope, four LFOs, eight slots with the engine's
-/// targets -- the same keys as the polyphonic voice's, so a preset's modulation reads the same everywhere.
+/**
+ * The modulation block's core as rows (Phase 5b): the modulation envelope, four LFOs, eight slots with the engine's
+ * targets -- the same keys as the polyphonic voice's, so a preset's modulation reads the same everywhere.
+ * @param[in] n  the LFO's number
+ */
 #define PARH_MOD_LFO(n) \
     { "lfo" #n "_rate",   "LFO " #n " Rate",   "Hz", 0.01f, 40.0f, 1.0f, CurveE::LOG }, \
     { "lfo" #n "_shape",  "LFO " #n " Shape",  "",   0.0f,  6.0f,  0.0f, CurveE::CHOICE, LfoShapeNames }, \
     { "lfo" #n "_sync",   "LFO " #n " Sync",   "",   0.0f,  9.0f,  0.0f, CurveE::CHOICE, LfoSyncNames }, \
     { "lfo" #n "_retrig", "LFO " #n " Retrig", "",   0.0f,  1.0f,  0.0f, CurveE::TOGGLE }, \
     { "lfo" #n "_fade",   "LFO " #n " Fade",   "s",  0.0f,  8.0f,  0.0f, CurveE::LINEAR }
-/** @brief The three knobs of modulation slot @p n: its source, its target from @p DST (up to @p DMAX), its amount. */
+/**
+ * @brief The three knobs of modulation slot @p n: its source, its target from @p DST (up to @p DMAX), its amount.
+ * @param[in] n     the slot's number
+ * @param[in] DST   the targets' names
+ * @param[in] DMAX  the last target
+ */
 #define PARH_MOD_SLOT(n, DST, DMAX) \
     { "mx" #n "_src",    "Mod " #n " Source", "", 0.0f, 12.0f, 0.0f, CurveE::CHOICE, ModSourceNames }, \
     { "mx" #n "_dst",    "Mod " #n " Target", "", 0.0f, DMAX,  0.0f, CurveE::CHOICE, DST }, \
     { "mx" #n "_amount", "Mod " #n " Amount", "", -1.0f, 1.0f, 0.0f, CurveE::LINEAR }
-/** @brief The modulation block's core with the targets @p DST (up to @p DMAX): the envelope, four LFOs, eight slots. */
+/**
+ * @brief The modulation block's core with the targets @p DST (up to @p DMAX): the envelope, four LFOs, eight slots.
+ * @param[in] DST   the targets' names
+ * @param[in] DMAX  the last target
+ */
 #define PARH_MOD_CORE(DST, DMAX) \
     { "menv_attack",  "Mod Attack",  "ms", 0.1f, 8000.0f,  10.0f, CurveE::LOG }, \
     { "menv_decay",   "Mod Decay",   "ms", 5.0f, 12000.0f, 800.0f, CurveE::LOG }, \
@@ -92,7 +105,15 @@ const char* const PolyFilterNames[] = { "Low Pass", "Band Pass", "High Pass", "N
 const char* const PolyFilterModelNames[VoiceFilterModels] = { "State Variable", "Moog Ladder", "Prophet (SSM2040)", "Juno (IR3109)",
                                                                 "Oberheim SEM", "Xpander", "Diode Ladder", "Korg35 (MS-20)",
                                                                 "Polivoks", "Wasp" };
-/// The `table` choice: the six tables written as spectra in code, then the library's (Phosphene's list; WaveTableFile.h).
+/**
+ * The `table` choice: the six tables written as spectra in code, then the library's (Phosphene's list;
+ * WaveTableFile.h).
+ * @param[in] index     the table's index
+ * @param[in] name      its name
+ * @param[in] id        its library id
+ * @param[in] lane      the lane it suits
+ * @param[in] fallback  the built-in table standing in
+ */
 #define PARH_WT(index, name, id, lane, fallback) name,
 /** @brief poly.table: the wavetables. */
 const char* const WaveTableNames[] = { "Classic", "Vocal", "Glass", "PWM", "Sync", "Formant Saw",
@@ -765,10 +786,18 @@ const ModuleSpec Modules[static_cast<int>(ModuleE::COUNT)] = {
     { "cue",     CueParams,     cue::COUNT,     1 },
 };
 
-/** @brief Whether a curve takes whole steps (Int, Choice, Toggle). */
+/**
+ * @brief Whether a curve takes whole steps (Int, Choice, Toggle).
+ * @param[in] c  the curve
+ * @return true when it takes whole steps
+ */
 bool isDiscrete(CurveE c) { return c == CurveE::INT || c == CurveE::CHOICE || c == CurveE::TOGGLE; }
 
-/** @brief @p s without spaces, tabs and carriage returns at either end. */
+/**
+ * @brief @p s without spaces, tabs and carriage returns at either end.
+ * @param[in] s  the text
+ * @return the text without spaces, tabs and carriage returns at either end
+ */
 std::string_view trim(std::string_view s)
 {
     while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\r')) s.remove_prefix(1);
@@ -776,7 +805,11 @@ std::string_view trim(std::string_view s)
     return s;
 }
 
-/** @brief Lower case without spaces, for matching choice names ("909 Metal" = "909metal"). */
+/**
+ * @brief Lower case without spaces, for matching choice names ("909 Metal" = "909metal").
+ * @param[in] s  the name
+ * @return the name folded
+ */
 std::string foldName(std::string_view s)
 {
     std::string out;

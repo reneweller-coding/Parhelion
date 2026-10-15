@@ -36,6 +36,7 @@
  * the pad's drift, and without the presets the choir's vowel, the brass's blare, the cloud). The velocity scatter is a hash of the track's
  * seed and each note. A set asks for a track with its own tempo, key and energy (TrackRequest); its units are
  * `track<n>.<unit>`.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Params.h"
@@ -98,17 +99,23 @@ extern const char* const UnitNames[UnitCount];
 
 /**
  * @brief Writes one track, beat 0 its first bar.
- * @param p        the knobs
- * @param seed     the track's seed
- * @param req      what a set asks (all defaults: a track alone)
- * @param curation rerolls, or null
- * @param unit     prefix of this track's units in @p curation ("" alone, "track3." in a set)
- * @param info     receives what the track tells, or null
+ * @param[in]  p         the knobs
+ * @param[in]  seed      the track's seed
+ * @param[in]  req       what a set asks (all defaults: a track alone)
+ * @param[in]  curation  rerolls, or null
+ * @param[in]  unit      prefix of this track's units in @p curation ("" alone, "track3." in a set)
+ * @param[out] info      receives what the track tells, or null
+ * @return the track's score
  */
 Score composeTrack(const ParamStore& p, uint64_t seed, const TrackRequest& req = TrackRequest{}, const Curation* curation = nullptr,
                    const std::string& unit = std::string(), TrackInfo* info = nullptr);
 
-/** @brief The Camelot label of a key (minor: "8A" for A minor; @p major: "11B" for A major). */
+/**
+ * @brief The Camelot label of a key (minor: "8A" for A minor; @p major: "11B" for A major).
+ * @param[in] key    the key's root, a pitch class
+ * @param[in] major  true for a major key
+ * @return the Camelot label
+ */
 std::string camelotLabel(int key, bool major);
 
 } // namespace parh

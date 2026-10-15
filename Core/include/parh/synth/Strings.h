@@ -33,6 +33,7 @@
  *
  * **Lanes** (Vec.h): the players run eight side by side (every lane its own string and bow, the friction solved with
  * selects), bit-identical to the scalar path; the envelopes, the noise and the bodies are scalar.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -58,43 +59,101 @@ class StringSection {
 public:
     static constexpr int MaxBlock = 32;   ///< samples per decision cell (vibrato, envelopes' targets)
 
-    /** @brief Rate and seed (the players' intonation, vibrato and onsets, the bodies' high modes). */
+    /**
+     * @brief Rate and seed (the players' intonation, vibrato and onsets, the bodies' high modes).
+     * @param[in] sampleRate  the sample rate
+     * @param[in] seed        the seed of the players' streams
+     */
     void prepare(double sampleRate, uint64_t seed);
-    /** @brief The knobs (strings:: parameters). */
+    /**
+     * @brief The knobs (strings:: parameters).
+     * @param[in] v  the effective parameter values
+     */
     void update(const float* v);
-    /** @brief Players take up @p pitch at @p velocity; @p staccato: a short bitten stroke. */
+    /**
+     * @brief Players take up @p pitch at @p velocity; @p staccato: a short bitten stroke.
+     * @param[in] pitch     the MIDI note
+     * @param[in] velocity  the velocity, 0..1
+     * @param[in] staccato  true for a short bitten stroke
+     * @param[in] late      samples after the ideal start
+     */
     void noteOn(int pitch, float velocity, bool staccato, double late);
-    /** @brief The players on @p pitch lift their bows. */
+    /**
+     * @brief The players on @p pitch lift their bows.
+     * @param[in] pitch  the MIDI note
+     */
     void noteOff(int pitch);
     /** @brief Silence. */
     void reset();
-    /** @brief Players on a note (1 .. StringPlayers, at most the quality's limit): the knob, through update(). */
+    /**
+     * @brief Players on a note (1 .. StringPlayers, at most the quality's limit): the knob, through update().
+     * @param[in] n  the players per note
+     */
     void setPlayers(int n) { m_players = n < 1 ? 1 : (n > m_playerLimit ? m_playerLimit : n); }
     /**
      * @brief The quality's limit on the players (Deck::setQuest; the Quest's three). Until 29.09.2026 the Quest set the
      *        players themselves, and the knob's value from update() overwrote them at the next cell: the Quest played
      *        all six. It takes effect with the next update().
+     * @param[in] n  the most players per note
      */
     void setPlayerLimit(int n) { m_playerLimit = n < 1 ? 1 : (n > StringPlayers ? StringPlayers : n); }
-    /** @brief Renders @p n samples, replacing @p L and @p R. */
+    /**
+     * @brief Renders @p n samples, replacing @p L and @p R.
+     * @param[out] L  the left channel
+     * @param[out] R  the right channel
+     * @param[in]  n  the block's samples
+     */
     void process(float* L, float* R, int n);
-    /** @brief With a chosen lane type (float: the scalar reference), for the vector tests. */
+    /**
+     * @brief With a chosen lane type (float: the scalar reference), for the vector tests.
+     * @param[out] L  the left channel
+     * @param[out] R  the right channel
+     * @param[in]  n  the block's samples
+     */
     template <class VT> void processWith(float* L, float* R, int n);
-    /** @brief Lanes sounding. */
+    /**
+     * @brief Lanes sounding.
+     * @return the lanes sounding
+     */
     int activeLanes() const;
-    /** @brief The family a pitch is played by (0 violins .. 3 basses). */
+    /**
+     * @brief The family a pitch is played by (0 violins .. 3 basses).
+     * @param[in] pitch  the MIDI note
+     * @return 0 violins .. 3 basses
+     */
     static int familyOf(int pitch);
-    /** @brief The deck's shared modulation sources (Modulation.h). */
+    /**
+     * @brief The deck's shared modulation sources (Modulation.h).
+     * @param[in] g  the shared sources
+     */
     void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
-    /** @brief The beat now and the beats per sample (the synced LFOs). */
+    /**
+     * @brief The beat now and the beats per sample (the synced LFOs).
+     * @param[in] beat            the beat now
+     * @param[in] beatsPerSample  the beats per sample
+     */
     void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
 
 private:
-    /** @brief A lane's bow point moved to @p beta: its modes' response there and its admittance. */
+    /**
+     * @brief A lane's bow point moved to @p beta: its modes' response there and its admittance.
+     * @param[in] lane  the lane
+     * @param[in] beta  the bow point, a share of the string
+     */
     void placeBow(int lane, double beta);
-    /** @brief @p n samples of every lane's string and bow within one cell (see the file comment). */
+    /**
+     * @brief @p n samples of every lane's string and bow within one cell (see the file comment).
+     * @param[in] n  the samples
+     */
     template <class VT> void bowSegment(int n);
-    /** @brief Sets lane @p lane to play @p pitch at @p velocity as player @p player (@p staccato: a bitten stroke). */
+    /**
+     * @brief Sets lane @p lane to play @p pitch at @p velocity as player @p player (@p staccato: a bitten stroke).
+     * @param[in] lane      the lane
+     * @param[in] pitch     the MIDI note
+     * @param[in] velocity  the velocity, 0..1
+     * @param[in] staccato  true for a bitten stroke
+     * @param[in] player    the player
+     */
     void startLane(int lane, int pitch, float velocity, bool staccato, int player);
     /** @brief The decisions of a cell: the envelopes' targets, the vibrato, the modulation, the lanes that end. */
     void cellUpdate();

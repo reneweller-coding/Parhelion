@@ -4,6 +4,11 @@
  *        of the engine's mixer and master add their wall time to a slot each, and parh_render prints the table. Without
  *        it the scopes compile to nothing.
  * @note Copied from Totality `Core/include/tot/Profile.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
+ *
+ * @par Compile Flags:
+ *   @arg @c PARH_PROFILE - times the stages of the engine into a slot each (the CMake option of the same name); without
+ *                          it the scopes compile to nothing
  */
 #pragma once
 
@@ -39,10 +44,19 @@ struct Scope {
 #define PARH_PROF_BEGIN(slot) const auto parhProfT_##slot = std::chrono::steady_clock::now()
 #define PARH_PROF_END(slot)     (::parh::prof::ns[::parh::prof::slot] += std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - parhProfT_##slot).count())
 #else
-/** @brief Times the enclosing scope into @p slot (nothing without TOT_PROFILE). */
+/**
+ * @brief Times the enclosing scope into @p slot (nothing without PARH_PROFILE).
+ * @param[in] slot  the profiler slot
+ */
 #define PARH_PROF(slot) ((void)0)
-/** @brief Starts timing into @p slot (nothing without TOT_PROFILE). */
+/**
+ * @brief Starts timing into @p slot (nothing without PARH_PROFILE).
+ * @param[in] slot  the profiler slot
+ */
 #define PARH_PROF_BEGIN(slot) ((void)0)
-/** @brief Ends timing into @p slot (nothing without TOT_PROFILE). */
+/**
+ * @brief Ends timing into @p slot (nothing without PARH_PROFILE).
+ * @param[in] slot  the profiler slot
+ */
 #define PARH_PROF_END(slot) ((void)0)
 #endif

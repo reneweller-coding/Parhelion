@@ -1,6 +1,6 @@
 /**
  * @file arm_neon.h
- * @brief NOT the real <arm_neon.h>, and not the test shim either (Tests/neonshim): the NEON intrinsics Vec.h uses, on
+ * @brief NOT the real \<arm_neon.h\>, and not the test shim either (Tests/neonshim): the NEON intrinsics Vec.h uses, on
  *        SSE's four lanes, so the NEON path can be *timed* on the desktop (Phase 7: what a set costs on the Quest, before
  *        a headset is at hand). The Quest's core does four lanes per instruction as SSE does; the table reads, which the
  *        AVX2 path gathers, run through the scalar loops as they do on the Quest.
@@ -8,6 +8,7 @@
  * Only for timing: the fused forms are a multiply and an add here (SSE has no FMA), so the results are not the NEON
  * path's bit for bit -- the test shim (Tests/neonshim) is the one that checks those. Built with PARH_NEON_BENCH, which
  * Vec.h treats as PARH_NEON_SHIM (the NEON path, named "neon-bench").
+ * @author Rene Weller
  */
 #pragma once
 #include <cstdint>

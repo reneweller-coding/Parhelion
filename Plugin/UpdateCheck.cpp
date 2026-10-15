@@ -2,6 +2,7 @@
  * @file UpdateCheck.cpp
  * @brief The update check (UpdateCheck.h).
  * @note Copied from Totality `Plugin/UpdateCheck.cpp` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #include "UpdateCheck.h"
 #include <cstdlib>
@@ -10,7 +11,10 @@ namespace {
 const char* const Releases = "https://api.github.com/repos/reneweller-coding/Parhelion/releases/latest";   ///< GitHub's API for the latest release
 constexpr juce::int64 Day = 24 * 60 * 60 * 1000;   ///< a day, ms
 
-/** @brief The check's settings file: Parhelion.updates beside the standalone's settings. */
+/**
+ * @brief The check's settings file: Parhelion.updates beside the standalone's settings.
+ * @return the settings file's options
+ */
 juce::PropertiesFile::Options options()
 {
     juce::PropertiesFile::Options o;

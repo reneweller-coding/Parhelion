@@ -3,6 +3,7 @@
  * @brief The player's hands.
  * @note Copied from Ephemeris `Core/src/compose/GestureEngine.cpp` (namespace eph) at d047d79 (27.09.2026); the grid added.
  * @note Copied from Totality `Core/src/compose/GestureEngine.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/compose/GestureEngine.h"
 #include <algorithm>

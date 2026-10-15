@@ -4,6 +4,7 @@
  * @note The raster, the event splitting, the automation cursors, the knob settings, the trims and the stems are copied
  *       from Totality `Core/src/Deck.cpp` at 4d3c0d2 (29.09.2026), which had them from Ephemeris; the voices, the pump and
  *       the rooms are Parhelion's.
+ * @author Rene Weller
  */
 #include "parh/Deck.h"
 #include "parh/Profile.h"

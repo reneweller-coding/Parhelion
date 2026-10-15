@@ -18,6 +18,7 @@
  * @note After Ephemeris' Plugin/EditorTheme.h at d047d79 (27.09.2026); the look and feel is the frame's since
  *       01.10.2026, the palette and the groups are Parhelion's.
  * @note Copied from Totality `Plugin/EditorTheme.h` at 4d3c0d2 (29.09.2026); renamed to Parhelion (namespace parh, prefix PARH_).
+ * @author Rene Weller
  */
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -45,11 +46,22 @@ const juce::Colour Red       { 0xffe06a5f };   ///< a meter over
 } // namespace colour
 
 using Family = frame::FamilyE;   ///< The module families (the frame's).
-/** @brief The colour of a family. */
+/**
+ * @brief The colour of a family.
+ * @param[in] f  the family
+ * @return its colour
+ */
 juce::Colour familyColour(Family f);
-/** @brief The colour of deck @p d (A, B, C). */
+/**
+ * @brief The colour of deck @p d (A, B, C).
+ * @param[in] d  the deck
+ * @return its colour
+ */
 juce::Colour deckColour(int d);
-/** @brief Parhelion's skin of the frame: the palette above, the halo behind it, the logo. */
+/**
+ * @brief Parhelion's skin of the frame: the palette above, the halo behind it, the logo.
+ * @return the skin
+ */
 const frame::Skin& skin();
 
 /**
@@ -61,7 +73,11 @@ struct GroupSpec {
     Family m_family;   ///< its family: the colour
     std::vector<const char*> m_keys;   ///< its parameters by key
 };
-/** @brief The panel of a module: its groups, in order (empty: one group of everything). */
+/**
+ * @brief The panel of a module: its groups, in order (empty: one group of everything).
+ * @param[in] m  the module
+ * @return its page's groups
+ */
 const std::vector<GroupSpec>& layoutOf(parh::ModuleE m);
 
 } // namespace parhui

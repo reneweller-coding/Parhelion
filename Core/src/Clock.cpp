@@ -4,6 +4,7 @@
  * @note Copied from Phosphene `Core/src/Clock.cpp` at 9a2f615 (24.09.2026); namespace eph, prefix EPH_.
  * @note Copied from Ephemeris `Core/src/Clock.cpp` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/src/Clock.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/Clock.h"
 #include <algorithm>
@@ -23,7 +24,11 @@ const double SyncBeats[NumSyncDivs] = {
 
 namespace {
 
-/** @brief @p bpm limited to 20 .. 400. */
+/**
+ * @brief @p bpm limited to 20 .. 400.
+ * @param[in] bpm  the tempo
+ * @return the tempo limited to 20 .. 400
+ */
 double clampBpm(double bpm) { return bpm < 20.0 ? 20.0 : (bpm > 400.0 ? 400.0 : bpm); }
 
 /**
@@ -32,6 +37,10 @@ double clampBpm(double bpm) { return bpm < 20.0 ? 20.0 : (bpm > 400.0 ? 400.0 : 
  *
  * dt/db = 60 / (b0 + s db), so t = (60 / s) ln(1 + s db / b0), and 60 db / b0 when s is zero. The
  * log1p form stays accurate for the tiny slopes of a slow drift.
+ * @param[in] b0  the tempo at the segment's start
+ * @param[in] s   the slope in BPM per beat
+ * @param[in] db  the beat offset into the segment
+ * @return the seconds spent up to it
  */
 double segmentSeconds(double b0, double s, double db)
 {
@@ -39,7 +48,13 @@ double segmentSeconds(double b0, double s, double db)
     return 60.0 / s * std::log1p(s * db / b0);
 }
 
-/** @brief Inverse of segmentSeconds: the beat offset reached after @p dt seconds. */
+/**
+ * @brief Inverse of segmentSeconds: the beat offset reached after @p dt seconds.
+ * @param[in] b0  the tempo at the segment's start
+ * @param[in] s   the slope in BPM per beat
+ * @param[in] dt  the seconds into the segment
+ * @return the beat offset reached
+ */
 double segmentBeats(double b0, double s, double dt)
 {
     if (std::fabs(s) < 1e-12) return dt * b0 / 60.0;

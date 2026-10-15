@@ -17,6 +17,7 @@
  * the constraints, and a forward pass that draws in proportion to it. Nothing is drawn that breaks a constraint, and
  * nothing that keeps them is less likely than the model says. A shaping factor per transition (the contour: a leap at the
  * phrase's start, a walk down to its end) multiplies the model's weights.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Dsp.h"
@@ -58,30 +59,59 @@ extern const CorpusRole CorpusRoles[CorpusRoleCount];
 /** @brief The variable-order model of one role: P(next step | two steps before). */
 class StepModel {
 public:
-    /** @brief The model of role @p role, built from its counts. */
+    /**
+     * @brief The model of role @p role, built from its counts.
+     * @param[in] role  the role
+     */
     explicit StepModel(CorpusRoleIdE role);
-    /** @brief The probability of step @p c after @p a, @p b (indices 0 .. CorpusAlpha-1; @p a < 0: no second context). */
+    /**
+     * @brief The probability of step @p c after @p a, @p b (indices 0 .. CorpusAlpha-1; @p a < 0: no second context).
+     * @param[in] a  the step two before, negative for none
+     * @param[in] b  the step before
+     * @param[in] c  the step
+     * @return the probability
+     */
     double p(int a, int b, int c) const;
-    /** @brief The chance of an onset on sixteenth @p step (0 .. 31) given whether the step before had one. */
+    /**
+     * @brief The chance of an onset on sixteenth @p step (0 .. 31) given whether the step before had one.
+     * @param[in] step  the sixteenth, 0..31
+     * @param[in] prev  true when the step before had an onset
+     * @return the chance of an onset
+     */
     double onset(int step, bool prev) const;
-    /** @brief The chance of an accent and of a slide on sixteenth @p step (0 .. 15). */
+    /**
+     * @brief The chance of an accent and of a slide on sixteenth @p step (0 .. 15).
+     * @param[in] step  the sixteenth, 0..15
+     * @return the chance of an accent
+     */
     double accent(int step) const;
-    double slide(int step) const;   ///< @copydoc accent
+    /**
+     * @copybrief accent
+     * @param[in] step  the sixteenth, 0..15
+     * @return the chance of a slide
+     */
+    double slide(int step) const;
 private:
     const CorpusRole& m_r;   ///< the role's counts
     std::vector<float> m_p1;                    ///< order 1 with Witten-Bell back-off to order 0, [a][c]
     std::vector<float> m_p2;                    ///< order 2 interpolated, [a][b][c]
 };
 
-/** @brief The model of @p role, built once (thread-safe). */
+/**
+ * @brief The model of @p role, built once (thread-safe).
+ * @param[in] role  the role
+ * @return its model
+ */
 const StepModel& corpusModel(CorpusRoleIdE role);
 
 /**
  * @brief Draws a line of @p n steps exactly under constraints (Pachet and Roy 2011) from @p model.
- * @param allowed  allowed[i][s]: whether step index s may stand at position i
- * @param shape    an extra weight on the transition (i, a, b, c) -> c at position i (1: none); may be empty
- * @param r        the stream
- * @param out      receives the step indices (0 .. CorpusAlpha-1)
+ * @param[in]     model    the model
+ * @param[in]     n        the steps
+ * @param[in]     allowed  allowed[i][s]: whether step index s may stand at position i
+ * @param[in]     shape    an extra weight on the transition (i, a, b, c) -> c at position i (1: none); may be empty
+ * @param[in,out] r        the stream
+ * @param[out]    out      receives the step indices (0 .. CorpusAlpha-1)
  * @return false if no line satisfies the constraints
  */
 bool sampleConstrained(const StepModel& model, int n, const std::vector<std::array<bool, CorpusAlpha>>& allowed,

@@ -3,6 +3,7 @@
  * @brief Automation curves and score housekeeping.
  * @note The curves are copied from Ephemeris `Core/src/Score.cpp` at d047d79 (27.09.2026).
  * @note Copied from Totality `Core/src/Score.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/Score.h"
 #include <algorithm>

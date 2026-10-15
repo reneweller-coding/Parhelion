@@ -4,14 +4,14 @@
  *
  * A module declares its parameters once as a table of descriptors and may exist several times -- the twelve
  * lanes of the percussion kit are one module in twelve instances, the six polyphonic voices another. A parameter's id
- * is the base index of its module instance plus its index in the table; its text key is "<prefix>.<key>",
- * "<prefix><instance>.<key>" ("perc3.decay") or, where the instances have names, "<name>.<key>" ("lead.detune").
+ * is the base index of its module instance plus its index in the table; its text key is "\<prefix\>.\<key\>",
+ * "\<prefix\>\<instance\>.\<key\>" ("perc3.decay") or, where the instances have names, "\<name\>.\<key\>" ("lead.detune").
  *
  * From the same tables come the host parameters, OSC addresses, the preset text form, the manual and the
  * `--list` output of parh_render. The composer never writes parameters; it reads a snapshot, and what it plays on
  * a knob it writes into the score as an automation curve (Score.h).
  *
- * Values are stored as std::atomic<float> in their real range (Hz, ms, dB), so the audio thread can read what
+ * Values are stored as std::atomic\<float\> in their real range (Hz, ms, dB), so the audio thread can read what
  * another thread wrote without a lock.
  *
  * @note The store (ParamStore) is copied from Totality `Core/include/tot/Params.h` at 4d3c0d2 (29.09.2026), which had
@@ -19,6 +19,7 @@
  *       mixer are Totality's; the polyphonic voice's is Phosphene's (at 76f7100); compose, pump and sends are
  *       Parhelion's own. Rule kept: a table is only ever appended to, never reordered, once the first preset exists,
  *       because the indices sit in presets, `.parhset` files and the plugin's state.
+ * @author Rene Weller
  */
 #pragma once
 #include <atomic>
@@ -394,9 +395,18 @@ struct ScaleDef {
     int m_size;       ///< number of degrees (5 .. 7)
     int m_steps[7];   ///< semitones of the degrees, ascending from 0
 };
-/** @brief The definition of scale @p scale (compose.scale order); Aeolian for an index out of range. */
+/**
+ * @brief The definition of scale @p scale (compose.scale order); Aeolian for an index out of range.
+ * @param[in] scale  the scale
+ * @return its definition
+ */
 const ScaleDef& scaleDef(int scale);
-/** @brief Whether @p semitones above the root lies in scale @p scale. */
+/**
+ * @brief Whether @p semitones above the root lies in scale @p scale.
+ * @param[in] scale      the scale
+ * @param[in] semitones  the interval above the root
+ * @return true when the scale has it
+ */
 bool inScale(int scale, int semitones);
 /** @brief The kick's tuning rules, in the order of kick.tune (Kick.h, tuneToKey). */
 enum class KickTuneE : int { FREE = 0, KEY, FIFTH, FLAT_SEVENTH, COUNT };
@@ -413,76 +423,163 @@ public:
     ParamStore(const ParamStore&) = delete;
     ParamStore& operator=(const ParamStore&) = delete;
 
-    /** @brief Number of parameters. */
+    /**
+     * @brief Number of parameters.
+     * @return the number of parameters
+     */
     int count() const { return static_cast<int>(m_entries.size()); }
-    /** @brief First id of a module instance; -1 if it does not exist. */
+    /**
+     * @brief First id of a module instance; -1 if it does not exist.
+     * @param[in] m         the module
+     * @param[in] instance  its instance
+     * @return the first id of the module instance, -1 if it does not exist
+     */
     int base(ModuleE m, int instance = 0) const;
-    /** @brief Id of parameter @p index of a module instance; -1 if it does not exist. */
+    /**
+     * @brief Id of parameter @p index of a module instance; -1 if it does not exist.
+     * @param[in] m         the module
+     * @param[in] instance  its instance
+     * @param[in] index     the parameter's index within the module
+     * @return the parameter's id, -1 if it does not exist
+     */
     int id(ModuleE m, int instance, int index) const { const int b = base(m, instance); return b < 0 ? -1 : b + index; }
-    /** @brief Descriptor of @p id. */
+    /**
+     * @brief Descriptor of @p id.
+     * @param[in] id  the parameter
+     * @return its descriptor
+     */
     const ParamDesc& desc(int id) const { return *m_entries[static_cast<size_t>(id)].m_desc; }
-    /** @brief Full text key of @p id ("perc3.decay"). */
+    /**
+     * @brief Full text key of @p id ("perc3.decay").
+     * @param[in] id  the parameter
+     * @return its full text key
+     */
     const std::string& key(int id) const { return m_entries[static_cast<size_t>(id)].m_key; }
-    /** @brief The module, the instance and the index within the module of parameter @p id. */
+    /**
+     * @brief The module, the instance and the index within the module of parameter @p id.
+     * @param[in] id  the parameter
+     * @return its module
+     */
     ModuleE moduleOf(int id) const { return m_entries[static_cast<size_t>(id)].m_module; }
-    int instanceOf(int id) const { return m_entries[static_cast<size_t>(id)].m_instance; }   ///< @copydoc moduleOf
-    int indexOf(int id) const { const Entry& e = m_entries[static_cast<size_t>(id)]; return id - base(e.m_module, e.m_instance); }   ///< @copydoc moduleOf
-    /** @brief Id for a text key, or -1. */
+    /**
+     * @copybrief moduleOf
+     * @param[in] id  the parameter
+     * @return its module's instance
+     */
+    int instanceOf(int id) const { return m_entries[static_cast<size_t>(id)].m_instance; }
+    /**
+     * @copybrief moduleOf
+     * @param[in] id  the parameter
+     * @return its index within the module
+     */
+    int indexOf(int id) const { const Entry& e = m_entries[static_cast<size_t>(id)]; return id - base(e.m_module, e.m_instance); }
+    /**
+     * @brief Id for a text key, or -1.
+     * @param[in] key  the text key
+     * @return its id, -1 when there is none
+     */
     int find(std::string_view key) const;
 
-    /** @brief Current real value. */
+    /**
+     * @brief Current real value.
+     * @param[in] id  the parameter
+     * @return its current real value
+     */
     float get(int id) const { return m_values[static_cast<size_t>(id)].load(std::memory_order_relaxed); }
-    /** @brief Current value rounded to an integer (Int, Choice, Toggle). */
+    /**
+     * @brief Current value rounded to an integer (Int, Choice, Toggle).
+     * @param[in] id  the parameter
+     * @return its current value rounded to an integer
+     */
     int getInt(int id) const;
-    /** @brief Current value as a switch. */
+    /**
+     * @brief Current value as a switch.
+     * @param[in] id  the parameter
+     * @return its current value as a switch
+     */
     bool getBool(int id) const { return get(id) >= 0.5f; }
-    /** @brief Sets a real value, clamped to the range (and rounded for discrete curves). */
+    /**
+     * @brief Sets a real value, clamped to the range (and rounded for discrete curves).
+     * @param[in] id     the parameter
+     * @param[in] value  the real value
+     */
     void set(int id, float value);
     /**
      * @brief Counts the writes to the values (set, resetDefaults, copyValuesFrom). A reader that sees the same count as
      *        before its last read of the values saw no write since (the Deck's cell cache): the count is raised after
      *        the value is stored (release) and read before the values are (acquire).
+     * @return the count of writes
      */
     uint32_t version() const { return m_version.load(std::memory_order_acquire); }
-    /** @brief Sets from a normalised 0..1 position. */
+    /**
+     * @brief Sets from a normalised 0..1 position.
+     * @param[in] id    the parameter
+     * @param[in] norm  the position, 0..1
+     */
     void setNormalised(int id, float norm) { set(id, fromNormalised(id, norm)); }
 
-    /** @brief Real value to normalised 0..1. */
+    /**
+     * @brief Real value to normalised 0..1.
+     * @param[in] id     the parameter
+     * @param[in] value  a real value
+     * @return its normalised position, 0..1
+     */
     float toNormalised(int id, float value) const;
-    /** @brief Normalised 0..1 to real value. */
+    /**
+     * @brief Normalised 0..1 to real value.
+     * @param[in] id    the parameter
+     * @param[in] norm  a normalised position, 0..1
+     * @return the real value there
+     */
     float fromNormalised(int id, float norm) const;
 
     /** @brief All parameters back to their defaults. */
     void resetDefaults();
-    /** @brief Default of @p id: the descriptor's, or the instance's own where instances differ (the kit's lanes). */
+    /**
+     * @brief Default of @p id: the descriptor's, or the instance's own where instances differ (the kit's lanes).
+     * @param[in] id  the parameter
+     * @return its default value
+     */
     float defaultValue(int id) const { return m_defaults[static_cast<size_t>(id)]; }
-    /** @brief Copies every value from another store (for snapshots on another thread). */
+    /**
+     * @brief Copies every value from another store (for snapshots on another thread).
+     * @param[in] other  the store whose values are copied
+     */
     void copyValuesFrom(const ParamStore& other);
     /**
      * @brief Copies the current values of one module instance into @p out, indexed like its table.
-     * @param m        module
-     * @param instance instance index
-     * @param out      at least as many floats as the module has parameters
+     * @param[in]     m         module
+     * @param[in]     instance  instance index
+     * @param[in,out] out       at least as many floats as the module has parameters
      */
     void readModule(ModuleE m, int instance, float* out) const;
-    /** @brief Number of parameters of a module. */
+    /**
+     * @brief Number of parameters of a module.
+     * @param[in] m  the module
+     * @return how many parameters an instance of it has
+     */
     static int moduleCount(ModuleE m);
 
     /**
      * @brief Applies "key=value" assignments separated by whitespace, newlines or ';'.
      *
      * Choice parameters accept their name ("compose.key=F#") or index. Lines starting with '#' are comments.
-     * @param text  the assignments
-     * @param error receives a message for the first bad assignment, may be null
+     * @param[in]  text   the assignments
+     * @param[out] error  receives a message for the first bad assignment, may be null
      * @return false if any assignment failed (the good ones are still applied)
      */
     bool parseText(std::string_view text, std::string* error = nullptr);
     /**
      * @brief The text form, one "key=value" per line.
-     * @param onlyChanged leave out parameters at their default
+     * @param[in] onlyChanged  leave out parameters at their default
+     * @return the text form
      */
     std::string toText(bool onlyChanged) const;
-    /** @brief A value formatted for display ("330 Hz", "F#"). */
+    /**
+     * @brief A value formatted for display ("330 Hz", "F#").
+     * @param[in] id  the parameter
+     * @return its value formatted for display
+     */
     std::string format(int id) const;
 
 private:

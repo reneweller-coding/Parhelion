@@ -44,6 +44,7 @@
  *       the phase trim, the tail limit and the click are Phosphene's; the 909 engine, the top layer, the EQ, the
  *       tuning rules and asymptoticPhase() are Totality's.
  * @note Copied from Totality `Core/include/tot/synth/Kick.h` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Adaa.h"
@@ -54,61 +55,86 @@ namespace parh {
 /** @brief The kick drum synthesizer (one voice plus a fade slot, and the top layer). */
 class Kick {
 public:
-    /** @brief Prepares for a sample rate. */
+    /**
+     * @brief Prepares for a sample rate.
+     * @param[in] sampleRate  the sample rate in Hz
+     */
     void prepare(double sampleRate);
     /** @brief Silences and clears all state. */
     void reset();
     /**
      * @brief Reads the effective parameter values.
-     * @param v       values indexed by kick:: (after offsets and constraints)
-     * @param keyRoot pitch class of the key (0 = C), used when Tune is not Free
+     * @param[in] v        values indexed by kick:: (after offsets and constraints)
+     * @param[in] keyRoot  pitch class of the key (0 = C), used when Tune is not Free
      */
     void update(const float* v, int keyRoot);
     /**
      * @brief Starts a kick.
-     * @param velocity 0..1
-     * @param late     how many samples ago the kick ideally started (0 <= late < 1)
+     * @param[in] velocity  0..1
+     * @param[in] late      how many samples ago the kick ideally started (0 <= late < 1)
      */
     void trigger(float velocity, double late = 0.0);
     /**
      * @brief Renders @p n samples.
-     * @param out  receives the kick (replaced)
-     * @param body receives what feeds the rumble: body and click after the EQ, without the top layer (may be null)
-     * @param n    samples
+     * @param[out] out   receives the kick (replaced)
+     * @param[out] body  receives what feeds the rumble: body and click after the EQ, without the top layer (may be
+     *                   null)
+     * @param[in]  n     samples
      */
     void process(float* out, float* body, int n);
 
-    /** @brief The end pitch actually used, after tuning. */
+    /**
+     * @brief The end pitch actually used, after tuning.
+     * @return the end pitch in Hz after tuning
+     */
     float tunedEndHz() const { return m_endHz; }
-    /** @brief The body time constant the next kick uses, after the phase trim, in seconds. */
+    /**
+     * @brief The body time constant the next kick uses, after the phase trim, in seconds.
+     * @return the body time constant in seconds
+     */
     double bodyTau() const { return m_tau2Trimmed; }
-    /** @brief Whether anything is sounding. */
+    /**
+     * @brief Whether anything is sounding.
+     * @return true while anything sounds
+     */
     bool active() const { return m_voice.m_active || m_fade.m_active || m_top.m_active; }
 
     /**
      * @brief Output phase of a kick triggered with the current settings, @p t seconds after its ideal start.
+     * @param[in] t  seconds after the kick's ideal start
      * @return phase in cycles (not wrapped)
      */
     double outputPhaseAt(double t) const;
-    /** @brief The constant c with outputPhaseAt(t) -> f_e t + c for large t, in cycles (see the file comment). */
+    /**
+     * @brief The constant c with outputPhaseAt(t) -> f_e t + c for large t, in cycles (see the file comment).
+     * @return the constant c in cycles
+     */
     double asymptoticPhase() const;
-    /** @brief Instantaneous frequency of the current settings at @p t seconds. */
+    /**
+     * @brief Instantaneous frequency of the current settings at @p t seconds.
+     * @param[in] t  seconds after the kick's start
+     * @return the frequency in Hz
+     */
     double frequencyAt(double t) const;
-    /** @brief Phase in cycles the chain after the oscillator adds at @p hz (saturator, tone, DC blocker, EQ). */
+    /**
+     * @brief Phase in cycles the chain after the oscillator adds at @p hz (saturator, tone, DC blocker, EQ).
+     * @param[in] hz  the frequency in Hz
+     * @return the phase the chain adds there, in cycles
+     */
     double chainPhase(double hz) const;
     /**
      * @brief Trims tau_2 so the output phase at @p t is @p targetCycles modulo whole cycles (Phosphene's lock).
-     * @param t            seconds after the trigger; <= 0 disables the trim
-     * @param targetCycles wanted phase in cycles
+     * @param[in] t             seconds after the trigger; <= 0 disables the trim
+     * @param[in] targetCycles  wanted phase in cycles
      */
     void setPhaseTarget(double t, double targetCycles);
 
     /**
      * @brief Applies the amplitude constraints of Phosphene: the body floor (two periods of the end pitch above
      *        -20 dB), then the tail limit, if Tail Limit is below 0.
-     * @param v           kick values indexed by kick:: (modified in place)
-     * @param slotSeconds time from the kick to the point the tail limit concerns
-     * @param keyRoot     pitch class of the key, for the tuned end pitch
+     * @param[in,out] v            kick values indexed by kick:: (modified in place)
+     * @param[in]     slotSeconds  time from the kick to the point the tail limit concerns
+     * @param[in]     keyRoot      pitch class of the key, for the tuned end pitch
      */
     static void constrain(float* v, double slotSeconds, int keyRoot);
 
@@ -118,6 +144,10 @@ public:
      * KickTune::Key: the tonic, if an octave of it lies in 41 .. 62 Hz (E1 .. B1), else the fifth (C -> G1, C# ->
      * G#1, D -> A1, D# -> A#1). Fifth and FlatSeventh take that degree. Of a degree's octaves, the one nearest
      * @p targetHz.
+     * @param[in] keyRoot   the key's root, 0 .. 11
+     * @param[in] rule      the tuning rule (KickTune)
+     * @param[in] targetHz  the end pitch the free rule keeps, in Hz
+     * @return the end pitch in Hz
      */
     static float tuneToKey(int keyRoot, int rule, float targetHz);
 
@@ -169,13 +199,29 @@ private:
         float  m_velocity = 1.0f;  ///< 0..1
     };
 
-    /** @brief The body of one voice for one sample; the click layer's sample goes to @p click. */
+    /**
+     * @brief The body of one voice for one sample; the click layer's sample goes to @p click.
+     * @param[in,out] v      the voice
+     * @param[out]    click  receives the click layer's sample
+     * @return the body's sample
+     */
     float voiceSample(Voice& v, float& click);
-    /** @brief The top layer's sample (before its drive and high pass). */
+    /**
+     * @brief The top layer's sample (before its drive and high pass).
+     * @return the top layer's sample
+     */
     float topSample();
-    /** @brief The shape a kick triggered now would get, from the current parameters. */
+    /**
+     * @brief The shape a kick triggered now would get, from the current parameters.
+     * @return the shape a kick triggered now would get
+     */
     Shape currentShape() const;
-    /** @brief The sweep's phase at @p t seconds with body time constant @p tau2, in cycles. */
+    /**
+     * @brief The sweep's phase at @p t seconds with body time constant @p tau2, in cycles.
+     * @param[in] t     seconds after the kick's start
+     * @param[in] tau2  the body time constant in seconds
+     * @return the sweep's phase in cycles
+     */
     double phaseWith(double t, double tau2) const;
 
     double m_sr = 48000.0;   ///< sample rate

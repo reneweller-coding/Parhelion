@@ -18,6 +18,7 @@
  *
  * @note The shape (designated initialisers, a morph) follows Totality `Core/include/tot/compose/Style.h` at 4d3c0d2
  *       (29.09.2026); the fields are Parhelion's.
+ * @author Rene Weller
  */
 #pragma once
 #include "parh/Params.h"
@@ -104,13 +105,34 @@ struct StyleProfile {
     std::array<float, 5> m_mix{};                         ///< the styles this profile is (Uplifting .. Deep): the sounds' choice (Presets.h)
 };
 
-/** @brief The profile of a style (Style order). */
+/**
+ * @brief The profile of a style (Style order).
+ * @param[in] s  the style
+ * @return its profile
+ */
 const StyleProfile& styleProfile(StyleE s);
-/** @brief @p a moved towards @p b by @p t (0..1): ranges interpolated, weights mixed, the discrete fields from the nearer. */
+/**
+ * @brief @p a moved towards @p b by @p t (0..1): ranges interpolated, weights mixed, the discrete fields from the
+ *        nearer.
+ * @param[in] a  the profile at 0
+ * @param[in] b  the profile at 1
+ * @param[in] t  the place between them, 0..1
+ * @return the profile between
+ */
 StyleProfile morphProfile(const StyleProfile& a, const StyleProfile& b, float t);
-/** @brief The profile the knobs describe: compose.style, morphed towards compose.morph_to by compose.morph. */
+/**
+ * @brief The profile the knobs describe: compose.style, morphed towards compose.morph_to by compose.morph.
+ * @param[in] p  the knobs
+ * @return the profile they ask for
+ */
 StyleProfile profileOf(const ParamStore& p);
-/** @brief Draws an index by @p weights with the uniform @p u (0..1); the last index with a weight if all are 0. */
+/**
+ * @brief Draws an index by @p weights with the uniform @p u (0..1); the last index with a weight if all are 0.
+ * @param[in] weights  the weights
+ * @param[in] n        their count
+ * @param[in] u        a uniform draw, 0..1
+ * @return the index drawn
+ */
 int drawWeighted(const float* weights, int n, float u);
 
 } // namespace parh

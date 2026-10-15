@@ -9,6 +9,7 @@
  * @note Copied from Phosphene `Core/src/WavWriter.cpp` at 9a2f615 (24.09.2026); namespace eph, prefix EPH_.
  * @note Copied from Ephemeris `Core/src/WavWriter.cpp` at d047d79 (27.09.2026); namespace parh, prefix PARH_.
  * @note Copied from Totality `Core/src/WavWriter.cpp` at 4d3c0d2 (29.09.2026); namespace parh, prefix PARH_.
+ * @author Rene Weller
  */
 #include "parh/WavWriter.h"
 #include <cmath>
@@ -18,11 +19,23 @@
 namespace parh {
 
 namespace {
-/** @brief Writes @p v little-endian to @p p. */
+/**
+ * @brief Writes @p v little-endian to @p p.
+ * @param[out] p  where the bytes go
+ * @param[in]  v  the value
+ */
 void le16(uint8_t* p, uint16_t v) { p[0] = uint8_t(v); p[1] = uint8_t(v >> 8); }
-/** @brief Writes @p v little-endian to @p p. */
+/**
+ * @brief Writes @p v little-endian to @p p.
+ * @param[out] p  where the bytes go
+ * @param[in]  v  the value
+ */
 void le32(uint8_t* p, uint32_t v) { for (int i = 0; i < 4; ++i) p[i] = uint8_t(v >> (8 * i)); }
-/** @brief Writes @p v little-endian to @p p. */
+/**
+ * @brief Writes @p v little-endian to @p p.
+ * @param[out] p  where the bytes go
+ * @param[in]  v  the value
+ */
 void le64(uint8_t* p, uint64_t v) { for (int i = 0; i < 8; ++i) p[i] = uint8_t(v >> (8 * i)); }
 constexpr int HeaderBytes = 12 + 36 + 24 + 8;   ///< RIFF/WAVE + JUNK/ds64 + fmt + data header
 }
