@@ -8,7 +8,10 @@
 #include "EditorStyle.h"
 #include "parh/Presets.h"
 #include "ParhelionData.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
+#include <string>
 
 using namespace parh;
 
@@ -47,6 +50,55 @@ frame::SubTabs* findSubTabs(juce::Component* c)
     return nullptr;
 }
 
+/** @brief A synth's name in the presets' folder and the browser: its parameters' key without the lane's number ("bass", "perc"). */
+juce::String synthKey(const ParamStore& s, Module m)
+{
+    const std::string& k = s.key(s.id(m, 0, 0));
+    return juce::String(k.substr(0, k.find('.'))).trimCharactersAtEnd("0123456789");
+}
+
+/** @brief "perc3.decay" -> "Perc 3", "kick.tune" -> "Kick": the module instance a store id belongs to, for the palette and the info line. */
+juce::String moduleLabel(const ParamStore& s, int id)
+{
+    const std::string& k = s.key(id);
+    const juce::String p(k.substr(0, k.find('.')));
+    const juce::String name = p.trimCharactersAtEnd("0123456789");
+    const juce::String digits = p.substring(name.length());
+    const juce::String nice = name.substring(0, 1).toUpperCase() + name.substring(1);
+    return digits.isEmpty() ? nice : nice + " " + digits;
+}
+
+/** @brief Whether the knobs stand where @p values put them (within a thousandth of each one's range). */
+bool knobsAt(const ParamStore& s, const std::vector<std::pair<int, float>>& values)
+{
+    for (const auto& [id, v] : values) {
+        const ParamDesc& d = s.desc(id);
+        if (std::abs(s.get(id) - v) > 0.001f * std::max(1.0e-6f, d.maxValue - d.minValue)) return false;
+    }
+    return true;
+}
+
+/** @brief The player's presets of instance @p instance of synth @p m (the processor keeps them: Documents/Parhelion/Presets). */
+juce::Array<juce::File> userPresetFiles(ParhelionProcessor& p, Module m, int instance) { return p.userPresets(m, instance); }
+
+/** @brief The knobs of menu id @p menuId of synth @p m (a factory preset's index + 1, or PresetBar::kUserId + one of the player's). */
+std::vector<std::pair<int, float>> knobsOf(ParhelionProcessor& p, Module m, int instance, int menuId)
+{
+    std::vector<std::pair<int, float>> out;
+    const ParamStore& s = p.store();
+    if (menuId >= PresetBar::kUserId && menuId < PresetBar::kSaveId) {
+        const juce::Array<juce::File> files = p.userPresets(m, instance);
+        const int k = menuId - PresetBar::kUserId;
+        if (k >= 0 && k < files.size())
+            for (const auto& [i, v] : userPresetKnobs(s, m, instance, files[k].loadFileAsString().toStdString())) out.emplace_back(s.id(m, instance, i), v);
+        return out;
+    }
+    const std::vector<SoundPreset>& list = factoryPresets(m, instance);
+    if (menuId >= 1 && menuId <= static_cast<int>(list.size()))
+        for (const auto& [i, v] : presetKnobs(m, instance, list[static_cast<size_t>(menuId - 1)])) out.emplace_back(s.id(m, instance, i), v);
+    return out;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------------------------------
@@ -62,8 +114,10 @@ PresetBar::PresetBar(ParhelionProcessor& p, Module m, int instance) : proc_(p), 
             askName();
         } else if (id >= kUserId && id < kUserId + user_.size()) {
             proc_.applyUserPreset(module_, instance_, user_[id - kUserId]);
+            chosen(id);
         } else if (id > 0) {
             proc_.applyPreset(module_, instance_, id - 1);
+            chosen(id);
         }
     };
     // (The arrows step through the factory presets; from a user preset, from the first.)
@@ -79,13 +133,36 @@ PresetBar::PresetBar(ParhelionProcessor& p, Module m, int instance) : proc_(p), 
     };
     prev_.setTooltip("the preset before");
     next_.setTooltip("the next preset");
+    browse_.onClick = [this] {
+        if (auto* ed = findParentComponentOfClass<ParhelionEditor>())
+            ed->browsePresets(module_, instance_, [safe = juce::Component::SafePointer<PresetBar>(this)](int id) {
+                if (safe == nullptr) return;
+                safe->rebuildMenu();
+                safe->chosen(id);
+            });
+    };
+    save_.onClick = [this] { askName(); };
+    star_.setColour(juce::Label::textColourId, parhui::colour::accent);
+    star_.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    star_.setJustificationType(juce::Justification::centred);
+    star_.setTooltip("The knobs have moved from the preset (the disk saves the sound as a user preset)");
     composed_.setColour(juce::Label::textColourId, parhui::colour::dim);
     composed_.setTooltip("The preset the composer chose for this synth in the track that plays (compose.pick_sounds; reroll sounds "
                          "draws others). Its values stand on the knobs; turn one and the sound follows.");
     for (juce::Component* c : { static_cast<juce::Component*>(&menu_), static_cast<juce::Component*>(&prev_), static_cast<juce::Component*>(&next_),
+                                static_cast<juce::Component*>(&browse_), static_cast<juce::Component*>(&save_), static_cast<juce::Component*>(&star_),
                                 static_cast<juce::Component*>(&composed_) })
         addAndMakeVisible(c);
     startTimerHz(4);
+}
+
+void PresetBar::chosen(int menuId)
+{
+    menu_.setSelectedId(menuId, juce::dontSendNotification);
+    loaded_ = menuId;
+    loadedKnobs_ = knobsOf(proc_, module_, instance_, menuId);
+    if (menu_.getText().isNotEmpty()) frame::PresetBrowser::played("Parhelion", synthKey(proc_.store(), module_), menu_.getText());
+    star_.setText({}, juce::dontSendNotification);
 }
 
 void PresetBar::rebuildMenu()
@@ -125,29 +202,33 @@ void PresetBar::askName()
         if (f == juce::File()) return;
         self->rebuildMenu();
         const int i = self->user_.indexOf(f);
-        if (i >= 0) self->menu_.setSelectedId(kUserId + i, juce::dontSendNotification);
+        if (i >= 0) self->chosen(kUserId + i);
     }), true);
 }
 
 void PresetBar::choose(int index)
 {
-    menu_.setSelectedId(index + 1, juce::dontSendNotification);
     proc_.applyPreset(module_, instance_, index);
+    chosen(index + 1);
 }
 
 void PresetBar::timerCallback()
 {
     const int index = proc_.composedPreset(module_, instance_);
-    if (index == shown_) return;
-    shown_ = index;
-    const std::vector<SoundPreset>& list = factoryPresets(module_, instance_);
-    if (index >= 0 && index < static_cast<int>(list.size())) {
-        composed_.setText("this track: " + juce::String(list[static_cast<size_t>(index)].name) + " (" + list[static_cast<size_t>(index)].group + ")",
-                          juce::dontSendNotification);
-        menu_.setSelectedId(index + 1, juce::dontSendNotification);   // what plays, until another is chosen
-    } else {
-        composed_.setText("this track: the knobs' own sound", juce::dontSendNotification);
+    if (index != shown_) {
+        shown_ = index;
+        const std::vector<SoundPreset>& list = factoryPresets(module_, instance_);
+        if (index >= 0 && index < static_cast<int>(list.size())) {
+            composed_.setText("this track: " + juce::String(list[static_cast<size_t>(index)].name) + " (" + list[static_cast<size_t>(index)].group + ")",
+                              juce::dontSendNotification);
+            chosen(index + 1);   // what plays, until another is chosen
+        } else {
+            composed_.setText("this track: the knobs' own sound", juce::dontSendNotification);
+        }
     }
+    // The star: the knobs have moved from the preset they came from.
+    const bool moved = !loadedKnobs_.empty() && !knobsAt(proc_.store(), loadedKnobs_);
+    if (star_.getText().isNotEmpty() != moved) star_.setText(moved ? "*" : "", juce::dontSendNotification);
 }
 
 void PresetBar::resized()
@@ -156,10 +237,14 @@ void PresetBar::resized()
     auto row = r.removeFromTop(28);
     prev_.setBounds(row.removeFromLeft(28));
     row.removeFromLeft(4);
-    menu_.setBounds(row.removeFromLeft(280));
+    menu_.setBounds(row.removeFromLeft(260));
     row.removeFromLeft(4);
     next_.setBounds(row.removeFromLeft(28));
-    row.removeFromLeft(10);
+    row.removeFromLeft(4);
+    browse_.setBounds(row.removeFromLeft(30));
+    save_.setBounds(row.removeFromLeft(30));
+    star_.setBounds(row.removeFromLeft(16));
+    row.removeFromLeft(6);
     composed_.setBounds(row);
 }
 
@@ -175,6 +260,16 @@ ParamPage::ParamPage(ParhelionProcessor& p, std::vector<std::pair<Module, int>> 
     actions_.forget = [this](int id) { proc_.forget(id); };
     actions_.reset = [this](int id) { proc_.resetToDefault(id); };
     actions_.describe = [this](int id) { return juce::String(proc_.store().desc(id).name) + "  (" + proc_.store().key(id) + ")"; };
+    // The modulation at the knob (15.10.2026, Frame.h): the voice's matrix rows on its knobs, as arcs round them and in
+    // their right-click menus; an Alt-drag sets a row's depth.
+    {
+        frame::ModAccess a = frame::slotMatrix(proc_.store(), [this](int id, float v) { proc_.setFromUi(id, v); },
+                                               [this](const juce::String& what) { proc_.beginStep(what); }, [this] { proc_.endStep(); },
+                                               parhui::skin());
+        a.say = [this](const juce::String& text) { if (auto* ed = findParentComponentOfClass<ParhelionEditor>()) ed->say(text); };
+        modulation_ = std::make_unique<frame::ModulationAtKnob>(std::move(a));
+        modulation_->install(actions_, &live_);
+    }
     if (instances_ > 1) {
         for (int i = 0; i < instances_; ++i) {
             auto* b = instanceButtons_.add(new juce::TextButton(i < static_cast<int>(names.size()) ? names[static_cast<size_t>(i)] : juce::String(i + 1)));
@@ -375,6 +470,38 @@ void ParamPage::refit()
 }
 
 int ParamPage::top() const { return instances_ > 1 || split_ ? 32 : 0; }
+
+void ParamPage::reveal(juce::Component& part)
+{
+    // The box holding it, and its section in front.
+    for (size_t b = 0; b < boxes_.size(); ++b)
+        for (const Cell& c : boxes_[b].cells) {
+            juce::Component* comp = controls_[c.control];
+            if (comp != &part && !comp->isParentOf(&part)) continue;
+            if (split_ && b < sectionOf_.size() && sectionOf_[b] != section_.current()) {
+                section_.setCurrent(sectionOf_[b]);
+                applySection();
+                refit();
+            }
+            return;
+        }
+}
+
+bool ParamPage::bringId(int id)
+{
+    if (instances_ <= 1) return false;
+    const ParamStore& s = proc_.store();
+    if (id < 0 || id >= s.count()) return false;
+    const Module m = s.moduleOf(id);
+    const int inst = s.instanceOf(id);
+    for (const auto& g : groups_)
+        if (g.first == m && inst >= 0 && inst < instanceButtons_.size()) {
+            instanceButtons_[inst]->setToggleState(true, juce::dontSendNotification);
+            if (instanceButtons_[inst]->onClick) instanceButtons_[inst]->onClick();   // build() makes that instance's controls
+            return true;
+        }
+    return false;
+}
 
 juce::String ParamPage::describe() const
 {
@@ -1164,7 +1291,8 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
         for (int i = 0; i < tabs_.getNumTabs(); ++i)
             if (tabs_.getTabNames()[i] == "Perform") tabs_.setCurrentTabIndex(i);
     };
-    for (auto* b : { &undo_, &redo_, &help_, &settings_ }) body_.addAndMakeVisible(b);
+    search_.onClick = [this] { openPalette(); };
+    for (auto* b : { &undo_, &redo_, &search_, &help_, &settings_ }) body_.addAndMakeVisible(b);
     body_.addChildComponent(headsetIcon_);
     // Phase 17: rate the track under the playhead; with Favor Ratings (the Set page) the ratings weigh what comes.
     like_.onClick = [this] { rated_ = proc_.rate(1); ratedTicks_ = 60; };
@@ -1214,6 +1342,14 @@ ParhelionEditor::ParhelionEditor(ParhelionProcessor& p) : juce::AudioProcessorEd
     tabs_.addTab("Style", kPanel, new StylePage(proc_), true);
     tabs_.setOutline(0);
     body_.addAndMakeVisible(tabs_);
+    // The family's ways around the panel (15.10.2026, Frame.h): the info line at the bottom, and over everything while
+    // open the command palette, the preset browser and the first steps.
+    info_ = std::make_unique<frame::InfoLine>(parhui::skin(), body_);
+    info_->describe = [this](int id, juce::String& name, juce::String& text) { return describeControl(id, name, text); };
+    body_.addAndMakeVisible(*info_);
+    for (juce::Component* c : { static_cast<juce::Component*>(&palette_), static_cast<juce::Component*>(&browser_), static_cast<juce::Component*>(&tour_) })
+        body_.addChildComponent(c);
+    tour_.onDone = [] { frame::Settings::of("Parhelion").setValue("tourDone", "1"); };
     frame::keepKeysForEditor(body_);
     setWantsKeyboardFocus(true);
 
@@ -1275,6 +1411,8 @@ void ParhelionEditor::parentHierarchyChanged()
         if (window != nullptr)
             window->setTitleBarButtonsRequired(juce::DocumentWindow::minimiseButton | juce::DocumentWindow::maximiseButton
                                                    | juce::DocumentWindow::closeButton, false);
+        // The standalone's window back where it was left (15.10.2026; not in the screenshot and report modes).
+        if (std::getenv("PARH_SHOT") == nullptr && std::getenv("PARH_PAGE_REPORT") == nullptr) safe->window_.attach(*safe, "Parhelion");
         safe->layoutBody();
     });
 }
@@ -1319,6 +1457,7 @@ bool ParhelionEditor::keyPressed(const juce::KeyPress& key)
     k.save = [this] { if (auto* e = exportPage()) e->save(); };
     k.open = [this] { if (auto* e = exportPage()) e->load(); };
     k.exportFile = [this] { if (auto* e = exportPage()) e->exportWith(0); };
+    k.palette = [this] { openPalette(); };
     return frame::handleKey(key, k);
 }
 
@@ -1369,6 +1508,10 @@ void ParhelionEditor::showSettings()
         m.linkStatus = [this] { return proc_.linkStatus(); };
     m.jamStatus = [this] { return proc_.jamStatus(); };   // the family jam (02.10.2026), plugin and standalone
     m.about = [] { return juce::String("Trance -- uplifting, progressive, dream, acid, deep -- composed and synthesised.\ngithub.com/reneweller-coding/Parhelion"); };
+    m.moreItems = [this](juce::PopupMenu& pm) {
+        pm.addItem("Search: any control, preset or action (Ctrl+K) ...", [this] { openPalette(); });
+        pm.addItem("First steps (the tour) ...", [this] { startTour(); });
+    };
     m.show(settings_);
 }
 
@@ -1415,9 +1558,16 @@ void ParhelionEditor::layoutBody()
     h.status = &status_;
     h.curation = &rerolls_;
     h.update = &update_;
-    h.tools = { &headsetIcon_, nullptr, &undo_, &redo_, nullptr, &help_, &settings_ };
+    h.tools = { &headsetIcon_, nullptr, &undo_, &redo_, nullptr, &search_, &help_, &settings_ };
     frame::layoutHeader(area, h);
     headerBottom_ = area.getY();
+    // The info line along the bottom (15.10.2026); the overlays over the whole body.
+    if (info_ != nullptr) {
+        info_->setBounds(area.removeFromBottom(frame::InfoLine::kHeight));
+        area.removeFromBottom(4);
+    }
+    for (juce::Component* c : { static_cast<juce::Component*>(&palette_), static_cast<juce::Component*>(&browser_), static_cast<juce::Component*>(&tour_) })
+        c->setBounds(body_.getLocalBounds());
     // The overview, unless the settings fold it away (01.10.2026): then the pages get its height.
     const bool overview = frame::Settings::of("Parhelion").overview();
     arrange_.setVisible(overview);
@@ -1429,6 +1579,13 @@ void ParhelionEditor::layoutBody()
 
 void ParhelionEditor::timerCallback()
 {
+    // The first steps on the first start (not in an automated run: the screenshots, the report, PARH_MUTE).
+    if (tourTicks_ >= 0 && ++tourTicks_ > 25) {
+        tourTicks_ = -1;
+        if (shotPath_.isEmpty() && std::getenv("PARH_PAGE_REPORT") == nullptr && !proc_.muteForced()
+            && frame::Settings::of("Parhelion").value("tourDone").isEmpty())
+            startTour();
+    }
     if (ratedTicks_ > 0) --ratedTicks_;
     if (shotHands_) proc_.headset().inject(proc_.headset().hands());
     status_.setText(ratedTicks_ > 0 && rated_.isNotEmpty() ? rated_ : proc_.status(), juce::dontSendNotification);
@@ -1522,4 +1679,185 @@ void ParhelionEditor::timerCallback()
         shotPath_ = {};
         if (juce::JUCEApplicationBase::isStandaloneApp()) juce::JUCEApplicationBase::quit();
     }
+}
+
+// --------------------------------------------------------------------------------------------------- ways around the panel
+
+void ParhelionEditor::openPalette()
+{
+    if (browser_.isVisible()) browser_.close();
+    palette_.open(paletteCommands());
+}
+
+bool ParhelionEditor::revealId(int id) { return frame::revealControl(tabs_, id, kAccent); }
+
+std::vector<frame::CommandPalette::Command> ParhelionEditor::paletteCommands()
+{
+    using Command = frame::CommandPalette::Command;
+    std::vector<Command> out;
+    auto action = [&out](const juce::String& title, const juce::String& detail, std::function<void()> f) {
+        out.push_back({ title, detail, "Action", false, [f](const juce::String&) { f(); } });
+    };
+    action("Play / stop", "Space", [this] { proc_.setPlaying(!proc_.isPlaying()); });
+    action("Compose track", "a single track, its length in the header", [this] { proc_.chooseMix(false); proc_.compose(); });
+    action("Compose DJ mix", "a set of tracks on two decks", [this] { proc_.chooseMix(true); proc_.compose(); });
+    action("New seed", "another track from the same settings", [this] { proc_.newSeed(); });
+    action("Undo", "Ctrl+Z", [this] { proc_.undo(); });
+    action("Redo", "Ctrl+Y", [this] { proc_.redo(); });
+    action("Mute / unmute the output", "the speaker", [this] { proc_.setMuted(!proc_.muted()); });
+    action("I like this track", "a thumb up", [this] { rated_ = proc_.rate(1); ratedTicks_ = 60; });
+    action("Not this one", "a thumb down", [this] { rated_ = proc_.rate(-1); ratedTicks_ = 60; });
+    action("Save the set", "Ctrl+S", [this] { if (auto* e = exportPage()) e->save(); });
+    action("Open a set", "Ctrl+O", [this] { if (auto* e = exportPage()) e->load(); });
+    action("Export WAV + MIDI + cues", "Ctrl+E", [this] { if (auto* e = exportPage()) e->exportWith(0); });
+    action("Help", "F1: the manual by topic", [this] { showHelp(true); });
+    action("Settings", "the window, the headset, the jam, Link", [this] { showSettings(); });
+    action("First steps", "the tour of the panel", [this] { startTour(); });
+    action("Overview above the tabs", "show it or fold it away", [] {
+        auto& s = frame::Settings::of("Parhelion");
+        s.setOverview(!s.overview());
+    });
+    if (standalone()) action("Full screen", "F11", [this] { toggleFullScreen(); });
+    // The pages, and the small tabs of the pages of several.
+    const juce::StringArray names = tabs_.getTabNames();
+    for (int t = 0; t < tabs_.getNumTabs(); ++t) {
+        out.push_back({ names[t], "page", "Page", false, [this, t](const juce::String&) { tabs_.setCurrentTabIndex(t); } });
+        if (auto* st = findSubTabs(tabs_.getTabContentComponent(t)))
+            for (int j = 0; j < st->count(); ++j)
+                out.push_back({ names[t] + ": " + st->name(j), "page", "Page", false, [this, t, j](const juce::String&) {
+                                   tabs_.setCurrentTabIndex(t);
+                                   if (auto* s2 = findSubTabs(tabs_.getTabContentComponent(t))) s2->show(j);
+                               } });
+    }
+    // Every control: its page opens and it lights up; a number after its name sets it.
+    const ParamStore& s = proc_.store();
+    for (int id = 0; id < s.count(); ++id) {
+        if (proc_.parameter(id) == nullptr) continue;
+        const ParamDesc& d = s.desc(id);
+        const bool number = d.curve != Curve::Choice && d.curve != Curve::Toggle;
+        out.push_back({ d.name, moduleLabel(s, id), "Control", number, [this, id](const juce::String& n) {
+                           if (n.isNotEmpty()) proc_.applyKnobs(juce::String(proc_.store().desc(id).name), { { id, n.getFloatValue() } });
+                           revealId(id);
+                           if (info_ != nullptr) info_->showControl(id);
+                       } });
+    }
+    // Every preset of every synth (on the instance its page shows), the player's own first.
+    for (int mi = 0; mi < static_cast<int>(Module::Count); ++mi) {
+        const auto m = static_cast<Module>(mi);
+        if (!hasPresets(m)) continue;
+        int inst = 0;
+        if (m == Module::Perc)
+            for (int t = 0; t < tabs_.getNumTabs(); ++t)
+                if (names[t] == "Drums")
+                    if (auto* sp = dynamic_cast<ScrollingPage*>(tabs_.getTabContentComponent(t))) inst = sp->page().instance();
+        if (m == Module::Poly)
+            for (int t = 0; t < tabs_.getNumTabs(); ++t)
+                if (names[t] == "Synths")
+                    if (auto* sp = dynamic_cast<ScrollingPage*>(tabs_.getTabContentComponent(t))) inst = sp->page().instance();
+        const juce::String where = moduleLabel(s, s.id(m, inst, 0));
+        const juce::Array<juce::File> yours = userPresetFiles(proc_, m, inst);
+        for (int k = 0; k < yours.size(); ++k)
+            out.push_back({ yours[k].getFileNameWithoutExtension(), where + " preset, yours", "Yours", false, [this, m, inst, k](const juce::String&) {
+                               const juce::Array<juce::File> files = userPresetFiles(proc_, m, inst);
+                               if (k >= files.size()) return;
+                               proc_.applyKnobs("preset " + files[k].getFileNameWithoutExtension(), knobsOf(proc_, m, inst, PresetBar::kUserId + k));
+                               frame::PresetBrowser::played("Parhelion", synthKey(proc_.store(), m), files[k].getFileNameWithoutExtension());
+                               revealId(proc_.store().id(m, inst, 0));
+                           } });
+        const std::vector<SoundPreset>& list = factoryPresets(m, inst);
+        for (size_t i = 0; i < list.size(); ++i)
+            out.push_back({ list[i].name, where + " preset, " + list[i].group, "Preset", false, [this, m, inst, i](const juce::String&) {
+                               proc_.applyPreset(m, inst, static_cast<int>(i));
+                               frame::PresetBrowser::played("Parhelion", synthKey(proc_.store(), m), juce::String(factoryPresets(m, inst)[i].name));
+                               revealId(proc_.store().id(m, inst, 0));
+                           } });
+    }
+    return out;
+}
+
+bool ParhelionEditor::describeControl(int id, juce::String& name, juce::String& text)
+{
+    const ParamStore& s = proc_.store();
+    if (id < 0 || id >= s.count()) return false;
+    const ParamDesc& d = s.desc(id);
+    auto fmt = [&d](float v) {
+        return juce::String(v, std::abs(v) >= 100.0f ? 0 : std::abs(v) >= 10.0f ? 1 : 2) + (d.unit[0] != 0 ? juce::String(" ") + d.unit : juce::String());
+    };
+    name = d.name;
+    text = moduleLabel(s, id) + "    now " + juce::String(s.format(id));
+    if (d.curve != Curve::Choice && d.curve != Curve::Toggle) {
+        text << "    " << fmt(d.minValue) << " .. " << fmt(d.maxValue) << ", default " << fmt(s.defaultValue(id));
+        // Where it plays now, when the score's automation (a section, a ramp) moves it away from where it stands.
+        const float played = proc_.playedNormalised(id);
+        if (!std::isnan(played) && std::abs(played - s.toNormalised(id, s.get(id))) > 0.004f)
+            text << "    plays at " << fmt(s.fromNormalised(id, played)) << " (the score moves it)";
+    }
+    // What moves it: the voice's matrix rows on it.
+    {
+        juce::String by;
+        const ParamStore& st = proc_.store();
+        const std::string& k = st.key(id);
+        const std::string prefix = k.substr(0, k.find('.'));
+        for (const char* stem : { ".mx", ".mod" })
+            for (int n = 1; n <= 32; ++n) {
+                const int src = st.find(prefix + stem + std::to_string(n) + "_src");
+                if (src < 0 || src + 2 >= st.count()) break;
+                const int which = st.getInt(src);
+                if (which <= 0) continue;
+                const auto& dd = st.desc(src + 1);
+                const int t = st.getInt(src + 1);
+                if (dd.choices == nullptr || t <= 0 || t > static_cast<int>(dd.maxValue)) continue;
+                const juce::String target = frame::detail::loose(dd.choices[t]), knob = frame::detail::loose(d.name);
+                if (!(knob == target || knob.endsWith(target) || (target.length() >= 4 && knob.startsWith(target)))) continue;
+                const auto& sd = st.desc(src);
+                by << (by.isEmpty() ? "" : ", ") << (sd.choices != nullptr ? juce::String(sd.choices[which]) : juce::String(which)) << " ("
+                   << (st.get(src + 2) >= 0.0f ? "+" : "") << juce::String(st.get(src + 2), 2) << ")";
+            }
+        if (by.isNotEmpty()) text << "    moved by " << by;
+    }
+    if (const int cc = proc_.controllerFor(id); cc >= 0) text << "    MIDI CC " << cc;
+    text << "    [" << juce::String(s.key(id)) << "]";
+    return true;
+}
+
+void ParhelionEditor::browsePresets(Module m, int inst, std::function<void(int)> chosen)
+{
+    if (palette_.isVisible()) palette_.close();
+    const ParamStore& s = proc_.store();
+    frame::PresetBrowser::Bank bank;
+    bank.key = synthKey(s, m);
+    bank.title = moduleLabel(s, s.id(m, inst, 0)) + " presets";
+    const juce::Array<juce::File> yours = userPresetFiles(proc_, m, inst);
+    for (int k = 0; k < yours.size(); ++k)
+        bank.entries.push_back({ yours[k].getFileNameWithoutExtension(), "Yours", {}, PresetBar::kUserId + k, true, {} });
+    const std::vector<SoundPreset>& list = factoryPresets(m, inst);
+    for (size_t i = 0; i < list.size(); ++i) bank.entries.push_back({ list[i].name, list[i].group, {}, static_cast<int>(i) + 1, false, {} });
+    bank.preview = [this, m, inst](const frame::PresetBrowser::Entry& e) { proc_.previewKnobs(knobsOf(proc_, m, inst, e.index)); };
+    bank.endPreview = [this] { proc_.endPreview(); };
+    bank.choose = [this, m, inst, chosen](const frame::PresetBrowser::Entry& e) {
+        if (e.index >= PresetBar::kUserId) proc_.applyKnobs("preset " + e.name, knobsOf(proc_, m, inst, e.index));
+        else proc_.applyPreset(m, inst, e.index - 1);
+        if (chosen) chosen(e.index);
+    };
+    browser_.open(std::move(bank));
+}
+
+void ParhelionEditor::startTour()
+{
+    if (helpView_ != nullptr && helpView_->isVisible()) showHelp(false);
+    std::vector<frame::Tour::Step> steps;
+    steps.push_back({ &style_, "The style", "What the next track is composed in -- uplifting, progressive, dream, acid, deep -- with its key and scale beside it." });
+    steps.push_back({ &compose_, "Compose", "Composes a track (or a DJ mix, with DJ mix chosen) from the knobs, the seed and the rerolls. The die beside it: a new seed, another track from the same settings." });
+    steps.push_back({ &play_, "Play", "Plays and stops (Space). The speaker beside it silences the output." });
+    if (arrange_.isVisible())
+        steps.push_back({ &arrange_, "The overview", "The track's sections (or the mix's tracks on their decks), its layers lit where they play. "
+                                                     "Click to jump there, the wheel zooms." });
+    steps.push_back({ &tabs_.getTabbedButtonBar(), "The pages", "Every part of the instrument: the set, the arrangement, the low end, the drums, the synth voices, the keys, the orchestra, the effects (each synth with 1024 presets and your own, and its modulation), the mixer, Perform for playing live, Export." });
+    steps.push_back({ &search_, "Search", "Ctrl+K: any knob, preset or action by a few letters -- its page opens and it lights up. A number after a "
+                                          "knob's name sets it (\"cutoff 800\")." });
+    if (info_ != nullptr)
+        steps.push_back({ info_.get(), "The info line", "What the control under the mouse is: its value, its range, what moves it, its MIDI controller." });
+    steps.push_back({ &help_, "Help", "F1: the manual by topic, and the knobs of the page in front." });
+    steps.push_back({ &settings_, "Settings", "The window's size, the headset, the family jam, Ableton Link -- and these first steps again." });
+    tour_.start(std::move(steps));
 }

@@ -22,6 +22,19 @@ Melodik, 5 Sound Design, 6 Arrangement und Form, 7 Mixing und Mastering, 8 Drei 
 aus einer im Dokument zitierten Quelle, **[A]** daraus abgeleitet, **[I]** inferiert und zu kalibrieren, **[M]** hier
 gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
+
+## Die Wege durchs Panel (15.10.2026, aus Empyrean, Frame.h)
+
+Nutzer: „Bitte baue alles ein, die Tests erst am Ende.“ -- die GUI-Verbesserungen und ASIO in allen fünf Instrumenten:
+- **Frame.h** (Vorlage hier, in alle sechs kopiert): WindowKeeper (Fensterzustand in <App>.frame "window"), Settings::value,
+  IconButton Search/Night/Compare, Keys::palette (Strg+K), CommandPalette, InfoLine (frameId-Eigenschaft für eigene
+  Regler), Tour, PresetBrowser (Favoriten/zuletzt in den Settings), revealControl (Tabs, SubTabs, Abschnitte, Instanzen
+  über Revealer), ModArc + LiveRings-Bögen, ModAccess/ModulationAtKnob, Vorlage slotMatrix (mx/mod-Slots).
+- **ASIO**: JUCE_ASIO=1, das SDK aus _Sources/ASIO-SDK (sonst JUCEs Kopie), nur Windows.
+- **Zoom** gab es schon: der Inhalt skaliert mit dem Fenster ("Window size" 75-200 %).
+- Prozessor: applyKnobs (ein Undo-Schritt), previewKnobs/endPreview (Vorhören im Browser).
+- Eigene Presets gab es schon (Menü); dazu Browser und Stern. Modulation am Knopf über slotMatrix.
+
 ## Stand der Umsetzung
 
 Die Entscheidungen stehen (16.1, 16.2). **Phasen 0 bis 8 gebaut, Version 1.0.1 (01.10.2026; die Quest ohne Headset:

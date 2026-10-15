@@ -378,6 +378,39 @@ bool ParhelionProcessor::applyUserPreset(Module m, int instance, const juce::Fil
     return true;
 }
 
+void ParhelionProcessor::applyKnobs(const juce::String& what, const std::vector<std::pair<int, float>>& values)
+{
+    endPreview();
+    beginStep(what);
+    {
+        const juce::ScopedValueSetter<bool> one(restoring_, true);   // the knobs' gestures join the step
+        for (const auto& [id, v] : values) {
+            StoreParameter* p = parameter(id);
+            if (p == nullptr) continue;
+            p->beginChangeGesture();
+            p->setValueNotifyingHost(store().toNormalised(id, v));
+            p->endChangeGesture();
+        }
+    }
+    endStep();
+}
+
+void ParhelionProcessor::previewKnobs(const std::vector<std::pair<int, float>>& values)
+{
+    endPreview();
+    for (const auto& [id, v] : values) {
+        if (id < 0 || id >= store().count()) continue;
+        previewSaved_.emplace_back(id, store().get(id));
+        store().set(id, v);
+    }
+}
+
+void ParhelionProcessor::endPreview()
+{
+    for (const auto& [id, v] : previewSaved_) store().set(id, v);
+    previewSaved_.clear();
+}
+
 void ParhelionProcessor::length(double& beats, double& seconds) const
 {
     std::lock_guard<std::mutex> g(lock_);

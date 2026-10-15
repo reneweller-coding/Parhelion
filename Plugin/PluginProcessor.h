@@ -168,6 +168,18 @@ public:
     /** @brief Puts factory preset @p index of @p m on instance @p instance's knobs, through the host's parameters. */
     void applyPreset(parh::Module m, int instance, int index);
     /**
+     * @brief Sets the knobs @p values (store id, real value) through the host's parameters as one undo step named @p what
+     *        (15.10.2026: a value typed into the command palette).
+     */
+    void applyKnobs(const juce::String& what, const std::vector<std::pair<int, float>>& values);
+    /**
+     * @brief Plays @p values (store id, real value) while a preset is listened to in the browser -- in the store only: no
+     *        undo step, nothing to the host --; endPreview() takes them back.
+     */
+    void previewKnobs(const std::vector<std::pair<int, float>>& values);
+    /** @brief Back to the knobs as they were before previewKnobs (nothing when no preview plays). */
+    void endPreview();
+    /**
      * @name User presets (after Phosphene's)
      * A synth's own sounds, `<name>.txt` in Documents/Parhelion/Presets/<synth> (the kit's twelve lanes share "perc"):
      * every knob a factory preset sets, one `knob=value` a line with the key inside the module ("cutoff=2400"), so a
@@ -395,6 +407,7 @@ private:
     std::atomic<int> learn_{ -1 };                   ///< learn()
     std::atomic<bool> mute_{ false };                ///< muted()
     bool forceMute_ = false;                         ///< muteForced()
+    std::vector<std::pair<int, float>> previewSaved_;   ///< the knobs a preview replaced (store id, real value)
     std::atomic<double> hostBpm_{ 0.0 };             ///< the host's tempo as the audio thread last saw it, 0 outside a host
     std::atomic<double> playedBpm_{ 0.0 };           ///< the tempo the engine's score was loaded with, 0 as composed
     // Ableton Link in the standalone (02.10.2026, LinkClock.h; Settings > Ableton Link).
