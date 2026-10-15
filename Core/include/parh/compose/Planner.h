@@ -44,61 +44,66 @@
 #include <string>
 #include <vector>
 
-namespace parh {
+namespace parh
+{
 
 /** @brief The inner parts of a breakdown (bars, absolute). */
-struct BreakdownParts {
-    int m_start = 0;    ///< the breakdown's first bar
-    int m_tease = 0;    ///< where the motif's fragment enters
-    int m_peak = 0;     ///< where the whole melody plays
-    int m_end = 0;      ///< the build's first bar (the breakdown's end)
+struct BreakdownParts
+{
+    int m_start = 0;   ///< the breakdown's first bar
+    int m_tease = 0;   ///< where the motif's fragment enters
+    int m_peak = 0;    ///< where the whole melody plays
+    int m_end = 0;     ///< the build's first bar (the breakdown's end)
 };
 
 /** @brief The silence before a drop (rule 5): from beat @ref m_from of bar @ref m_bar to the drop, the kick alone on the
  *         bar's last beat where @ref m_kickOn4. */
-struct Vacuum {
-    int m_bar = 0;            ///< the bar before the drop
-    double m_from = 3.0;      ///< the beat in the bar where the silence begins (3: the last beat, 2: the last two, 0: the bar)
+struct Vacuum
+{
+    int    m_bar = 0;   ///< the bar before the drop
+    double m_from =
+        3.0;   ///< the beat in the bar where the silence begins (3: the last beat, 2: the last two, 0: the bar)
     bool m_kickOn4 = false;   ///< the kick still on the last beat (and only the kick)
 };
 
 /** @brief What the planner decided. */
-struct Plan {
-    FormTemplateE m_form = FormTemplateE::ANTHEM;   ///< the track's form
-    int m_bars = 0;                          ///< the track's length
-    std::vector<Section> m_sections;         ///< in order (beats)
-    std::vector<LayerBlock> m_blocks;        ///< one per 8 bars (beats)
-    std::vector<BreakdownParts> m_breakdowns;   ///< every breakdown's parts
-    int m_mainDrop = -1;                     ///< index into sections of the main drop
-    int m_mainBreakdown = -1;                ///< index of the main breakdown (-1: none)
-    int m_firstLeadBar = -1;                 ///< where the lead is first heard
-    bool m_beatless = false;                 ///< no kick at all (Deep)
-    int m_bassPattern = 0;                   ///< BassPattern (Acid where the 303 carries the bass)
-    std::vector<int> m_miniBreaks;           ///< bars in which the kick rests (Dok. 6: "Kick raus fuer 1 Takt")
-    std::vector<Vacuum> m_vacuums;           ///< the silence before every drop (rule 5)
+struct Plan
+{
+    FormTemplateE               m_form = FormTemplateE::ANTHEM;   ///< the track's form
+    int                         m_bars = 0;                       ///< the track's length
+    std::vector<Section>        m_sections;                       ///< in order (beats)
+    std::vector<LayerBlock>     m_blocks;                         ///< one per 8 bars (beats)
+    std::vector<BreakdownParts> m_breakdowns;                     ///< every breakdown's parts
+    int                         m_mainDrop = -1;                  ///< index into sections of the main drop
+    int                         m_mainBreakdown = -1;             ///< index of the main breakdown (-1: none)
+    int                         m_firstLeadBar = -1;              ///< where the lead is first heard
+    bool                        m_beatless = false;               ///< no kick at all (Deep)
+    int                         m_bassPattern = 0;                ///< BassPattern (Acid where the 303 carries the bass)
+    std::vector<int>            m_miniBreaks;   ///< bars in which the kick rests (Dok. 6: "Kick raus fuer 1 Takt")
+    std::vector<Vacuum>         m_vacuums;      ///< the silence before every drop (rule 5)
     /**
      * @brief The section of bar @p bar (index), -1 past the end.
      * @param[in] bar  the bar
      * @return the section's index, -1 past the end
      */
-    int sectionAt(int bar) const;
+    int sectionAt( int bar ) const;
     /**
      * @brief The state of @p l in bar @p bar.
      * @param[in] bar  the bar
      * @param[in] l    the layer
      * @return the layer's state
      */
-    LayerStateE at(int bar, LayerE l) const;
+    LayerStateE at( int bar, LayerE l ) const;
     /**
      * @brief The energy (0..10) at bar @p bar, interpolated inside its section.
      * @param[in] bar  the bar
      * @return the energy, 0..10
      */
-    float energyAt(int bar) const;
+    float energyAt( int bar ) const;
 };
 
 /** @brief A unit's seed by its name ("form", "matrix", "section3"; Composer.h). */
-using UnitStreamT = std::function<uint64_t(const std::string&)>;
+using UnitStreamT = std::function<uint64_t( const std::string & )>;
 
 /**
  * @brief The seed of unit @p name of a track's @p seed after @p rerolls rerolls (SetFile.h, Curation).
@@ -107,7 +112,7 @@ using UnitStreamT = std::function<uint64_t(const std::string&)>;
  * @param[in] rerolls  the rerolls
  * @return the unit's seed
  */
-uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls = 0);
+uint64_t unitSeed( uint64_t seed, const std::string &name, int rerolls = 0 );
 
 /**
  * @brief Plans a track.
@@ -118,12 +123,13 @@ uint64_t unitSeed(uint64_t seed, const std::string& name, int rerolls = 0);
  *                     no ambient intro or outro, never beatless -- so a blend can lie over them
  * @return the plan
  */
-Plan planTrack(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable = false);
+Plan planTrack( const StyleProfile &prof, int bars, const UnitStreamT &stream, bool mixable = false );
 // (A mixable track that opens a mix -- TrackRequest::opener -- may have the ambient intro a track alone may have.)
 
 /** @brief A performer's "now": from bar @p bar (an 8-bar line) a breakdown with its build and drop, or a drop at once. */
-struct Rewrite {
-    int m_bar = -1;   ///< the 8-bar line it begins on, -1 none
+struct Rewrite
+{
+    int          m_bar = -1;                         ///< the 8-bar line it begins on, -1 none
     SectionKindE m_kind = SectionKindE::BREAKDOWN;   ///< a breakdown (with its build and drop) or a drop at once
 };
 
@@ -141,7 +147,8 @@ struct Rewrite {
  * @param[in] kind     a breakdown or a drop
  * @return the plan
  */
-Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable, int bar, SectionKindE kind);
+Plan planTrackRewritten( const StyleProfile &prof, int bars, const UnitStreamT &stream, bool mixable, int bar,
+                         SectionKindE kind );
 
 /**
  * @brief The same for several "now"s one after the other (Phase 7, 30.09.2026: a second "now" keeps the first): each
@@ -155,8 +162,8 @@ Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& s
  * @param[in] opener    true for a set's first track
  * @return the plan
  */
-Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& stream, bool mixable, const std::vector<Rewrite>& rewrites,
-                        bool opener = false);
+Plan planTrackRewritten( const StyleProfile &prof, int bars, const UnitStreamT &stream, bool mixable,
+                         const std::vector<Rewrite> &rewrites, bool opener = false );
 
 /**
  * @brief Plans a track from a track's seed without rerolls (as composeTrack does).
@@ -166,13 +173,13 @@ Plan planTrackRewritten(const StyleProfile& prof, int bars, const UnitStreamT& s
  * @param[in] mixable  true for a DJ's track
  * @return the plan
  */
-Plan planTrack(const StyleProfile& prof, int bars, uint64_t seed, bool mixable = false);
+Plan planTrack( const StyleProfile &prof, int bars, uint64_t seed, bool mixable = false );
 
 /**
  * @brief The share of @p plan's bars in breaks, breakdowns and builds.
  * @param[in] plan  the plan
  * @return the share, 0..1
  */
-float breakdownShare(const Plan& plan);
+float breakdownShare( const Plan &plan );
 
-} // namespace parh
+}   // namespace parh

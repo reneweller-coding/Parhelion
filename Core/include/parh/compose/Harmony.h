@@ -25,12 +25,14 @@
 #include <array>
 #include <vector>
 
-namespace parh {
+namespace parh
+{
 
 /** @brief A chord: its three tones in semitones above the key's root (root, third, fifth; they may pass 12). */
-struct Chord {
-    int m_degree = 0;       ///< scale degree of the root (0-based)
-    int m_tones[3] = {};    ///< semitones above the key's root
+struct Chord
+{
+    int m_degree = 0;      ///< scale degree of the root (0-based)
+    int m_tones[3] = {};   ///< semitones above the key's root
     /**
      * @brief The root, semitones above the key's root.
      * @return the root in semitones above the key's root
@@ -39,20 +41,21 @@ struct Chord {
 };
 
 /** @brief The harmony of a whole track. */
-struct Harmony {
-    int m_key = 9;                       ///< pitch class of the tonic
-    int m_scale = 0;                     ///< compose.scale
-    int m_progression = 0;               ///< Progression
-    std::vector<Chord> m_bars;           ///< the chord of every bar
-    std::vector<int> m_shift;            ///< the key change in semitones from each bar on (0, or 3 after the Cinematic change)
-    int m_changeBar = -1;                ///< where the key changes (-1: never)
+struct Harmony
+{
+    int                m_key = 9;           ///< pitch class of the tonic
+    int                m_scale = 0;         ///< compose.scale
+    int                m_progression = 0;   ///< Progression
+    std::vector<Chord> m_bars;              ///< the chord of every bar
+    std::vector<int>   m_shift;   ///< the key change in semitones from each bar on (0, or 3 after the Cinematic change)
+    int                m_changeBar = -1;   ///< where the key changes (-1: never)
     /**
      * @brief The absolute pitch class of the chord's tone @p i at @p bar.
      * @param[in] bar  the bar
      * @param[in] i    the chord tone's index
      * @return its pitch class
      */
-    int pc(int bar, int i) const;
+    int pc( int bar, int i ) const;
 };
 
 /**
@@ -62,7 +65,7 @@ struct Harmony {
  * @param[out]    key    the key's root
  * @param[out]    scale  the mode
  */
-void drawKey(const StyleProfile& prof, Rng& r, int& key, int& scale);
+void drawKey( const StyleProfile &prof, Rng &r, int &key, int &scale );
 /**
  * @brief The chord on @p degree of @p scale (triads in thirds on the chord scale described above).
  * @param[in] scale      the mode
@@ -70,7 +73,7 @@ void drawKey(const StyleProfile& prof, Rng& r, int& key, int& scale);
  * @param[in] majorFive  true for a major chord on the fifth
  * @return the chord
  */
-Chord chordOn(int scale, int degree, bool majorFive = false);
+Chord chordOn( int scale, int degree, bool majorFive = false );
 /**
  * @brief The harmony of @p plan in @p key and @p scale, from the stream @p seed.
  * @param[in] plan   the plan
@@ -80,14 +83,14 @@ Chord chordOn(int scale, int degree, bool majorFive = false);
  * @param[in] seed   the stream's seed
  * @return the harmony
  */
-Harmony composeHarmony(const Plan& plan, const StyleProfile& prof, int key, int scale, uint64_t seed);
+Harmony composeHarmony( const Plan &plan, const StyleProfile &prof, int key, int scale, uint64_t seed );
 /**
  * @brief The pitch of pitch class @p pc at or above @p floor.
  * @param[in] pc     the pitch class
  * @param[in] floor  the lowest note
  * @return the MIDI note
  */
-int atOrAbove(int pc, int floor);
+int atOrAbove( int pc, int floor );
 /**
  * @brief The pad's four voices over the chord of @p bar: the third or the fifth at the bottom from about E3 (Dok. 4:
  *        "tiefste Stimme Terz oder Quinte, nicht der Grundton"), the smallest movement from @p prev.
@@ -98,6 +101,6 @@ int atOrAbove(int pc, int floor);
  * @param[in] floor  the lowest note
  * @return the four voices
  */
-std::array<int, 4> voicePad(const Harmony& h, int bar, const std::array<int, 4>& prev, bool first, int floor = 52);
+std::array<int, 4> voicePad( const Harmony &h, int bar, const std::array<int, 4> &prev, bool first, int floor = 52 );
 
-} // namespace parh
+}   // namespace parh

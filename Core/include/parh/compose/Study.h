@@ -27,7 +27,8 @@
 #include "parh/Score.h"
 #include <cstdint>
 
-namespace parh {
+namespace parh
+{
 
 /**
  * @brief Composes the study.
@@ -36,6 +37,6 @@ namespace parh {
  * @param[in] seed  the seed
  * @return the score, sorted
  */
-Score composeStudy(const ParamStore& p, uint64_t seed);
+Score composeStudy( const ParamStore &p, uint64_t seed );
 
-} // namespace parh
+}   // namespace parh

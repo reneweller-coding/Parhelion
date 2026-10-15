@@ -33,10 +33,12 @@
 #include <functional>
 #include <vector>
 
-namespace parh {
+namespace parh
+{
 
 /** @brief The handover from the engine that plays to a second one on the same timeline (the file comment). */
-class Handover {
+class Handover
+{
 public:
     static constexpr int Fade = 1024;   ///< the crossfade, samples (21 ms at 48 kHz)
 
@@ -45,7 +47,7 @@ public:
      * @param[in] maxBlock  the largest block in samples
      * @pre not called on the audio thread
      */
-    void prepare(int maxBlock);
+    void prepare( int maxBlock );
 
     /**
      * @brief Worker thread: renders @p next (loaded and sought by the caller, prepared like the engine that plays) until
@@ -62,8 +64,8 @@ public:
      *                          anywhere
      * @return true once the second engine plays (the fade has ended); false: broken off or too late, nothing changed
      */
-    bool handOver(Engine& next, int64_t deadline, const std::function<bool()>& stop,
-                  const std::function<int64_t(int64_t)>& align = {});
+    bool handOver( Engine &next, int64_t deadline, const std::function<bool()> &stop,
+                   const std::function<int64_t( int64_t )> &align = {} );
 
     /**
      * @brief Audio thread: renders @p n samples of @p front into @p L and @p R, and from an armed sample on the fade into
@@ -76,44 +78,44 @@ public:
      * @return true in the block the fade ends: from the next block on @p back is the front (the caller swaps them)
      * @pre called on the audio thread
      */
-    bool process(Engine& front, Engine& back, float* L, float* R, int n);
+    bool process( Engine &front, Engine &back, float *L, float *R, int n );
 
     /**
      * @brief Audio thread, when it does not render (paused, or the front just changed): publishes where @p front is.
      * @param[in] front  the playing engine
      * @pre called on the audio thread
      */
-    void follow(const Engine& front) { m_playing.store(front.samplePosition(), std::memory_order_release); }
+    void follow( const Engine &front ) { m_playing.store( front.samplePosition(), std::memory_order_release ); }
     /**
      * @brief Whether a handover is armed or fading (the second engine is the audio thread's).
      * @return true while a handover is armed or fading
      */
-    bool busy() const { return m_at.load(std::memory_order_acquire) != None; }
+    bool busy() const { return m_at.load( std::memory_order_acquire ) != None; }
     /**
      * @brief The playing engine's position after the last block (any thread).
      * @return the position in samples
      */
-    int64_t playing() const { return m_playing.load(std::memory_order_acquire); }
+    int64_t playing() const { return m_playing.load( std::memory_order_acquire ); }
     /**
      * @brief Where the last handover began (its fade's first sample), -1 before any (any thread).
      * @return the sample the last handover began at, -1 before any
      */
-    int64_t lastTaken() const { return m_taken.load(std::memory_order_acquire); }
+    int64_t lastTaken() const { return m_taken.load( std::memory_order_acquire ); }
 
 private:
-    static constexpr int64_t None = -1;       ///< nothing armed
-    static constexpr int64_t Fading = -2;     ///< the audio thread took the armed sample and fades
+    static constexpr int64_t None = -1;     ///< nothing armed
+    static constexpr int64_t Fading = -2;   ///< the audio thread took the armed sample and fades
 
-    std::atomic<int64_t> m_at{ None };         ///< the armed sample, None or Fading
-    std::atomic<int64_t> m_playing{ 0 };        ///< the audio thread's front engine's position after its last block
-    std::atomic<int> m_outcome{ 0 };            ///< 1 switched, -1 missed (the audio thread was past the sample)
-    std::atomic<int64_t> m_taken{ -1 };         ///< where the last fade began
-    int m_fadePos = 0;                          ///< audio thread: samples of the fade done
-    int m_maxBlock = 512;   ///< the largest block the audio thread is given
-    std::vector<float> m_fadeL;   ///< audio thread: the second engine's samples during the fade, left
-    std::vector<float> m_fadeR;   ///< ... right
-    std::vector<float> m_workL;   ///< worker: where the pre-roll is rendered to, left
-    std::vector<float> m_workR;   ///< ... right
+    std::atomic<int64_t> m_at{ None };       ///< the armed sample, None or Fading
+    std::atomic<int64_t> m_playing{ 0 };     ///< the audio thread's front engine's position after its last block
+    std::atomic<int>     m_outcome{ 0 };     ///< 1 switched, -1 missed (the audio thread was past the sample)
+    std::atomic<int64_t> m_taken{ -1 };      ///< where the last fade began
+    int                  m_fadePos = 0;      ///< audio thread: samples of the fade done
+    int                  m_maxBlock = 512;   ///< the largest block the audio thread is given
+    std::vector<float>   m_fadeL;            ///< audio thread: the second engine's samples during the fade, left
+    std::vector<float>   m_fadeR;            ///< ... right
+    std::vector<float>   m_workL;            ///< worker: where the pre-roll is rendered to, left
+    std::vector<float>   m_workR;            ///< ... right
 };
 
 /**
@@ -126,6 +128,6 @@ private:
  * @param[in] from  the first beat compared
  * @return the first beat where they differ
  */
-double firstDifference(const Score& a, const Score& b, double from);
+double firstDifference( const Score &a, const Score &b, double from );
 
-} // namespace parh
+}   // namespace parh

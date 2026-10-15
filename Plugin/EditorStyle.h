@@ -15,26 +15,27 @@
 #include <memory>
 
 /** @brief The Style tab. */
-class StylePage final : public juce::Component, private juce::Timer {
+class StylePage final : public juce::Component, private juce::Timer
+{
 public:
     /**
      * @brief The tab for @p p.
      * @param[in,out] p  the processor
      */
-    explicit StylePage(ParhelionProcessor& p);
+    explicit StylePage( ParhelionProcessor &p );
     /** @brief The profile's numbers and the button on top, the custom style's knobs under them. */
     void resized() override;
     /**
      * @brief The style's profile beside the references' medians.
      * @param[in,out] g  the graphics context to draw into
      */
-    void paint(juce::Graphics& g) override;
+    void paint( juce::Graphics &g ) override;
 
 private:
     /** @brief Follows the style chosen. */
     void timerCallback() override;
-    ParhelionProcessor& m_proc;   ///< the processor
-    ScrollingPage m_knobs;   ///< compose.style, morph_to, morph (the Compose module's page)
-    int m_knobsH = 150;      ///< its height: as tall as it needs, where the chart keeps its room
-    juce::String m_shown;    ///< the profile's numbers as last drawn
+    ParhelionProcessor &m_proc;           ///< the processor
+    ScrollingPage       m_knobs;          ///< compose.style, morph_to, morph (the Compose module's page)
+    int                 m_knobsH = 150;   ///< its height: as tall as it needs, where the chart keeps its room
+    juce::String        m_shown;          ///< the profile's numbers as last drawn
 };

@@ -22,23 +22,25 @@
 #include "parh/Dsp.h"
 #include "parh/mix/Ducker.h"
 
-namespace parh {
+namespace parh
+{
 
 /** @brief The sub bass voice (monophonic). */
-class SubBass {
+class SubBass
+{
 public:
     /**
      * @brief Prepares for a sample rate.
      * @param[in] sampleRate  the sample rate in Hz
      */
-    void prepare(double sampleRate);
+    void prepare( double sampleRate );
     /** @brief Silence. */
     void reset();
     /**
      * @brief Reads the effective parameter values (indexed by sub::).
      * @param[in] v  the effective parameter values, indexed by sub::
      */
-    void update(const float* v);
+    void update( const float *v );
     /**
      * @brief Starts a note.
      * @param[in] pitch     MIDI note (before sub.octave)
@@ -46,26 +48,26 @@ public:
      * @param[in] late      samples since its ideal start (0 <= late < 1)
      * @param[in] phase     the phase to start at, in cycles, or a negative value for "free" (the running phase)
      */
-    void noteOn(int pitch, float velocity, double late, double phase);
+    void noteOn( int pitch, float velocity, double late, double phase );
     /** @brief Releases the note. */
     void noteOff();
     /**
      * @brief A kick starts: the duck.
      * @param[in] late  samples since the kick's ideal start
      */
-    void kick(double late) { m_duck.trigger(late); }
+    void kick( double late ) { m_duck.trigger( late ); }
     /**
      * @brief Renders @p n samples (replacing @p out, mono).
      * @param[out] out  receives the mono output (replaced)
      * @param[in]  n    how many samples
      */
-    void process(float* out, int n);
+    void process( float *out, int n );
     /**
      * @brief The frequency a note of @p pitch plays at, after the octave setting.
      * @param[in] pitch  the MIDI note
      * @return the frequency it plays at, in Hz
      */
-    double noteHz(int pitch) const;
+    double noteHz( int pitch ) const;
     /**
      * @brief Whether sub.lock asks for the kick's phase.
      * @return true when sub.lock asks for the kick's phase
@@ -77,7 +79,7 @@ public:
      * @param[in] hz  the frequency in Hz
      * @return the phase the voice's chain adds there, in cycles
      */
-    double chainPhase(double hz) const;
+    double chainPhase( double hz ) const;
     /**
      * @brief Whether anything sounds.
      * @return true while anything sounds
@@ -85,24 +87,24 @@ public:
     bool active() const { return m_env.isActive(); }
 
 private:
-    double m_sr = 48000.0;   ///< the sample rate, Hz
-    Envelope m_env;           ///< the amplitude envelope
-    Ducker m_duck;            ///< the kick's duck
-    TanhAdaa m_sat;           ///< the drive
-    Svf m_lp;                 ///< the low pass
-    double m_phase = 0.0;   ///< the phase, cycles
-    double m_inc = 0.0;   ///< the phase step per sample, cycles
-    float m_velocity = 1.0f;   ///< the note's velocity
-    float m_level = 0.5f;   ///< sub.level, linear
-    float m_drive = 1.0f;   ///< the drive
-    float m_driveNorm = 1.0f;   ///< the gain that keeps the level after it
-    float m_attackS = 0.003f;   ///< the envelope's attack, seconds
-    float m_decayS = 0.25f;   ///< its decay, seconds
-    float m_sustain = 0.7f;   ///< its sustain, 0..1
-    float m_releaseS = 0.09f;   ///< its release, seconds
-    float m_lpHz = 110.0f;    ///< the low pass's corner
-    int m_octave = 0;   ///< octaves the notes are moved by
-    bool m_lock = true;   ///< the phase is locked to the kick's (sub.lock)
+    double   m_sr = 48000.0;       ///< the sample rate, Hz
+    Envelope m_env;                ///< the amplitude envelope
+    Ducker   m_duck;               ///< the kick's duck
+    TanhAdaa m_sat;                ///< the drive
+    Svf      m_lp;                 ///< the low pass
+    double   m_phase = 0.0;        ///< the phase, cycles
+    double   m_inc = 0.0;          ///< the phase step per sample, cycles
+    float    m_velocity = 1.0f;    ///< the note's velocity
+    float    m_level = 0.5f;       ///< sub.level, linear
+    float    m_drive = 1.0f;       ///< the drive
+    float    m_driveNorm = 1.0f;   ///< the gain that keeps the level after it
+    float    m_attackS = 0.003f;   ///< the envelope's attack, seconds
+    float    m_decayS = 0.25f;     ///< its decay, seconds
+    float    m_sustain = 0.7f;     ///< its sustain, 0..1
+    float    m_releaseS = 0.09f;   ///< its release, seconds
+    float    m_lpHz = 110.0f;      ///< the low pass's corner
+    int      m_octave = 0;         ///< octaves the notes are moved by
+    bool     m_lock = true;        ///< the phase is locked to the kick's (sub.lock)
 };
 
-} // namespace parh
+}   // namespace parh

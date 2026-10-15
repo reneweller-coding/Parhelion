@@ -27,14 +27,16 @@
 #include "parh/synth/Modulation.h"
 #include <cstdint>
 
-namespace parh {
+namespace parh
+{
 
-constexpr int ChoirNotes = 6;       ///< notes at once
-constexpr int ChoirSingers = 6;     ///< singers on a note at most
-constexpr int LfTable = 64;         ///< the LF shapes over Rd
+constexpr int ChoirNotes = 6;     ///< notes at once
+constexpr int ChoirSingers = 6;   ///< singers on a note at most
+constexpr int LfTable = 64;       ///< the LF shapes over Rd
 
 /** @brief The choir: up to ChoirNotes notes, each sung by a section of singers through two vocal tracts. */
-class Choir {
+class Choir
+{
 public:
     static constexpr int MaxBlock = 32;   ///< the longest block process() renders at once
 
@@ -43,12 +45,12 @@ public:
      * @param[in] sampleRate  the sample rate
      * @param[in] seed        the seed of the singers' streams
      */
-    void prepare(double sampleRate, uint64_t seed);
+    void prepare( double sampleRate, uint64_t seed );
     /**
      * @brief Reads the effective parameter values (indexed by choir::).
      * @param[in] v  the effective parameter values
      */
-    void update(const float* v);
+    void update( const float *v );
     /**
      * @brief Starts @p pitch at @p velocity (0..1), @p late samples after its ideal start; @p unused is not read.
      * @param[in] pitch     the MIDI note
@@ -56,31 +58,31 @@ public:
      * @param[in] unused    not read
      * @param[in] late      samples after the ideal start
      */
-    void noteOn(int pitch, float velocity, bool unused, double late);
+    void noteOn( int pitch, float velocity, bool unused, double late );
     /**
      * @brief Releases the note of @p pitch.
      * @param[in] pitch  the MIDI note
      */
-    void noteOff(int pitch);
+    void noteOff( int pitch );
     /** @brief Silence: every note and singer off. */
     void reset();
     /**
      * @brief Singers on a note (1 .. ChoirSingers, at most the quality's limit): the knob, through update().
      * @param[in] n  the singers per note
      */
-    void setSingers(int n) { m_singers = n < 1 ? 1 : (n > m_singerLimit ? m_singerLimit : n); }
+    void setSingers( int n ) { m_singers = n < 1 ? 1 : ( n > m_singerLimit ? m_singerLimit : n ); }
     /**
      * @brief The quality's limit on the singers (Deck::setQuest), as StringSection::setPlayerLimit.
      * @param[in] n  the most singers per note
      */
-    void setSingerLimit(int n) { m_singerLimit = n < 1 ? 1 : (n > ChoirSingers ? ChoirSingers : n); }
+    void setSingerLimit( int n ) { m_singerLimit = n < 1 ? 1 : ( n > ChoirSingers ? ChoirSingers : n ); }
     /**
      * @brief Renders @p n samples, replacing @p L and @p R (scalar: nothing to split into lanes).
      * @param[out] L  the left channel
      * @param[out] R  the right channel
      * @param[in]  n  the block's samples
      */
-    void process(float* L, float* R, int n);
+    void process( float *L, float *R, int n );
     /**
      * @brief How many singers sing now (for the tests and the meters).
      * @return the singers singing
@@ -91,29 +93,30 @@ public:
      * @param[in] pitch  the MIDI note
      * @return 0 bass, 1 tenor, 2 alto, 3 soprano
      */
-    static int voiceOf(int pitch);
+    static int voiceOf( int pitch );
     /**
      * @brief One period of the LF source at @p rd, @p n samples (normalised to Ee = 1; for the tests).
      * @param[in]  rd   the LF shape parameter
      * @param[in]  n    the samples of the period
      * @param[out] out  the period
      */
-    void lfPeriod(double rd, int n, float* out) const;
+    void lfPeriod( double rd, int n, float *out ) const;
     /**
      * @brief The deck's shared modulation sources (Modulation.h).
      * @param[in] g  the shared sources
      */
-    void setModGlobals(const ModGlobals& g) { m_mod.setGlobals(g); }
+    void setModGlobals( const ModGlobals &g ) { m_mod.setGlobals( g ); }
     /**
      * @brief The beat now and the beats per sample (the synced LFOs).
      * @param[in] beat            the beat now
      * @param[in] beatsPerSample  the beats per sample
      */
-    void setClock(double beat, double beatsPerSample) { m_mod.setClock(m_pos, beat, beatsPerSample); }
+    void setClock( double beat, double beatsPerSample ) { m_mod.setClock( m_pos, beat, beatsPerSample ); }
 
 private:
     /** @brief The LF model's shape of one period. */
-    struct LfShape {
+    struct LfShape
+    {
         double m_tp;      ///< the flow's peak
         double m_te;      ///< the main excitation
         double m_ta;      ///< the return phase's time constant
@@ -122,56 +125,58 @@ private:
         double m_e0;      ///< the open phase's amplitude (Ee = 1)
     };
     /** @brief One singer of a note: his period, his source, his perturbations. */
-    struct Singer {
-        bool m_on = false;   ///< he sings
-        int m_note = -1;   ///< the note he sings, -1 none
-        int m_group = 0;   ///< the tract he sings through (0 the shorter, 1 the longer)
-        double m_t = 0.0;   ///< seconds into the period
-        double m_T0 = 0.005;   ///< the period's length, seconds
-        double m_start = 0.0;          ///< seconds until the singer sets in
+    struct Singer
+    {
+        bool    m_on = false;          ///< he sings
+        int     m_note = -1;           ///< the note he sings, -1 none
+        int     m_group = 0;           ///< the tract he sings through (0 the shorter, 1 the longer)
+        double  m_t = 0.0;             ///< seconds into the period
+        double  m_T0 = 0.005;          ///< the period's length, seconds
+        double  m_start = 0.0;         ///< seconds until the singer sets in
         LfShape m_s{};                 ///< this period's, in seconds
-        double m_w = 0.0;              ///< pi / tp
-        double m_zr = 0.0;   ///< e^((alpha + i w) t): real part
-        double m_zi = 0.0;   ///< ... imaginary part
-        double m_sr = 1.0;   ///< its step per sample: real part
-        double m_si = 0.0;   ///< ... imaginary part
-        double m_ret = 0.0;   ///< the return phase's e^(-eps (t - te))
-        double m_retStep = 1.0;   ///< its factor per sample
-        double m_retEnd = 0.0;   ///< its value at the period's end, e^(-eps (T0 - te))
-        bool m_returning = false;   ///< the period is past te: the return phase
-        double m_amp = 1.0;   ///< this period's amplitude (shimmer)
-        double m_cents = 0.0;   ///< his intonation, cents
-        double m_vibHz = 5.3;   ///< his vibrato's rate, Hz
-        double m_vibCents = 25.0;   ///< his vibrato's depth, cents
-        double m_vibPhase = 0.0;   ///< his vibrato's phase, radians
-        double m_wander = 0.0;   ///< the slow wander of his pitch, cents
-        double m_wanderTo = 0.0;   ///< where it wanders to
-        double m_age = 0.0;   ///< seconds since the note began
-        Rng m_rng;   ///< his own random stream
+        double  m_w = 0.0;             ///< pi / tp
+        double  m_zr = 0.0;            ///< e^((alpha + i w) t): real part
+        double  m_zi = 0.0;            ///< ... imaginary part
+        double  m_sr = 1.0;            ///< its step per sample: real part
+        double  m_si = 0.0;            ///< ... imaginary part
+        double  m_ret = 0.0;           ///< the return phase's e^(-eps (t - te))
+        double  m_retStep = 1.0;       ///< its factor per sample
+        double  m_retEnd = 0.0;        ///< its value at the period's end, e^(-eps (T0 - te))
+        bool    m_returning = false;   ///< the period is past te: the return phase
+        double  m_amp = 1.0;           ///< this period's amplitude (shimmer)
+        double  m_cents = 0.0;         ///< his intonation, cents
+        double  m_vibHz = 5.3;         ///< his vibrato's rate, Hz
+        double  m_vibCents = 25.0;     ///< his vibrato's depth, cents
+        double  m_vibPhase = 0.0;      ///< his vibrato's phase, radians
+        double  m_wander = 0.0;        ///< the slow wander of his pitch, cents
+        double  m_wanderTo = 0.0;      ///< where it wanders to
+        double  m_age = 0.0;           ///< seconds since the note began
+        Rng     m_rng;                 ///< his own random stream
     };
     /** @brief One sung note: its pitch and voice, its envelope, its two tracts and its modulation. */
-    struct Note {
-        bool m_on = false;   ///< it sounds
-        bool m_held = false;   ///< its key is held
-        int m_pitch = 60;   ///< MIDI note
-        int m_voice = 0;   ///< the voice that sings it: 0 bass, 1 tenor, 2 alto, 3 soprano
-        float m_velocity = 0.7f;   ///< its velocity, 0..1
-        double m_t = 0.0;   ///< seconds since it began
+    struct Note
+    {
+        bool   m_on = false;        ///< it sounds
+        bool   m_held = false;      ///< its key is held
+        int    m_pitch = 60;        ///< MIDI note
+        int    m_voice = 0;         ///< the voice that sings it: 0 bass, 1 tenor, 2 alto, 3 soprano
+        float  m_velocity = 0.7f;   ///< its velocity, 0..1
+        double m_t = 0.0;           ///< seconds since it began
         double m_released = -1.0;   ///< seconds since its release, -1 while held
-        float m_env = 0.0f;   ///< its envelope
-        Svf m_formant[2][5];   ///< the five formants of each of the two tracts
-        float m_gain[5] = {};   ///< the formants' levels
-        int m_quiet = 0;   ///< cells it has been silent (it ends after a few)
+        float  m_env = 0.0f;        ///< its envelope
+        Svf    m_formant[2][5];     ///< the five formants of each of the two tracts
+        float  m_gain[5] = {};      ///< the formants' levels
+        int    m_quiet = 0;         ///< cells it has been silent (it ends after a few)
         // The modulation's values for this note (Phase 5b); the knobs' where no slot reaches them.
-        float m_vowel = 0.0f;   ///< the vowel, 0 "a" .. 2 "u"
-        float m_formantMul = 1.0f;   ///< the formants' frequency factor
-        float m_tension = 0.4f;   ///< the tension: Rd from lax to pressed
-        float m_breath = 0.25f;   ///< the aspiration noise
-        float m_vib = 1.0f;   ///< the vibrato's depth factor
-        float m_level = 1.0f;   ///< the level factor
-        float m_panL = 1.0f;   ///< the pan's gain, left
-        float m_panR = 1.0f;   ///< the pan's gain, right
-        double m_pitchSt = 0.0;   ///< the pitch offset, semitones
+        float  m_vowel = 0.0f;        ///< the vowel, 0 "a" .. 2 "u"
+        float  m_formantMul = 1.0f;   ///< the formants' frequency factor
+        float  m_tension = 0.4f;      ///< the tension: Rd from lax to pressed
+        float  m_breath = 0.25f;      ///< the aspiration noise
+        float  m_vib = 1.0f;          ///< the vibrato's depth factor
+        float  m_level = 1.0f;        ///< the level factor
+        float  m_panL = 1.0f;         ///< the pan's gain, left
+        float  m_panR = 1.0f;         ///< the pan's gain, right
+        double m_pitchSt = 0.0;       ///< the pitch offset, semitones
     };
     /**
      * @brief Starts singer @p g's next period of note @p n, @p tInto seconds into it: its length, amplitude and LF
@@ -180,46 +185,46 @@ private:
      * @param[in]     n      the note
      * @param[in]     tInto  seconds into the period
      */
-    void startPeriod(Singer& g, const Note& n, double tInto);
+    void startPeriod( Singer &g, const Note &n, double tInto );
     /**
      * @brief Sets note @p n's formants for its voice, vowel and formant factor.
      * @param[in,out] n  the note
      */
-    void setFormants(Note& n);
+    void setFormants( Note &n );
     /** @brief Every sounding note's modulation at this cell (every 32 samples of the choir's own count). */
     void modCell();
     /**
      * @brief Note @p s's modulation now.
      * @param[in] s  the note's slot
      */
-    void modNote(int s);
+    void modNote( int s );
     /**
      * @brief The LF shape for @p rd, in time normalised to the period.
      * @param[in] rd  the LF shape parameter
      * @return the LF shape
      */
-    static LfShape solveLf(double rd);
+    static LfShape solveLf( double rd );
 
-    double m_sr = 48000.0;   ///< the sample rate, Hz
-    uint64_t m_seed = 1;   ///< the singers' streams' seed
-    int m_singers = ChoirSingers;   ///< singers on a note
-    int m_singerLimit = ChoirSingers;   ///< setSingerLimit()
-    uint32_t m_counter = 0;   ///< counts the notes started (each singer's stream)
-    LfShape m_lf[LfTable];   ///< the LF shapes over Rd
-    float m_level = 1.0f;   ///< choir.level, linear
-    float m_vowel = 0.0f;   ///< the vowel knob
-    float m_vibrato = 1.0f;   ///< the vibrato's depth knob
-    float m_breath = 0.25f;   ///< the breath knob
-    float m_tension = 0.4f;   ///< the tension knob
-    float m_attackMs = 250.0f;   ///< the attack, ms
-    float m_releaseMs = 400.0f;   ///< the release, ms
-    float m_width = 0.8f;   ///< the width
-    float m_lowCutHz = 90.0f;   ///< the low cut, Hz
-    Svf m_lowCut[2];   ///< the low cut, per channel
-    Singer m_singer[ChoirNotes * ChoirSingers];   ///< the singers, ChoirSingers per note
-    Note m_note[ChoirNotes];   ///< the notes
-    NoteModulation<ChoirNotes> m_mod;   ///< the modulation, a Modulator per note (Phase 5b)
-    int64_t m_pos = 0;                   ///< the choir's absolute sample count
+    double                     m_sr = 48000.0;                 ///< the sample rate, Hz
+    uint64_t                   m_seed = 1;                     ///< the singers' streams' seed
+    int                        m_singers = ChoirSingers;       ///< singers on a note
+    int                        m_singerLimit = ChoirSingers;   ///< setSingerLimit()
+    uint32_t                   m_counter = 0;                  ///< counts the notes started (each singer's stream)
+    LfShape                    m_lf[LfTable];                  ///< the LF shapes over Rd
+    float                      m_level = 1.0f;                 ///< choir.level, linear
+    float                      m_vowel = 0.0f;                 ///< the vowel knob
+    float                      m_vibrato = 1.0f;               ///< the vibrato's depth knob
+    float                      m_breath = 0.25f;               ///< the breath knob
+    float                      m_tension = 0.4f;               ///< the tension knob
+    float                      m_attackMs = 250.0f;            ///< the attack, ms
+    float                      m_releaseMs = 400.0f;           ///< the release, ms
+    float                      m_width = 0.8f;                 ///< the width
+    float                      m_lowCutHz = 90.0f;             ///< the low cut, Hz
+    Svf                        m_lowCut[2];                    ///< the low cut, per channel
+    Singer                     m_singer[ChoirNotes * ChoirSingers];   ///< the singers, ChoirSingers per note
+    Note                       m_note[ChoirNotes];                    ///< the notes
+    NoteModulation<ChoirNotes> m_mod;       ///< the modulation, a Modulator per note (Phase 5b)
+    int64_t                    m_pos = 0;   ///< the choir's absolute sample count
 };
 
-} // namespace parh
+}   // namespace parh

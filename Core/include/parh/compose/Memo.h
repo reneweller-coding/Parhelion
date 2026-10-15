@@ -16,13 +16,14 @@
 #include <cstdint>
 #include <vector>
 
-namespace parh {
+namespace parh
+{
 
-constexpr int MemoMinNotes = 5;   ///< a window counts with at least this many notes
+constexpr int MemoMinNotes = 5;     ///< a window counts with at least this many notes
 constexpr int MemoMinPitches = 3;   ///< ... and this many distinct pitches
 
-extern const int MemoBloomBits;
-extern const int MemoBloomK;
+extern const int      MemoBloomBits;
+extern const int      MemoBloomK;
 extern const uint64_t MemoBloom[];
 /** @brief The hash of the probe window {(0, 0), (4, +2), (8, +1), (12, -3), (16, +5)} as the tool computed it. */
 extern const uint64_t MemoProbeHash;
@@ -34,18 +35,18 @@ extern const uint64_t MemoProbeHash;
  * @param[out] hash   the hash
  * @return false if the window is too thin to count (@p hash untouched)
  */
-bool memoWindowHash(const std::vector<int>& top, int start, uint64_t& hash);
+bool memoWindowHash( const std::vector<int> &top, int start, uint64_t &hash );
 /**
  * @brief Whether @p hash is (maybe) a transcription's window.
  * @param[in] hash  the window's hash
  * @return true when it may be a transcription's
  */
-bool memoContains(uint64_t hash);
+bool memoContains( uint64_t hash );
 /**
  * @brief Whether any window of @p top that starts on a bar is (maybe) a transcription's.
  * @param[in] top  a pitch per sixteenth, -1 for no onset
  * @return true when a window may be a transcription's
  */
-bool memoHitsAnyBar(const std::vector<int>& top);
+bool memoHitsAnyBar( const std::vector<int> &top );
 
-} // namespace parh
+}   // namespace parh

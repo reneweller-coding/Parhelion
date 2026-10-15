@@ -25,10 +25,12 @@
 #include <cstdint>
 #include <vector>
 
-namespace parh {
+namespace parh
+{
 
 /** @brief The cloud. */
-class GrainCloud {
+class GrainCloud
+{
 public:
     static constexpr int MaxGrains = 24;   ///< grains at once; an onset beyond them is dropped
     /**
@@ -37,14 +39,14 @@ public:
      * @param[in] seed        the seed of the grain stream
      * @pre not called on the audio thread
      */
-    void prepare(double sampleRate, uint64_t seed);
+    void prepare( double sampleRate, uint64_t seed );
     /** @brief Silence, the stream from its seed again. */
     void reset();
     /**
      * @brief Reads the effective parameter values (indexed by cloud::).
      * @param[in] v  the effective parameter values, indexed by cloud::
      */
-    void update(const float* v);
+    void update( const float *v );
     /**
      * @brief Writes @p n samples of @p inL / @p inR into the history and renders the grains into @p L / @p R
      *        (replaced).
@@ -54,37 +56,38 @@ public:
      * @param[out] R    receives the right output (replaced)
      * @param[in]  n    how many samples
      */
-    void process(const float* inL, const float* inR, float* L, float* R, int n);
+    void process( const float *inL, const float *inR, float *L, float *R, int n );
 
 private:
     /** @brief One grain: where it reads, how fast, how long, where it sits. */
-    struct Grain {
-        double m_pos = 0.0;     ///< read position in the history, frames
-        double m_rate = 1.0;    ///< frames per sample
-        int m_length = 0;       ///< samples
-        int m_age = 0;          ///< samples played
-        float m_gl = 0.0f;   ///< the pan's gain, left
-        float m_gr = 0.0f;   ///< the pan's gain, right
-        bool m_live = false;   ///< it sounds
+    struct Grain
+    {
+        double m_pos = 0.0;      ///< read position in the history, frames
+        double m_rate = 1.0;     ///< frames per sample
+        int    m_length = 0;     ///< samples
+        int    m_age = 0;        ///< samples played
+        float  m_gl = 0.0f;      ///< the pan's gain, left
+        float  m_gr = 0.0f;      ///< the pan's gain, right
+        bool   m_live = false;   ///< it sounds
     };
     /** @brief Starts a grain at a random place in the history (Spray), pitch and side. */
     void spawn();
 
-    double m_sr = 48000.0;   ///< the sample rate, Hz
-    uint64_t m_seed = 1;   ///< the stream's seed
-    Rng m_rng;   ///< the random stream
-    std::vector<float> m_histL;   ///< the history the grains read, left
-    std::vector<float> m_histR;   ///< ... right
-    int m_mask = 0;   ///< its size - 1
-    int m_write = 0;   ///< where the next sample goes
-    Grain m_g[MaxGrains];   ///< the grains
-    int m_live = 0;   ///< how many grains sound
-    float m_rate = 0.0f;        ///< onsets per sample
-    float m_sizeS = 0.2f;   ///< a grain's length, s
-    float m_pitch = 0.3f;   ///< the grains' pitch spread, semitones
-    float m_spray = 1.5f;   ///< how far back in the history they read, s
-    float m_level = 0.0f;   ///< the level, linear
-    bool m_on = false;   ///< the cloud plays (level above zero)
+    double             m_sr = 48000.0;   ///< the sample rate, Hz
+    uint64_t           m_seed = 1;       ///< the stream's seed
+    Rng                m_rng;            ///< the random stream
+    std::vector<float> m_histL;          ///< the history the grains read, left
+    std::vector<float> m_histR;          ///< ... right
+    int                m_mask = 0;       ///< its size - 1
+    int                m_write = 0;      ///< where the next sample goes
+    Grain              m_g[MaxGrains];   ///< the grains
+    int                m_live = 0;       ///< how many grains sound
+    float              m_rate = 0.0f;    ///< onsets per sample
+    float              m_sizeS = 0.2f;   ///< a grain's length, s
+    float              m_pitch = 0.3f;   ///< the grains' pitch spread, semitones
+    float              m_spray = 1.5f;   ///< how far back in the history they read, s
+    float              m_level = 0.0f;   ///< the level, linear
+    bool               m_on = false;     ///< the cloud plays (level above zero)
 };
 
-} // namespace parh
+}   // namespace parh

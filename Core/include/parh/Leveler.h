@@ -32,21 +32,23 @@
 #include <functional>
 #include <vector>
 
-namespace parh {
+namespace parh
+{
 
 /** @brief What levelScore found for one track. */
-struct LevelReading {
-    double m_beat = 0.0;       ///< the track's start
-    float m_measured = 0.0f;   ///< its loudest part as composed, LUFS
-    float m_target = 0.0f;     ///< what it should measure
-    float m_trim = 0.0f;       ///< the correction set, dB
-    float m_after = 0.0f;      ///< the part with the correction, LUFS
-    float m_gapBefore = 0.0f;  ///< the breakdown's loudest 3 s under the drop's, as composed, LU (NaN: no breakdown)
-    float m_gapAfter = 0.0f;   ///< and with the correction
-    float m_breakDb = 0.0f;    ///< the breakdown's correction, dB
-    float m_buildDb = 0.0f;    ///< the builds' correction, dB
-    BalanceDbT m_found{};       ///< every part's loudest sample against the kick's as composed, dB (NaN: silent)
-    BalanceDbT m_bal{};         ///< the parts' corrections set, dB
+struct LevelReading
+{
+    double m_beat = 0.0;         ///< the track's start
+    float  m_measured = 0.0f;    ///< its loudest part as composed, LUFS
+    float  m_target = 0.0f;      ///< what it should measure
+    float  m_trim = 0.0f;        ///< the correction set, dB
+    float  m_after = 0.0f;       ///< the part with the correction, LUFS
+    float  m_gapBefore = 0.0f;   ///< the breakdown's loudest 3 s under the drop's, as composed, LU (NaN: no breakdown)
+    float  m_gapAfter = 0.0f;    ///< and with the correction
+    float  m_breakDb = 0.0f;     ///< the breakdown's correction, dB
+    float  m_buildDb = 0.0f;     ///< the builds' correction, dB
+    BalanceDbT m_found{};        ///< every part's loudest sample against the kick's as composed, dB (NaN: silent)
+    BalanceDbT m_bal{};          ///< the parts' corrections set, dB
 };
 
 /**
@@ -57,8 +59,8 @@ struct LevelReading {
  * @param[in]     stop     asked between blocks: true breaks off, and @p score is left as it was
  * @return what was found, a reading per track (nothing if broken off)
  */
-std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, double seconds = 20.0,
-                                     const std::function<bool()>& stop = {});
+std::vector<LevelReading> levelScore( Score &score, const ParamStore &params, double seconds = 20.0,
+                                      const std::function<bool()> &stop = {} );
 
 /**
  * @brief Every track of a set (Phase 6, the plugin: a set plays at once and its corrections glide in): deck A's and deck
@@ -71,8 +73,8 @@ std::vector<LevelReading> levelScore(Score& score, const ParamStore& params, dou
  * @return the readings of decks A and B, in deck order
  * @note After Totality `Core/src/Leveler.cpp` (levelSet) at 4d3c0d2 (29.09.2026).
  */
-std::vector<LevelReading> levelSet(SetScore& set, const ParamStore& params, double seconds = 20.0,
-                                   const std::function<bool()>& stop = {});
+std::vector<LevelReading> levelSet( SetScore &set, const ParamStore &params, double seconds = 20.0,
+                                    const std::function<bool()> &stop = {} );
 
 /**
  * @brief The window of part @p part's loudest sample against the kick's, dB; a lane (0 .. 11) by its @p role (PercRole),
@@ -82,6 +84,6 @@ std::vector<LevelReading> levelSet(SetScore& set, const ParamStore& params, doub
  * @param[out] lo    the window's low end, dB
  * @param[out] hi    its high end, dB
  */
-void balanceWindow(int part, int role, float& lo, float& hi);
+void balanceWindow( int part, int role, float &lo, float &hi );
 
-} // namespace parh
+}   // namespace parh

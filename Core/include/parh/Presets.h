@@ -38,17 +38,21 @@
 #include <utility>
 #include <vector>
 
-namespace parh {
+namespace parh
+{
 
 /** @brief One preset: its group (a submenu), its name, and the values it sets (knob index in its module, value). */
-struct SoundPreset {
-    std::string m_group;   ///< its group (a submenu)
-    std::string m_name;   ///< its name
-    int m_groupIndex = -1;                                  ///< its group within the bank's sixteen
-    float m_style[5] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };    ///< its group's fit to Uplifting, Progressive, Dream House, Acid, Deep
-    uint32_t m_roles = 0;                                   ///< a kit lane's roles it is made for (bit PercRole), 0: any
-    std::vector<std::pair<int, float>> m_values;            ///< every knob it sets (all but presetLeaves), by index in the module
-    float m_trimDb = 0.0f;                                  ///< its loudness against the default sound, the composer's offset on the level
+struct SoundPreset
+{
+    std::string m_group;             ///< its group (a submenu)
+    std::string m_name;              ///< its name
+    int         m_groupIndex = -1;   ///< its group within the bank's sixteen
+    float       m_style[5] = { 1.0f, 1.0f, 1.0f, 1.0f,
+                               1.0f };   ///< its group's fit to Uplifting, Progressive, Dream House, Acid, Deep
+    uint32_t    m_roles = 0;             ///< a kit lane's roles it is made for (bit PercRole), 0: any
+    std::vector<std::pair<int, float>>
+          m_values;          ///< every knob it sets (all but presetLeaves), by index in the module
+    float m_trimDb = 0.0f;   ///< its loudness against the default sound, the composer's offset on the level
 };
 
 /**
@@ -56,21 +60,21 @@ struct SoundPreset {
  * @param[in] module  the module
  * @return true when it has factory presets
  */
-bool hasPresets(ModuleE module);
+bool hasPresets( ModuleE module );
 /**
  * @brief The factory presets of a module (1024; Poly by its instance). Built once per bank, thread-safe; empty without.
  * @param[in] module    the module
  * @param[in] instance  its instance
  * @return the presets, empty without a bank
  */
-const std::vector<SoundPreset>& factoryPresets(ModuleE module, int instance = 0);
+const std::vector<SoundPreset> &factoryPresets( ModuleE module, int instance = 0 );
 /**
  * @brief Whether a preset leaves knob @p k of @p module alone (the mix's, the composer's, the pattern's).
  * @param[in] module  the module
  * @param[in] k       the knob's index within the module
  * @return true when presets leave it alone
  */
-bool presetLeaves(ModuleE module, int k);
+bool presetLeaves( ModuleE module, int k );
 /**
  * @brief The values a preset gives every knob it does not leave: its own, the defaults for the rest -- the whole sound,
  *        so a preset sounds the same whatever was loaded before.
@@ -79,7 +83,7 @@ bool presetLeaves(ModuleE module, int k);
  * @param[in] preset    the preset
  * @return the knobs and their values
  */
-std::vector<std::pair<int, float>> presetKnobs(ModuleE module, int instance, const SoundPreset& preset);
+std::vector<std::pair<int, float>> presetKnobs( ModuleE module, int instance, const SoundPreset &preset );
 /**
  * @brief Applies @p preset to instance @p instance of @p module in @p params.
  * @param[in,out] params    the knobs, set here
@@ -87,7 +91,7 @@ std::vector<std::pair<int, float>> presetKnobs(ModuleE module, int instance, con
  * @param[in]     instance  its instance
  * @param[in]     preset    the preset
  */
-void applyPreset(ParamStore& params, ModuleE module, int instance, const SoundPreset& preset);
+void applyPreset( ParamStore &params, ModuleE module, int instance, const SoundPreset &preset );
 /**
  * @brief The module's knobs that differ from their defaults, as `key=value` lines (a user preset); presetLeaves() knobs
  *        left out.
@@ -96,7 +100,7 @@ void applyPreset(ParamStore& params, ModuleE module, int instance, const SoundPr
  * @param[in] instance  its instance
  * @return the key=value lines
  */
-std::string moduleText(const ParamStore& params, ModuleE module, int instance = 0);
+std::string moduleText( const ParamStore &params, ModuleE module, int instance = 0 );
 /**
  * @brief A user preset (the plugin's "Save as user preset"): every knob a preset sets, one `knob=value` a line with the
  *        key inside the module ("cutoff=2400"), so that it loads into any instance of the module -- a lane's sound into
@@ -107,7 +111,7 @@ std::string moduleText(const ParamStore& params, ModuleE module, int instance = 
  * @param[in] instance  its instance
  * @return the knob=value lines
  */
-std::string userPresetText(const ParamStore& params, ModuleE module, int instance = 0);
+std::string userPresetText( const ParamStore &params, ModuleE module, int instance = 0 );
 /**
  * @brief The values user preset @p text gives every knob a preset sets, by index in the module: its own, the defaults
  *        for the rest -- the whole sound, as presetKnobs() for a factory preset. Keys the module does not have (another
@@ -118,7 +122,8 @@ std::string userPresetText(const ParamStore& params, ModuleE module, int instanc
  * @param[in] text      the user preset
  * @return (index in the module, value) for every knob a preset sets
  */
-std::vector<std::pair<int, float>> userPresetKnobs(const ParamStore& params, ModuleE module, int instance, std::string_view text);
+std::vector<std::pair<int, float>> userPresetKnobs( const ParamStore &params, ModuleE module, int instance,
+                                                    std::string_view text );
 /**
  * @brief The composer's choice: a preset of @p module (instance @p instance) for a track of style weights @p style (the
  *        five styles, summing to 1), drawn from @p rng; for a kit lane only among presets made for @p role (-1: any).
@@ -130,30 +135,31 @@ std::vector<std::pair<int, float>> userPresetKnobs(const ParamStore& params, Mod
  * @param[in]     prefs     the player's ratings (compose.use_ratings): a factor on each group's weight, or null
  * @return its index in factoryPresets(), -1 if the module has none
  */
-int pickPreset(ModuleE module, int instance, const float* style, int role, Rng& rng, const Preferences* prefs = nullptr);
+int pickPreset( ModuleE module, int instance, const float *style, int role, Rng &rng,
+                const Preferences *prefs = nullptr );
 /**
  * @brief The brightness a track of style weights @p style chooses its sounds around (0 dark .. 1 bright: the grid's
  *        rows).
  * @param[in] style  the five style weights
  * @return the brightness, 0..1
  */
-float styleBrightness(const float* style);
+float styleBrightness( const float *style );
 /**
  * @brief How many keys the bank's table names that no module has (the tests); @p first gets the first.
  * @param[out] first  receives the first unknown key, or null
  * @return the number of unknown keys
  */
-int bankUnknownKeys(std::string* first = nullptr);
+int bankUnknownKeys( std::string *first = nullptr );
 /**
  * @brief The bank's index of a module (the trims' table), -1 without a bank.
  * @param[in] module    the module
  * @param[in] instance  its instance
  * @return the bank's index, -1 for none
  */
-int bankIndex(ModuleE module, int instance);
+int bankIndex( ModuleE module, int instance );
 /** @brief Banks in all. */
 constexpr int PresetBanks = 18;
 /** @brief Presets per bank. */
 constexpr int PresetsPerBank = 1024;
 
-} // namespace parh
+}   // namespace parh

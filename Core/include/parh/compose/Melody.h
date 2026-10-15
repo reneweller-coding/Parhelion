@@ -29,26 +29,29 @@
 #include "parh/compose/Planner.h"
 #include <vector>
 
-namespace parh {
+namespace parh
+{
 
 /** @brief What the melodic writers share: the plan, the harmony, the score to write into, a velocity scatter. */
-struct MelodyContext {
-    const Plan* m_plan = nullptr;   ///< the track's plan
-    const Harmony* m_harmony = nullptr;   ///< its harmony
-    Score* m_score = nullptr;   ///< the score to write into
-    float m_humanize = 0.08f;   ///< velocity scatter (compose.humanize)
+struct MelodyContext
+{
+    const Plan    *m_plan = nullptr;      ///< the track's plan
+    const Harmony *m_harmony = nullptr;   ///< its harmony
+    Score         *m_score = nullptr;     ///< the score to write into
+    float          m_humanize = 0.08f;    ///< velocity scatter (compose.humanize)
     /** @brief The scatter's seed: a note's scatter is a hash of it and the note (its beat, part and pitch), so a voice
      *         drawn again changes no other voice's velocities (PLAN 6.9). */
     uint64_t m_velSeed = 0;
-    bool m_piano = false;       ///< the lead is the piano's (Dream House): Part::Piano, legato, the piano corpus, no octave up
-    float m_anthemShare = 0.7f; ///< the chance of the anthem motif (long notes) over the sixteenth riff
+    bool     m_piano =
+        false;   ///< the lead is the piano's (Dream House): Part::Piano, legato, the piano corpus, no octave up
+    float m_anthemShare = 0.7f;   ///< the chance of the anthem motif (long notes) over the sixteenth riff
     /**
      * @brief Whether a note of @p part at @p beat falls into a vacuum (the silence before a drop): it is not written.
      * @param[in] beat  the position in beats
      * @param[in] part  the part
      * @return true when the note falls into a vacuum
      */
-    bool silent(double beat, PartE part) const;
+    bool silent( double beat, PartE part ) const;
     /**
      * @brief Adds a note (dropped in a vacuum), its velocity scattered.
      * @param[in] beat      the start in beats
@@ -60,7 +63,8 @@ struct MelodyContext {
      * @param[in] accent    true for an accent
      * @param[in] slide     true for a slide
      */
-    void note(double beat, double len, PartE part, int pitch, float velocity, int shift = 0, bool accent = false, bool slide = false) const;
+    void note( double beat, double len, PartE part, int pitch, float velocity, int shift = 0, bool accent = false,
+               bool slide = false ) const;
 };
 
 /**
@@ -69,33 +73,33 @@ struct MelodyContext {
  * @param[in] motif  the stream `motif`: the kind (anthem or riff), the scale's colour, the motifs A and B
  * @param[in] lead   the stream `lead`: A', A'' and the tones drawn again where a motif meets other chords
  */
-void writeLead(const MelodyContext& c, uint64_t motif, uint64_t lead);
+void writeLead( const MelodyContext &c, uint64_t motif, uint64_t lead );
 /**
  * @brief The counter: answers in the lead's held tones, an octave over them, chord tones walking down (Phosphene); a held
  *        third or fifth over the riff where the lead has no long notes. Written after the lead.
  * @param[in] c     the melody's context
  * @param[in] seed  the stream's seed
  */
-void writeCounter(const MelodyContext& c, uint64_t seed);
+void writeCounter( const MelodyContext &c, uint64_t seed );
 /**
  * @brief The arp: sixteenths (eighths in a slow profile) up, down or up and down over the chord and its octave.
  * @param[in] c     the melody's context
  * @param[in] seed  the stream's seed
  * @param[in] slow  true for a slow profile
  */
-void writeArp(const MelodyContext& c, uint64_t seed, bool slow);
+void writeArp( const MelodyContext &c, uint64_t seed, bool slow );
 /**
  * @brief The pluck: a broken chord in one of the trance rhythms, a surprise every four bars.
  * @param[in] c     the melody's context
  * @param[in] seed  the stream's seed
  */
-void writePluck(const MelodyContext& c, uint64_t seed);
+void writePluck( const MelodyContext &c, uint64_t seed );
 /**
  * @brief The stab: short close chords on the off-beats.
  * @param[in] c     the melody's context
  * @param[in] seed  the stream's seed
  */
-void writeStab(const MelodyContext& c, uint64_t seed);
+void writeStab( const MelodyContext &c, uint64_t seed );
 /**
  * @brief The 303 (Dok. 5): a bar of sixteen steps, the onsets and pitches from the acid corpus (the first step the
  *        chord's root), accents and slides by the rules; two steps drawn again every four bars; the line moves with the
@@ -103,6 +107,6 @@ void writeStab(const MelodyContext& c, uint64_t seed);
  * @param[in] c     the melody's context
  * @param[in] seed  the stream's seed
  */
-void writeAcid(const MelodyContext& c, uint64_t seed);
+void writeAcid( const MelodyContext &c, uint64_t seed );
 
-} // namespace parh
+}   // namespace parh
