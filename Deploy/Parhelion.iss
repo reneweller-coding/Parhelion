@@ -54,12 +54,14 @@ Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 en.CompStandalone=Standalone application
 en.CompVst3=VST3 plug-in (for a DAW)
 en.CompRender=Offline renderer (parh_render, command line)
+en.CompSets=Parhelion Sets (tracks and DJ sets into WAV, FLAC, Ogg Vorbis or MP3)
 en.CompManual=Manual (PDF)
 en.TaskDesktop=Create a desktop shortcut
 en.NoAvx2=This processor reports no AVX2 support.%n%nParhelion is built for AVX2, which every x86-64 processor since 2013 has. Without it, it will not start.%n%nInstall anyway?
 de.CompStandalone=Eigenstaendiges Programm
 de.CompVst3=VST3-Plugin (fuer eine DAW)
 de.CompRender=Offline-Renderer (parh_render, Kommandozeile)
+de.CompSets=Parhelion Sets (Tracks und DJ-Sets als WAV, FLAC, Ogg Vorbis oder MP3)
 de.CompManual=Handbuch (PDF)
 de.TaskDesktop=Verknuepfung auf dem Desktop anlegen
 de.NoAvx2=Dieser Prozessor meldet keine AVX2-Unterstuetzung.%n%nParhelion ist fuer AVX2 gebaut, das jeder x86-64-Prozessor seit 2013 hat. Ohne AVX2 startet es nicht.%n%nTrotzdem installieren?
@@ -72,6 +74,7 @@ Name: "custom"; Description: "Custom"; Flags: iscustom
 Name: "standalone"; Description: "{cm:CompStandalone}"; Types: full custom; Flags: fixed
 Name: "vst3";       Description: "{cm:CompVst3}";       Types: full custom
 Name: "render";     Description: "{cm:CompRender}";     Types: full custom
+Name: "sets";       Description: "{cm:CompSets}";       Types: full custom
 Name: "manual";     Description: "{cm:CompManual}";     Types: full custom
 
 [Tasks]
@@ -90,12 +93,14 @@ Source: "{#Stage}\README.txt";             DestDir: "{app}";                 Fla
 Source: "{#Stage}\RELEASE_NOTES.txt";      DestDir: "{app}";                 Flags: ignoreversion; Components: standalone
 Source: "{#Stage}\LICENSE.txt";            DestDir: "{app}";                 Flags: ignoreversion; Components: standalone
 Source: "{#Stage}\parh_render.exe";        DestDir: "{app}";                 Flags: ignoreversion; Components: render
+Source: "{#Stage}\ParhelionSets.exe";      DestDir: "{app}";                 Flags: ignoreversion; Components: sets
 Source: "{#Stage}\Parhelion-Manual.pdf";   DestDir: "{app}";                 Flags: ignoreversion; Components: manual
 Source: "{#Stage}\Parhelion.vst3\*";       DestDir: "{autocf}\VST3\Parhelion.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3
 
 [Icons]
 Name: "{autoprograms}\{#AppName}";          Filename: "{app}\Parhelion.exe"; IconFilename: "{app}\parhelion.ico"
 Name: "{autoprograms}\{#AppName} Manual";   Filename: "{app}\Parhelion-Manual.pdf"; Components: manual
+Name: "{autoprograms}\{#AppName} Sets";     Filename: "{app}\ParhelionSets.exe"; IconFilename: "{app}\parhelion.ico"; Components: sets
 Name: "{autodesktop}\{#AppName}";           Filename: "{app}\Parhelion.exe"; IconFilename: "{app}\parhelion.ico"; Tasks: desktopicon
 
 [Run]

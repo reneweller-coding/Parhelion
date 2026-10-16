@@ -128,6 +128,10 @@ $vst3Dir = Get-ChildItem -Recurse (Join-Path $build "Plugin\Parhelion_artefacts"
 Copy-Item $standalone.FullName $stage
 Copy-Item -Recurse $vst3Dir.FullName $stage
 Copy-Item $render $stage
+# Parhelion Sets, the render app beside the instrument (Tools/renderapp).
+$sets = Get-ChildItem -Recurse (Join-Path $build "Tools\renderapp") -Filter ParhelionSets.exe | Select-Object -First 1
+if (-not $sets) { throw "no ParhelionSets.exe in the build" }
+Copy-Item $sets.FullName $stage
 Copy-Item (Join-Path $root "docs\manual\Parhelion-Manual.pdf") $stage
 Copy-Item (Join-Path $deploy "parhelion.ico") $stage
 Copy-Item (Join-Path $root "LICENSE") (Join-Path $stage "LICENSE.txt")
@@ -135,11 +139,11 @@ Copy-Item (Join-Path $root "README.md") (Join-Path $stage "README.txt")
 Copy-Item (Join-Path $root "docs\RELEASE_NOTES.md") (Join-Path $stage "RELEASE_NOTES.txt")
 
 # 5. Check: the files, and no dependency on the dynamic MSVC or Intel runtime.
-$expected = @("Parhelion.exe", "parh_render.exe", "Parhelion.vst3", "Parhelion-Manual.pdf", "parhelion.ico", "LICENSE.txt", "README.txt", "RELEASE_NOTES.txt")
+$expected = @("Parhelion.exe", "parh_render.exe", "ParhelionSets.exe", "Parhelion.vst3", "Parhelion-Manual.pdf", "parhelion.ico", "LICENSE.txt", "README.txt", "RELEASE_NOTES.txt")
 foreach ($f in $expected) { if (-not (Test-Path (Join-Path $stage $f))) { throw "missing in the stage: $f" } }
 $dumpbin = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($dumpbin) {
-    $binaries = @((Join-Path $stage "Parhelion.exe"), (Join-Path $stage "parh_render.exe")) +
+    $binaries = @((Join-Path $stage "Parhelion.exe"), (Join-Path $stage "parh_render.exe"), (Join-Path $stage "ParhelionSets.exe")) +
                 @(Get-ChildItem -Recurse (Join-Path $stage "Parhelion.vst3") -Filter *.vst3 -File | ForEach-Object { $_.FullName })
     foreach ($b in $binaries) {
         $deps = & $dumpbin.FullName /DEPENDENTS $b | Select-String -Pattern "(?i)((vcruntime|msvcp)\d+.*|libmmd|svml_disp\w*|libirngmd|libiomp\w*)\.dll"

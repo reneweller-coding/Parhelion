@@ -483,6 +483,8 @@ parh_render composes and renders without a window, the same samples the plugin p
     parh_render --list                  every parameter with its value
     parh_render --bench --quality quest how fast, at the headset's quality
 
+Parhelion Sets, a small program beside the instrument (in the Start menu, or ParhelionSets.exe in its folder), does the same with a window: the five styles and the sets you saved (.parhset files in Documents/Parhelion and its folders), each with the length of its rendering. Choose one or several (Ctrl, Shift), what to render -- a track or a DJ set of half an hour to three hours (its arc) --, the format (WAV or FLAC at 24 bits, Ogg Vorbis or MP3 at 320 kbit/s) and the folder (Documents/Parhelion/Renders at first), and Render: one after another, faster than real time, with the progress, the speed and the time left. New dice composes everything anew; the same dice give the same tracks. A saved set plays as it was saved.
+
 Tools/calibrate.py renders every style and measures its tracks exactly as the references were measured; the
 evaluation (Tools/eval_report.py) adds the section boundaries it hears against the planned ones, the key it hears
 against the planned one, and the rise into each drop.

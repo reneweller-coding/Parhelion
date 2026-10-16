@@ -23,6 +23,16 @@ aus einer im Dokument zitierten Quelle, **[A]** daraus abgeleitet, **[I]** infer
 gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 
+## Parhelion Sets, die Render-App der Familie (16.10.2026, 1.4.0)
+
+Nutzer (in Empyrean, nach Empyrean Journeys): „Können wir solche ein Zusatz-Progrämmchen auch für die anderen
+Synthesizer bauen? (Dort die Parameter eben angepasst, wenn diese keine Journeys haben).“
+- **Tools/renderapp:** der Baukasten der Familie (RenderKit, RenderWindow, Mp3Writer; kanonisch in Empyrean, unverändert
+  kopiert) und Parhelions `Source.cpp` (nach Totalitys): die fünf Stile und die gespeicherten `.parhset` aus
+  Documents/Parhelion (rekursiv; exakt wiedergegeben). Wahl „What“ (ein Track, DJ-Set 30 min .. 3 h) und „Arc“
+  (set.dramaturgy). Länge je Zeile = komponiert ohne Leveler + 2 s wie parh_render; die Aufnahme komponiert mit dem
+  Leveler je Track (composeSet-Callback) bzw. levelScore, prepare 48 kHz/512 -- dieselben Samples wie parh_render.
+
 ## Die Wege durchs Panel (15.10.2026, aus Empyrean, Frame.h)
 
 Nutzer: „Bitte baue alles ein, die Tests erst am Ende.“ -- die GUI-Verbesserungen und ASIO in allen fünf Instrumenten:

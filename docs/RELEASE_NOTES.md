@@ -1,5 +1,16 @@
 # Parhelion release notes
 
+## 1.4.0 (16.10.2026, not released)
+
+**Parhelion Sets.** A small program beside the instrument (Start menu, ParhelionSets.exe) that renders into files: the
+five styles, each composed into a track or a DJ set (30 minutes to three hours, with its arc) with the dice of the
+moment, and the sets you saved in the instrument (.parhset, played back exactly: seed, rerolls, knobs). Every row shows
+the length of its rendering -- composed before a sample is rendered, so the length is exact --; several chosen are
+rendered one after another, with progress, speed and time left. WAV or FLAC at 24 bits, Ogg Vorbis or MP3 at 320
+kbit/s (MP3 through Windows' own encoder). The same samples as parh_render: composed, levelled, rendered offline. The
+family's render app (Tools/renderapp, the same in all six instruments); `--list`, `--render`, and a self-test of every
+format and the queue (ctest `renderapp`).
+
 ## 1.3.0 (15.10.2026): the family plays together
 
 **The family jam** (Settings > Family jam: Off, Lead or Follow; in the plugin and in the standalone). The five

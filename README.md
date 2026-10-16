@@ -196,6 +196,11 @@ python Tools/eval_report.py --plan track.json --wav track.wav --out docs/eval/re
 python Tools/calibrate.py --seeds 1,2,3 --jobs 8
 ```
 
+**Parhelion Sets** (`ParhelionSets.exe`, in the Start menu) renders with a small window of its own: the five styles and
+the sets you saved (`.parhset` in Documents/Parhelion), each listed with the length of its rendering, as a track or a
+DJ set of half an hour to three hours, written as WAV or FLAC (24 bit), Ogg Vorbis or MP3 (320 kbit/s), faster than real
+time; `ParhelionSets --render Acid --what "DJ set, 1 hour" --format flac` without the window.
+
 ```
 build/Tools/pianoprobe/Release/parh_pianoprobe --info
 build/Tools/pianoprobe/Release/parh_pianoprobe --measure
