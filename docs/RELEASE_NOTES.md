@@ -7,7 +7,8 @@ five styles, each composed into a track or a DJ set (30 minutes to three hours, 
 moment, and the sets you saved in the instrument (.parhset, played back exactly: seed, rerolls, knobs). Every row shows
 the length of its rendering -- composed before a sample is rendered, so the length is exact --; several chosen are
 rendered one after another, with progress, speed and time left. WAV or FLAC at 24 bits, Ogg Vorbis or MP3 at 320
-kbit/s (MP3 through Windows' own encoder). The same samples as parh_render: composed, levelled, rendered offline. The
+kbit/s (MP3 through Windows' own encoder). Composed and levelled as the instrument does it (your ratings when Use
+ratings is on; a set's teases levelled with their tracks' corrections), rendered offline as parh_render does. The
 family's render app (Tools/renderapp, the same in all six instruments); `--list`, `--render`, and a self-test of every
 format and the queue (ctest `renderapp`).
 

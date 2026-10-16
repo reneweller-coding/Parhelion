@@ -4,9 +4,10 @@
  *        set with the dice of the moment, and the sets the player saved (.parhset files in Documents/Parhelion, its
  *        subfolders too), each played back exactly: its seed, its rerolls, its knobs.
  *
- * A rendering is what parh_render writes for the same seed and knobs: composed (composeTrack, or composeSet for a set,
- * every track levelled before it is placed), levelled, the engine prepared at 48 kHz with blocks of 512 and loaded, two
- * seconds after the end for the rooms. The lengths in the table are the composed ones (composing without the levelling
+ * A rendering is what the plugin plays and parh_render writes for the same seed and knobs: composed (composeTrack, or
+ * composeSet for a set, the player's ratings weighing it when compose.use_ratings is on), levelled as the plugin levels
+ * (levelScore, or levelSet, which gives a set's teases their source's corrections -- parh_render's per-track hook
+ * does not), the engine prepared at 48 kHz with blocks of 512 and loaded, two seconds after the end for the rooms. The lengths in the table are the composed ones (composing without the levelling
  * takes a fraction of a second); the levelling renders the loudest part of every track first.
  * @note After Totality's Tools/renderapp/Source.cpp (16.10.2026), as parh_render follows tot_render.
  * @author Rene Weller
@@ -15,6 +16,7 @@
 #include "parh/Engine.h"
 #include "parh/Leveler.h"
 #include "parh/Params.h"
+#include "parh/Preferences.h"
 #include "parh/SetFile.h"
 #include "parh/compose/Composer.h"
 #include "parh/compose/Set.h"
@@ -49,6 +51,23 @@ struct Row
     int   m_style = -1;   ///< the style (StyleE), -1 for a saved set
     Saved m_saved;        ///< the saved set
 };
+
+/**
+ * @brief The player's ratings' weights when the knobs ask for them (compose.use_ratings), as the plugin composes with
+ *        them: read from Documents/Parhelion/ratings.tsv.
+ * @param[in]  p    the knobs
+ * @param[out] use  receives whether they are asked for
+ * @return the weights
+ */
+parh::Preferences preferencesOf( const parh::ParamStore &p, bool &use )
+{
+    use = p.getBool( p.id( parh::ModuleE::COMPOSE, 0, parh::compose::USE_RATINGS ) );
+    if ( !use ) return {};
+    const juce::File f = juce::File::getSpecialLocation( juce::File::userDocumentsDirectory )
+                             .getChildFile( "Parhelion" )
+                             .getChildFile( "ratings.tsv" );
+    return parh::preferencesFrom( parh::loadRatings( f.getFullPathName().toStdString() ) );
+}
 
 /** @brief A score composed: a track or a set, its length, and what plays when. */
 struct Composed
@@ -90,7 +109,10 @@ bool knobsOf( parh::ParamStore &p, const Row &row, const renderkit::Request &r, 
         why = error;
         return false;
     }
-    if ( sf.m_set > 0.0 ) p.set( p.id( ModuleE::SET, 0, set::MINUTES ), static_cast<float>( sf.m_set ) );
+    // as the plugin's loadSet: a track's length when it names one, the set's length always (0: a track)
+    if ( sf.m_minutes > 0.0 )
+        p.set( p.id( ModuleE::COMPOSE, 0, compose::MINUTES ), static_cast<float>( sf.m_minutes ) );
+    p.set( p.id( ModuleE::SET, 0, set::MINUTES ), static_cast<float>( sf.m_set ) );
     cur = sf.m_curation;
     out = sf.m_seed;
     return true;
@@ -108,24 +130,27 @@ juce::String trackText( const parh::TrackInfo &info )
 }
 
 /**
- * @brief Composes what the knobs ask for, as parh_render does: a set when set.minutes is above 0, else a track.
+ * @brief Composes what the knobs ask for, as the plugin does: a set when set.minutes is above 0, else a track.
  * @param[in] p      the knobs
  * @param[in] seed   the seed
  * @param[in] cur    the rerolls
- * @param[in] level  every track levelled before it is placed (the rendering); off for the length alone
+ * @param[in] level  levelled as the plugin levels (the rendering); off for the length alone
  * @return the score, its length and its marks
  */
 Composed compose( const parh::ParamStore &p, std::uint64_t seed, const parh::Curation &cur, bool level )
 {
     using namespace parh;
-    Composed     out;
-    const double minutes = p.get( p.id( ModuleE::SET, 0, set::MINUTES ) );
+    Composed          out;
+    bool              use = false;
+    const Preferences prefs = preferencesOf( p, use );
+    const double      minutes = p.get( p.id( ModuleE::SET, 0, set::MINUTES ) );
     if ( minutes > 0.0 )
     {
+        // As the plugin composes a set and then levels it (levelSet): every track, and the teases on deck C with their
+        // source's corrections -- which composeSet's per-track hook (parh_render's way) never gives them.
         SetInfo si;
-        auto    leveller = [&p]( Score &s ) { levelScore( s, p ); };
-        out.m_set = composeSet( p, seed, minutes, &cur, &si, nullptr,
-                                level ? std::function<void( Score & )>( leveller ) : std::function<void( Score & )>() );
+        out.m_set = composeSet( p, seed, minutes, &cur, &si, use ? &prefs : nullptr, {} );
+        if ( level ) levelSet( out.m_set, p );
         out.m_isSet = true;
         const TempoMap &tm = out.m_set.m_decks[0].m_tempo;
         out.m_seconds = tm.secondsAt( out.m_set.m_lengthBeats ) + Tail;
@@ -137,9 +162,11 @@ Composed compose( const parh::ParamStore &p, std::uint64_t seed, const parh::Cur
     }
     else
     {
-        TrackInfo info;
-        Score    &score = out.m_set.m_decks[0];
-        score = composeTrack( p, seed, TrackRequest{}, &cur, std::string(), &info );
+        TrackInfo    info;
+        Score       &score = out.m_set.m_decks[0];
+        TrackRequest req;
+        req.m_prefs = use ? &prefs : nullptr;
+        score = composeTrack( p, seed, req, &cur, std::string(), &info );
         if ( level ) levelScore( score, p );
         out.m_seconds = score.m_tempo.secondsAt( score.m_lengthBeats ) + Tail;
         out.m_marks.push_back( { 0.0, trackText( info ) } );
@@ -278,7 +305,7 @@ public:
             row.m_saved.m_file = f;
             row.m_saved.m_style = StyleNames[std::clamp( p.getInt( p.id( ModuleE::COMPOSE, 0, compose::STYLE ) ), 0,
                                                          static_cast<int>( StyleE::COUNT ) - 1 )];
-            row.m_saved.m_set = sf.m_set > 0.0 ? sf.m_set : p.get( p.id( ModuleE::SET, 0, set::MINUTES ) );
+            row.m_saved.m_set = sf.m_set;
             row.m_saved.m_seed = sf.m_seed;
             renderkit::Item item;
             item.m_name = f.getFileNameWithoutExtension();
