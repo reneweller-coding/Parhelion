@@ -35,6 +35,7 @@
 #include "parh/synth/Strings.h"
 #include "parh/synth/Synth.h"
 #include "parh/synth/Modulation.h"
+#include "parh/FactorySets.h"
 #include "parh/Presets.h"
 #include <atomic>
 #include <thread>
@@ -3029,6 +3030,84 @@ void testKeySplit()
            fmt( "%.3g after, %.3g held", named.second, named.first ) );
 }
 
+/** The factory's DJ sets (FactorySets.h, 17.10.2026): 256, every name unique, every one a set that reads, with an arc
+ *  of the composer's, in the style it keeps or across the styles (and then wandering); every eighth composed -- about
+ *  as long as it says, and most of those across the styles move through two or more. */
+void testFactorySets()
+{
+    section( "the factory's DJ sets" );
+    std::set<std::string> names;
+    int                   unread = 0, unknown = 0;
+    std::string           firstError;
+    for ( int i = 0; i < numFactorySets(); ++i )
+    {
+        const FactorySet &f = factorySet( i );
+        names.insert( f.m_name );
+        auto        p = std::make_unique<ParamStore>();
+        SetFile     sf;
+        std::string error;
+        if ( !loadSetText( f.m_text, sf, *p, &error ) || sf.m_set <= 0.0 )
+        {
+            if ( unread++ == 0 ) firstError = std::string( f.m_name ) + ": " + error;
+            continue;
+        }
+        const bool across = std::string( f.m_section ) == "Across the styles";
+        const bool wander = p->getInt( p->id( ModuleE::SET, 0, set::JOURNEY ) ) == 1;
+        bool       style = across, arc = false;
+        for ( int k = 0; k < static_cast<int>( StyleE::COUNT ); ++k )
+            style = style || ( std::string( StyleNames[k] ) == f.m_section &&
+                               p->getInt( p->id( ModuleE::COMPOSE, 0, compose::STYLE ) ) == k );
+        for ( int k = 0; k < 5; ++k )
+            arc = arc || ( std::string( DramaturgyNames[k] ) == f.m_group &&
+                           p->getInt( p->id( ModuleE::SET, 0, set::DRAMATURGY ) ) == k );
+        if ( !style || !arc || across != wander ) ++unknown;
+    }
+    check( numFactorySets() == 256 && static_cast<int>( names.size() ) == numFactorySets() && unread == 0 &&
+               unknown == 0,
+           "256 factory sets, every name its own, every one a set of a style and an arc",
+           fmt( "%d sets, %zu names, %d unread, %d with a style or arc not their own %s", numFactorySets(),
+                names.size(), unread, unknown, firstError.c_str() ) );
+    int         composed = 0, offLength = 0, wandering = 0, moved = 0;
+    std::string worst;
+    double      worstRatio = 1.0;
+    for ( int i = 0; i < numFactorySets(); i += 8 )
+    {
+        const FactorySet &f = factorySet( i );
+        auto              p = std::make_unique<ParamStore>();
+        SetFile           sf;
+        if ( !loadSetText( f.m_text, sf, *p ) ) continue;
+        SetInfo        info;
+        const SetScore score = composeSet( *p, sf.m_seed, sf.m_set, &sf.m_curation, &info );
+        if ( info.m_tracks.empty() ) continue;
+        ++composed;
+        double                bpm = 0.0;
+        std::set<std::string> styles;
+        for ( const SetTrack &t : info.m_tracks )
+        {
+            bpm += t.m_info.m_bpm;
+            styles.insert( t.m_info.m_style );
+        }
+        bpm /= static_cast<double>( info.m_tracks.size() );
+        const double minutes = score.m_lengthBeats / bpm;
+        const double ratio = minutes / sf.m_set;
+        if ( ratio < 0.85 || ratio > 1.3 ) ++offLength;
+        if ( std::fabs( ratio - 1.0 ) > std::fabs( worstRatio - 1.0 ) )
+        {
+            worstRatio = ratio;
+            worst = fmt( "%s: %.0f of %.0f min", f.m_name, minutes, sf.m_set );
+        }
+        if ( p->getInt( p->id( ModuleE::SET, 0, set::JOURNEY ) ) == 1 )
+        {
+            ++wandering;
+            moved += styles.size() >= 2 ? 1 : 0;
+        }
+    }
+    check( composed == 32 && offLength == 0 && moved * 3 >= wandering * 2,
+           "every eighth factory set composed: as long as it says, those across the styles moving through them",
+           fmt( "%d composed, %d off their length (the farthest %s), %d of %d across the styles moved", composed,
+                offLength, worst.c_str(), moved, wandering ) );
+}
+
 /** @brief Every section, in the order they run. */
 const TestSection Sections[] = {
     { "testTempoMap", testTempoMap },
@@ -3067,6 +3146,7 @@ const TestSection Sections[] = {
     { "testNoteTap", testNoteTap },
     { "testKeySplit", testKeySplit },
     { "testJam", testJam },
+    { "testFactorySets", testFactorySets },
 };
 
 }   // namespace

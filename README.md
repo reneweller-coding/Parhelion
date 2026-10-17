@@ -90,6 +90,9 @@ track's own score cues (the bars, the sections, the drops). `Tools/demo/make_dem
 
 ## Playing and export
 
+* **256 sets to begin with:** the Sets button opens the factory's DJ sets -- one style all night, or across the styles
+  as the arc leads, from a warm-up of an hour to a journey of twelve -- and your own; the one taken is composed and
+  plays.
 * **In a DAW** Parhelion follows the host's transport and tempo. The **Perform** page: mutes, a master filter, an echo
   throw, the mod wheel, and "Breakdown now" and "Drop now", which rewrite the playing track from its next 8-bar line.
 * **Play it yourself:** a MIDI keyboard plays a voice -- the kit, the bass, the 303, the six polyphonic voices, the
@@ -196,8 +199,9 @@ python Tools/eval_report.py --plan track.json --wav track.wav --out docs/eval/re
 python Tools/calibrate.py --seeds 1,2,3 --jobs 8
 ```
 
-**Parhelion Sets** (`ParhelionSets.exe`, in the Start menu) renders with a small window of its own: the five styles and
-the sets you saved (`.parhset` in Documents/Parhelion), each listed with the length of its rendering, as a track or a
+**Parhelion Sets** (`ParhelionSets.exe`, in the Start menu) renders with a small window of its own: the five styles,
+the factory's 256 DJ sets and the sets you saved (`.parhset` in Documents/Parhelion), each listed with the length of its
+rendering, as a track or a
 DJ set of half an hour to three hours, written as WAV or FLAC (24 bit), Ogg Vorbis or MP3 (320 kbit/s), faster than real
 time; `ParhelionSets --render Acid --what "DJ set, 1 hour" --format flac` without the window.
 

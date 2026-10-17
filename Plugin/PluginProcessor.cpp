@@ -7,6 +7,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "parh/Export.h"
+#include "parh/FactorySets.h"
 #include "parh/Leveler.h"
 #include "parh/Midi.h"
 #include "parh/Presets.h"
@@ -1205,10 +1206,23 @@ bool ParhelionProcessor::saveSet( const juce::File &file )
 
 bool ParhelionProcessor::loadSet( const juce::File &file )
 {
+    if ( !file.existsAsFile() ) return false;
+    return loadSetText( file.getFileName(), file.loadFileAsString().toStdString() );
+}
+
+bool ParhelionProcessor::loadFactorySet( int index )
+{
+    if ( index < 0 || index >= numFactorySets() ) return false;
+    const FactorySet &f = factorySet( index );
+    return loadSetText( f.m_name, f.m_text );
+}
+
+bool ParhelionProcessor::loadSetText( const juce::String &name, const std::string &text )
+{
     SetFile     sf;
     std::string err;
-    beginStep( "load " + file.getFileName() );
-    if ( !parh::loadSet( file.getFullPathName().toRawUTF8(), sf, store(), &err ) )
+    beginStep( "load " + name );
+    if ( !parh::loadSetText( text, sf, store(), &err ) )
     {
         endStep();
         return false;

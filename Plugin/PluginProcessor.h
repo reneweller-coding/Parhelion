@@ -393,6 +393,19 @@ public:
      * @return false if it cannot be read
      */
     bool loadSet( const juce::File &file );
+    /**
+     * @brief Loads one of the factory's DJ sets (parh/FactorySets.h) and composes it.
+     * @param[in] index  the set
+     * @return false when there is none of that index
+     */
+    bool loadFactorySet( int index );
+    /**
+     * @brief Reads a set from its text (a file's, a factory set's) and composes it.
+     * @param[in] name  what the undo step calls it
+     * @param[in] text  the set's text
+     * @return false when the text is no set
+     */
+    bool loadSetText( const juce::String &name, const std::string &text );
     /** @brief What an export writes beside the WAV and its MIDI and cues. */
     enum ExportExtraE
     {

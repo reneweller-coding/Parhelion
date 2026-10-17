@@ -40,6 +40,7 @@ add_library(ParhelionCore STATIC
     src/compose/Memo.cpp
     src/compose/MemoFilter.cpp
     src/SetFile.cpp
+    src/FactorySets.cpp
     src/Deck.cpp
     src/Export.cpp
     src/PresetBank.cpp

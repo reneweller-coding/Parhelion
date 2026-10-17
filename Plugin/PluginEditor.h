@@ -522,6 +522,12 @@ public:
      */
     void browsePresets( parh::ModuleE m, int instance, std::function<void( int )> chosen );
     /**
+     * @brief Opens the preset browser on the DJ sets: the factory's 256 (parh/FactorySets.h, by the style they keep or
+     *        across the styles, and their arc) and the player's own (.parhset in Documents/Parhelion). The one taken is
+     *        composed.
+     */
+    void browseSets();
+    /**
      * @brief Shows a line in the info line (an Alt-drag's depth).
      * @param[in] text  the line
      */
@@ -613,6 +619,7 @@ private:
     juce::Label       m_lengthLabel;                                   ///< the length's name
     bool              m_lengthOfMix = false;          ///< the slider shows set.minutes (else compose.minutes)
     bool              m_syncing = false;              ///< the slider is set from its parameter, not by a hand
+    juce::TextButton  m_sets{ "Sets" };               ///< the DJ sets: the factory's and the player's own
     juce::TextButton  m_compose{ "Compose track" };   ///< composes a track or a mix
     frame::IconButton m_seed{ frame::IconButton::IconE::DICE, "New seed" };   ///< a new seed, then composes: a die
     frame::IconButton m_play{ frame::IconButton::IconE::PLAY,

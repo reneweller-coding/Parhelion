@@ -2,6 +2,14 @@
 
 ## 1.4.0 (16.10.2026, not released)
 
+**256 DJ sets to begin with.** The Sets button in the header opens the browser on the factory's DJ sets and on your own
+`.parhset` files; the one taken is composed and plays. 200 keep one of the five styles all night -- every style through
+the five arcs, eight sets an arc, now and then leaning towards another style --, 56 go across the styles as their arc
+leads (a warm-up from Deep to Progressive, a sunrise from Progressive to Uplifting, a journey through all five, one of
+twelve hours). Each is a set as you would save it: a seed and the set's knobs (its arc and length, a track's time, the
+blend, the humanize). Parhelion Sets lists them too, and so Heliacal. In the browser a group under a section now shows
+that section's alone.
+
 **Parhelion Sets.** A small program beside the instrument (Start menu, ParhelionSets.exe) that renders into files: the
 five styles, each composed into a track or a DJ set (30 minutes to three hours, with its arc) with the dice of the
 moment, and the sets you saved in the instrument (.parhset, played back exactly: seed, rerolls, knobs). Every row shows
