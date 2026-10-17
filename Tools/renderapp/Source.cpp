@@ -134,14 +134,64 @@ juce::String trackText( const parh::TrackInfo &info )
 }
 
 /**
+ * @brief A track's sections on the time line, as Kaleidoscope's cues know them (renderkit::CueSheet): the intro, the
+ *        bass's entry a groove, every breakdown and break a break, every drop a drop -- the main drop the most -- with a
+ *        build eight bars before it, the outro; only those between @p from and @p to (a set's track before its swap
+ *        still belongs to the one before).
+ * @param[in,out] sheet     the time line
+ * @param[in]     t         what the track's composer told
+ * @param[in]     at        the track's first beat in the score
+ * @param[in]     tm        the score's tempo map
+ * @param[in]     energy    the set's energy where the track begins (0 .. 1)
+ * @param[in]     from      s: the first moment that is the track's
+ * @param[in]     to        s: the moment it hands over
+ * @param[in]     chapters  each section a chapter as well (a track alone)
+ */
+void trackTimeline( renderkit::CueSheet &sheet, const parh::TrackInfo &t, double at, const parh::TempoMap &tm,
+                    double energy, double from, double to, bool chapters )
+{
+    const auto sec = [&]( int bar ) { return tm.secondsAt( at + 4.0 * bar ); };
+    const auto put = [&]( double when, const char *kind, double e, bool drop, const juce::String &title )
+    {
+        if ( when < from || when >= to ) return;
+        sheet.section( when, kind, e, drop );
+        if ( chapters && title.isNotEmpty() ) sheet.chapter( when, title );
+    };
+    put( sec( 0 ), "Intro", 0.3, false, "Intro" );
+    if ( t.m_bassBar > 0 ) put( sec( t.m_bassBar ), "Groove", 0.4 + 0.3 * energy, false, "Bass in" );
+    for ( const auto &b : t.m_breakdowns )
+        put( sec( b.first ), "Break", b.second - b.first >= 16 ? 0.3 : 0.45, false,
+             b.second - b.first >= 16 ? "Breakdown" : "Break" );
+    for ( int d : t.m_drops )
+    {
+        const bool main = d == t.m_mainDropBar;
+        put( sec( d - 8 ), "Build", 0.6, false, {} );
+        put( sec( d ), "Drop", main ? 1.0 : 0.6 + 0.3 * energy, true, main ? "Main drop" : "Drop" );
+    }
+    if ( t.m_outroBar > 0 && t.m_outroBar < t.m_bars ) put( sec( t.m_outroBar ), "Outro", 0.3, false, "Outro" );
+}
+
+/**
+ * @brief A key as the cues name it.
+ * @param[in] t  what the track's composer told
+ * @return "A Aeolian"
+ */
+juce::String keyName( const parh::TrackInfo &t )
+{
+    return juce::String( parh::KeyNames[t.m_key] ) + " " + parh::ScaleNames[t.m_scale];
+}
+
+/**
  * @brief Composes what the knobs ask for, as the plugin does: a set when set.minutes is above 0, else a track.
  * @param[in] p      the knobs
  * @param[in] seed   the seed
  * @param[in] cur    the rerolls
  * @param[in] level  levelled as the plugin levels (the rendering); off for the length alone
+ * @param[out] sheet  receives the time line -- a set's tracks as chapters, a track's sections -- (null: not asked)
  * @return the score, its length and its marks
  */
-Composed compose( const parh::ParamStore &p, std::uint64_t seed, const parh::Curation &cur, bool level )
+Composed compose( const parh::ParamStore &p, std::uint64_t seed, const parh::Curation &cur, bool level,
+                  renderkit::CueSheet *sheet = nullptr )
 {
     using namespace parh;
     Composed          out;
@@ -158,6 +208,19 @@ Composed compose( const parh::ParamStore &p, std::uint64_t seed, const parh::Cur
         out.m_isSet = true;
         const TempoMap &tm = out.m_set.m_decks[0].m_tempo;
         out.m_seconds = tm.secondsAt( out.m_set.m_lengthBeats ) + Tail;
+        for ( size_t i = 0; sheet != nullptr && i < si.m_tracks.size(); ++i )
+        {   // each track from its swap (the first from the start) to the next one's: its key, its sections, a chapter
+            const SetTrack &t = si.m_tracks[i];
+            const double    from = i == 0 ? 0.0 : tm.secondsAt( t.m_swapIn );
+            const double    to = i + 1 < si.m_tracks.size() ? tm.secondsAt( si.m_tracks[i + 1].m_swapIn ) : 1.0e12;
+            sheet->key( from, keyName( t.m_info ) );
+            sheet->chapter( from, "Track " + juce::String( static_cast<int>( i + 1 ) ) + ": " +
+                                      juce::String( t.m_info.m_style ) + ", " +
+                                      juce::String( std::lround( t.m_info.m_bpm ) ) + " BPM, " + keyName( t.m_info ) );
+            if ( i > 0 ) sheet->section( from, "Groove", 0.4 + 0.3 * t.m_energy );
+            trackTimeline( *sheet, t.m_info, t.m_start, tm, t.m_energy, from, to, false );
+        }
+        if ( sheet != nullptr ) sheet->grid( [&tm]( double b ) { return tm.secondsAt( b ); }, out.m_set.m_lengthBeats );
         for ( size_t i = 0; i < si.m_tracks.size(); ++i )
             out.m_marks.push_back( { tm.secondsAt( si.m_tracks[i].m_start ),
                                      "track " + juce::String( static_cast<int>( i + 1 ) ) + " of " +
@@ -173,6 +236,13 @@ Composed compose( const parh::ParamStore &p, std::uint64_t seed, const parh::Cur
         score = composeTrack( p, seed, req, &cur, std::string(), &info );
         if ( level ) levelScore( score, p );
         out.m_seconds = score.m_tempo.secondsAt( score.m_lengthBeats ) + Tail;
+        if ( sheet != nullptr )
+        {   // a track alone: its sections as chapters
+            sheet->key( 0.0, keyName( info ) );
+            trackTimeline( *sheet, info, 0.0, score.m_tempo, 0.7, 0.0, 1.0e12, true );
+            const TempoMap &tm = score.m_tempo;
+            sheet->grid( [&tm]( double b ) { return tm.secondsAt( b ); }, score.m_lengthBeats );
+        }
         out.m_marks.push_back( { 0.0, trackText( info ) } );
     }
     return out;
@@ -201,7 +271,7 @@ public:
             m_engine.reset();
             return;
         }
-        Composed c = compose( p, s, cur, true );
+        Composed c = compose( p, s, cur, true, &m_sheet );
         m_engine->prepare( Rate, EngineBlock );
         if ( c.m_isSet )
             m_engine->loadSet( c.m_set );
@@ -232,8 +302,10 @@ public:
             if ( at <= m_time ) s = what;
         return s;
     }
+    void timeline( renderkit::CueSheet &sheet ) const override { sheet = m_sheet; }
 
 private:
+    renderkit::CueSheet                          m_sheet;           ///< its time line, as composed
     std::unique_ptr<parh::Engine>                m_engine;          ///< the instrument offline
     double                                       m_seconds = 0.0;   ///< the length
     std::vector<std::pair<double, juce::String>> m_marks;           ///< s -> what begins there
