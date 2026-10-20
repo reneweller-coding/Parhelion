@@ -284,14 +284,15 @@ const ParamDesc MixParams[mix::COUNT] = {
 
 /**
  * The track bus and the master (PLAN 7.4, Dok. 7): a gentle glue (about 0.5 dB of gain reduction), a soft clipper at
- * four times the rate, a true-peak limiter at -1 dBTP, the side mono under 120 Hz, no tilt until measured.
+ * four times the rate, a true-peak limiter at -2 dBTP (AAC and Opus, 20.10.2026), the side mono under 120 Hz, no tilt
+ * until measured.
  */
 const ParamDesc MasterParams[master::COUNT] = {
     { "level", "Level", "dB", -24.0f, 12.0f, 0.0f, CurveE::LINEAR },
     { "threshold", "Glue Threshold", "dB", -40.0f, 0.0f, -12.0f, CurveE::LINEAR },
     { "ratio", "Glue Ratio", "", 1.0f, 10.0f, 1.5f, CurveE::LOG },
     { "clip", "Clip Drive", "dB", 0.0f, 9.0f, 2.0f, CurveE::LINEAR },
-    { "ceiling", "Ceiling", "dBTP", -6.0f, 0.0f, -1.0f, CurveE::LINEAR },
+    { "ceiling", "Ceiling", "dBTP", -6.0f, 0.0f, -2.0f, CurveE::LINEAR },   // -2: a loud master survives AAC and Opus
     { "mono_below", "Mono Below", "Hz", 40.0f, 250.0f, 120.0f, CurveE::LOG },
     { "tilt", "Tilt", "dB", -12.0f, 12.0f, 1.5f, CurveE::LINEAR },
 };
