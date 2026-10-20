@@ -84,6 +84,12 @@ void Engine::prepare( double sampleRate, int maxBlock )
     m_djEcho.prepare( sampleRate, 3.0, 0x444A4543484Full );   // "DJECHO"
     m_djHall.prepare( sampleRate );
     m_resonance.prepare( sampleRate );
+    // The image's ranges (20.10.2026): the trance references' width per band, first and third quartile -- side
+    // over mid in dB, 27 records (Family/tools/mix_audit.py --image-ranges trance).
+    static const float ImageLo[ImageMatch::Bands] = { -22.8f, -13.1f, -8.8f, -9.6f, -15.3f };
+    static const float ImageHi[ImageMatch::Bands] = { -14.9f, -7.3f, -5.2f, -4.3f, -8.3f };
+    m_image.prepare( sampleRate );
+    m_image.setRanges( ImageLo, ImageHi );
     m_limiter.prepare( sampleRate );
     for ( BandLimit &b : m_cutLp ) b.prepare( sampleRate, 16000.0f );
     for ( int c = 0; c < 2; ++c )
@@ -205,6 +211,7 @@ void Engine::seek( double beat )
     m_djEcho.reset();
     m_djHall.reset();
     m_resonance.reset();
+    m_image.reset();
     m_limiter.reset();
     for ( Oversampler4 &o : m_clipOs ) o.reset();
     for ( BandLimit &b : m_cutLp ) b.reset();
@@ -332,6 +339,7 @@ void Engine::updateCell()
     m_clipDrive = dbToGain( m_params.get( m_params.id( ModuleE::MASTER, 0, master::CLIP ) ) );
     m_limiter.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::CEILING ) ), 60.0f );
     m_resonance.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::RESONANCE ) ) );
+    m_image.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::IMAGE ) ) );
     m_cut = false;   // (Totality's vinyl cut profile is not Parhelion's)
     const float monoKnob = m_params.get( m_params.id( ModuleE::MASTER, 0, master::MONO_BELOW ) );
     const float mono = m_cut ? std::max( monoKnob, 150.0f ) : monoKnob;
@@ -519,6 +527,7 @@ void Engine::mix( float *L, float *R, int n )
         }
     }
     m_resonance.process( L, R, n );   // the mix's own resonances, before the clipper meets them
+    m_image.process( L, R, n );       // the width per band (fx/Image.h)
     PARH_PROF_END( MASTER_TONE );
     PARH_PROF_BEGIN( Clipper );
     const float gd = m_clipDrive, t = ClipCeiling;

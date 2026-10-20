@@ -9,6 +9,7 @@ add_library(ParhelionCore STATIC
     src/Leveler.cpp
     src/fx/Cloud.cpp
     src/fx/Dynamics.cpp
+    src/fx/Image.cpp
     src/fx/Resonance.cpp
     src/fx/Reverb.cpp
     src/fx/Plate.cpp

@@ -27,6 +27,7 @@
 #include "parh/Params.h"
 #include "parh/Score.h"
 #include "parh/fx/Dynamics.h"
+#include "parh/fx/Image.h"
 #include "parh/fx/Resonance.h"
 #include "parh/fx/Reverb.h"
 #include "parh/fx/TapeEcho.h"
@@ -447,6 +448,7 @@ private:
     float           m_cutRel = 0.001f;     ///< the envelope's release coefficient (50 ms)
     Oversampler4    m_clipOs[2];           ///< the clipper's fourfold oversampling, per channel
     ResonanceSuppressor m_resonance;       ///< the resonance suppressor (master.resonance)
+    ImageMatch          m_image;           ///< the width per band (master.image)
     TruePeakLimiter m_limiter;             ///< the true-peak limiter (master.ceiling)
 
     std::vector<float> m_deckL[Decks];      ///< per deck: its block, left

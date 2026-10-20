@@ -261,6 +261,8 @@ enum : int
     TILT,
     // 20.10.2026: the resonance suppressor (fx/Resonance.h), before the clipper.
     RESONANCE,
+    // 20.10.2026: the image (fx/Image.h): the width per band into the trance references' range, the mono guard.
+    IMAGE,
     COUNT
 };
 }
