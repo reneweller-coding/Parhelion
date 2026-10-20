@@ -295,6 +295,7 @@ const ParamDesc MasterParams[master::COUNT] = {
     { "ceiling", "Ceiling", "dBTP", -6.0f, 0.0f, -2.0f, CurveE::LINEAR },   // -2: a loud master survives AAC and Opus
     { "mono_below", "Mono Below", "Hz", 40.0f, 250.0f, 120.0f, CurveE::LOG },
     { "tilt", "Tilt", "dB", -12.0f, 12.0f, 1.5f, CurveE::LINEAR },
+    { "resonance", "Resonance", "", 0.0f, 1.0f, 0.4f, CurveE::LINEAR },   // moderate: a dense mix's own peaks
 };
 
 /**

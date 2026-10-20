@@ -822,6 +822,7 @@ Score composeTrack( const ParamStore &p, uint64_t seed, const TrackRequest &req,
     lm.m_targetLufs = prof.m_targetLufs;
     lm.m_gapLu = prof.m_gapLu;
     lm.m_windowDb = 6.0f * prof.m_kickSoft;
+    lm.m_styleMix = prof.m_mix;   // the tone's ranges (Leveler, 20.10.2026)
     sc.m_levels.push_back( lm );
     sc.sort();
 

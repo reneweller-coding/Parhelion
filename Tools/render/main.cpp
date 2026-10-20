@@ -473,6 +473,16 @@ int main( int argc, char **argv )
                                         ")"
                                   : "" );
                 std::printf( "%s\n", bal.c_str() );
+                static const char *const ToneNames[ToneBands] = { "20-60", "60-150", "150-400", "400-2k", "2k-5k",
+                                                                   "5k-16k" };
+                std::string tone = "tone (dB of the drop's power; trim):";
+                char        buf[48];
+                for ( size_t k = 0; k < static_cast<size_t>( ToneBands ); ++k )
+                {
+                    std::snprintf( buf, sizeof buf, " %s %.1f (%+.1f)", ToneNames[k], r.m_bands[k], r.m_tone[k] );
+                    tone += buf;
+                }
+                std::printf( "%s\n", tone.c_str() );
             }
         }
         t1 = std::chrono::steady_clock::now();

@@ -519,10 +519,12 @@ void ParhelionProcessor::run()
     {
         m_trims[d].clear();
         m_bal[d].clear();
+        m_tone[d].clear();
         for ( const LevelMark &m : p.m_set.m_decks[d].m_levels )
         {
             m_trims[d].push_back( m.m_trimDb );
             m_bal[d].push_back( m.m_balDb );
+            m_tone[d].push_back( m.m_toneDb );
         }
     }
     m_trimsFor = id;
@@ -532,6 +534,7 @@ void ParhelionProcessor::takeTrims()
 {
     std::vector<float>      trims[Decks];
     std::vector<BalanceDbT> bal[Decks];
+    std::vector<ToneDbT>    tone[Decks];
     {
         std::lock_guard<std::mutex> g( m_lock );
         if ( m_trimsFor == 0 || m_trimsFor > m_playingId ) return;   // (none, or for a score not yet loaded)
@@ -542,10 +545,13 @@ void ParhelionProcessor::takeTrims()
         {
             trims[d].swap( m_trims[d] );
             bal[d].swap( m_bal[d] );
+            tone[d].swap( m_tone[d] );
             for ( size_t i = 0; i < m_current.m_set.m_decks[d].m_levels.size() && i < trims[d].size(); ++i )
                 m_current.m_set.m_decks[d].m_levels[i].m_trimDb = trims[d][i];
             for ( size_t i = 0; i < m_current.m_set.m_decks[d].m_levels.size() && i < bal[d].size(); ++i )
                 m_current.m_set.m_decks[d].m_levels[i].m_balDb = bal[d][i];
+            for ( size_t i = 0; i < m_current.m_set.m_decks[d].m_levels.size() && i < tone[d].size(); ++i )
+                m_current.m_set.m_decks[d].m_levels[i].m_toneDb = tone[d][i];
         }
         m_levelled = true;
     }
@@ -555,6 +561,7 @@ void ParhelionProcessor::takeTrims()
     {
         if ( !trims[d].empty() ) m_engine.setLevelTrims( d, trims[d] );
         if ( !bal[d].empty() ) m_engine.setLevelBalance( d, bal[d] );
+        if ( !tone[d].empty() ) m_engine.setLevelTone( d, tone[d] );
     }
 }
 
@@ -582,13 +589,16 @@ void ParhelionProcessor::loadEngine( const Playing &p )
         {
             std::vector<float>      t;
             std::vector<BalanceDbT> b;
+            std::vector<ToneDbT>    tn;
             for ( const LevelMark &m : p.m_set.m_decks[d].m_levels )
             {
                 t.push_back( m.m_trimDb );
                 b.push_back( m.m_balDb );
+                tn.push_back( m.m_toneDb );
             }
             if ( !t.empty() ) m_engine.setLevelTrims( d, t );
             if ( !b.empty() ) m_engine.setLevelBalance( d, b );
+            if ( !tn.empty() ) m_engine.setLevelTone( d, tn );
         }
 }
 

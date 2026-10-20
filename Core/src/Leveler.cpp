@@ -9,6 +9,7 @@
 #include "parh/Dsp.h"
 #include "parh/Engine.h"
 #include "parh/Loudness.h"
+#include "parh/fx/Resonance.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -29,6 +30,173 @@ constexpr double BalWarm = 2.0;       ///< and before it
 constexpr float  BalDown = -8.0f;     ///< the largest correction of a part down, dB
 constexpr float  BalUp = 10.0f;       ///< the largest correction of a part up, dB
 constexpr float  BreakMost = 8.0f;    ///< the breakdown's correction, either way
+constexpr float  ToneMost = 3.0f;     ///< 20.10.2026: the largest tone trim either way, dB
+constexpr int    ToneFft = 8192;      ///< the tone reading's Welch segment (Tools/analyze_ref.py's)
+
+/** @brief 20.10.2026: the tone bands' edges in Hz -- the whole band (20-16000) first, then 20-60, 60-150, 150-400,
+ *         400-2000, 2000-5000, 5000-16000 (Tools/analyze_ref.py's shares of the drop's power). */
+constexpr double ToneEdges[ToneBands + 1][2] = { { 20, 16000 },  { 20, 60 },     { 60, 150 },  { 150, 400 },
+                                                 { 400, 2000 }, { 2000, 5000 }, { 5000, 16000 } };
+
+/**
+ * @brief 20.10.2026: plays @p seconds from @p beat (after BalWarm seconds before it) and adds the mid signal's power
+ *        spectrum to @p power as the references were read (Tools/analyze_ref.py: Welch, Hann, half overlap; 8192 points
+ *        there, here their equal in Hz at 48 kHz); @p kick receives the whole band's energy of this stretch alone.
+ * @param[in,out] e        the engine that plays the score
+ * @param[in]     s        the score
+ * @param[in]     beat     where the stretch begins
+ * @param[in]     seconds  how long it lasts
+ * @param[out]    power    receives this stretch's spectrum (ToneFft / 2 + 1 bins)
+ * @param[out]    kick     receives its energy in 20-16000 Hz
+ * @param[in]     stop     asked now and then; true stops the reading
+ * @return false when stopped
+ */
+bool readSpectrum( Engine &e, const Score &s, double beat, double seconds, std::vector<double> &power, double &kick,
+                   const std::function<bool()> &stop )
+{
+    const double at = s.m_tempo.secondsAt( beat );
+    e.seek( s.m_tempo.beatAt( std::max( 0.0, at - BalWarm ) ) );
+    std::vector<float> l( Block ), r( Block ), mid;
+    mid.reserve( static_cast<size_t>( seconds * Rate ) + Block );
+    const double warm = std::min( BalWarm, at );
+    for ( int done = 0; done < static_cast<int>( warm * Rate ); done += Block )
+    {
+        if ( stop && stop() ) return false;
+        e.process( l.data(), r.data(), Block );
+    }
+    for ( int done = 0; done < static_cast<int>( seconds * Rate ); done += Block )
+    {
+        if ( stop && stop() ) return false;
+        e.process( l.data(), r.data(), Block );
+        for ( size_t i = 0; i < static_cast<size_t>( Block ); ++i ) mid.push_back( 0.5f * ( l[i] + r[i] ) );
+    }
+    std::vector<float> re( ToneFft ), im( ToneFft );
+    power.assign( ToneFft / 2 + 1, 0.0 );
+    for ( size_t a = 0; a + ToneFft <= mid.size(); a += ToneFft / 2 )
+    {
+        for ( int j = 0; j < ToneFft; ++j )
+        {
+            const double w = 0.5 - 0.5 * std::cos( 2.0 * 3.14159265358979 * j / ToneFft );
+            re[static_cast<size_t>( j )] = static_cast<float>( mid[a + static_cast<size_t>( j )] * w );
+            im[static_cast<size_t>( j )] = 0.0f;
+        }
+        ResonanceSuppressor::transform( re, im );
+        for ( size_t k = 0; k < power.size(); ++k )
+            power[k] += static_cast<double>( re[k] ) * re[k] + static_cast<double>( im[k] ) * im[k];
+    }
+    kick = 0.0;
+    for ( size_t k = 0; k < power.size(); ++k )
+    {
+        const double hz = static_cast<double>( k ) * Rate / ToneFft;
+        if ( hz >= ToneEdges[0][0] && hz < ToneEdges[0][1] ) kick += power[k];
+    }
+    return true;
+}
+
+/**
+ * @brief 20.10.2026: the tone bands of @p power through the track bus's shelves and bells at @p trims, dB of the whole
+ *        band's power (the references' shares).
+ * @param[in]  power  the spectrum
+ * @param[in]  eq     the shelves and bells
+ * @param[in]  trims  their gains
+ * @param[out] out    receives the bands, dB of 20-16000 Hz
+ */
+void toneLevels( const std::vector<double> &power, const ToneEq &eq, const ToneDbT &trims, ToneDbT &out )
+{
+    double e[ToneBands + 1] = {};
+    for ( size_t k = 1; k < power.size(); ++k )
+    {
+        const double hz = static_cast<double>( k ) * Rate / ToneFft;
+        if ( hz >= 16000.0 ) break;
+        const double p = power[k] * eq.powerGain( trims.data(), hz );
+        for ( int b = 0; b <= ToneBands; ++b )
+            if ( hz >= ToneEdges[b][0] && hz < ToneEdges[b][1] ) e[b] += p;
+    }
+    for ( int b = 0; b < ToneBands; ++b )
+        out[static_cast<size_t>( b )] = static_cast<float>( 10.0 * std::log10( std::max( e[b + 1], 1e-30 ) /
+                                                                                std::max( e[0], 1e-30 ) ) );
+}
+
+/**
+ * @brief 20.10.2026: the smallest trims that bring the tone bands of @p power into [@p lo, @p hi] through the track bus's
+ *        shelves and bells -- least squares by Gauss-Newton on the spectrum itself: a band costs only by how far it
+ *        lies outside its range, a trim by its size (Tikhonov), each trim within ToneMost. The bands are shares of the
+ *        whole, and the shelves and bells overlap; solved together, a band's neighbours do not undo its trim, and a band
+ *        inside its range may move within it rather than be held by a counter-move (Totality, 20.10.2026).
+ * @param[in] power  the loudest part's spectrum
+ * @param[in] lo     the bands' lower edges, dB of 20-16000 Hz
+ * @param[in] hi     their upper edges
+ * @return the trims, dB
+ */
+ToneDbT fitTone( const std::vector<double> &power, const ToneDbT &lo, const ToneDbT &hi )
+{
+    ToneEq eq;
+    eq.prepare( Rate, DeckToneBands, ToneBands );
+    constexpr int N = ToneBands;
+    ToneDbT       t{};
+    for ( int iter = 0; iter < 8; ++iter )
+    {
+        ToneDbT now;
+        toneLevels( power, eq, t, now );
+        double J[N][N], r[N];
+        bool   out[N];
+        for ( int i = 0; i < N; ++i )
+        {   // the distance outside the range (0 inside, and then no pull either way)
+            const size_t q = static_cast<size_t>( i );
+            r[i] = now[q] > hi[q] ? now[q] - hi[q] : ( now[q] < lo[q] ? now[q] - lo[q] : 0.0 );
+            out[i] = r[i] != 0.0;
+        }
+        for ( int j = 0; j < N; ++j )
+        {
+            ToneDbT step = t, moved;
+            step[static_cast<size_t>( j )] += 0.5f;
+            toneLevels( power, eq, step, moved );
+            for ( int i = 0; i < N; ++i )
+                J[i][j] = out[i] ? ( moved[static_cast<size_t>( i )] - now[static_cast<size_t>( i )] ) / 0.5 : 0.0;
+        }
+        // The step of (J^T J + lambda I) d = -(J^T r + lambda t): the bands' distances and the trims' sizes together,
+        // by elimination with partial pivoting.
+        constexpr double Lambda = 0.15;   // a dB of trim weighs as much as 0.4 dB outside a band's range
+        double           M[N][N + 1];
+        for ( int a = 0; a < N; ++a )
+        {
+            for ( int b = 0; b < N; ++b )
+            {
+                double v = a == b ? Lambda : 0.0;
+                for ( int i = 0; i < N; ++i ) v += J[i][a] * J[i][b];
+                M[a][b] = v;
+            }
+            double v = -Lambda * t[static_cast<size_t>( a )];
+            for ( int i = 0; i < N; ++i ) v -= J[i][a] * r[i];
+            M[a][N] = v;
+        }
+        for ( int c = 0; c < N; ++c )
+        {
+            int piv = c;
+            for ( int q = c + 1; q < N; ++q )
+                if ( std::fabs( M[q][c] ) > std::fabs( M[piv][c] ) ) piv = q;
+            for ( int q = 0; q <= N; ++q ) std::swap( M[c][q], M[piv][q] );
+            if ( std::fabs( M[c][c] ) < 1e-12 ) continue;
+            for ( int q = c + 1; q < N; ++q )
+            {
+                const double f = M[q][c] / M[c][c];
+                for ( int z = c; z <= N; ++z ) M[q][z] -= f * M[c][z];
+            }
+        }
+        double d[N] = {};
+        for ( int c = N - 1; c >= 0; --c )
+        {
+            double v = M[c][N];
+            for ( int q = c + 1; q < N; ++q ) v -= M[c][q] * d[q];
+            d[c] = std::fabs( M[c][c] ) < 1e-12 ? 0.0 : v / M[c][c];
+        }
+        for ( int j = 0; j < N; ++j )
+            t[static_cast<size_t>( j )] =
+                std::clamp( t[static_cast<size_t>( j )] + static_cast<float>( d[j] ), -ToneMost, ToneMost );
+    }
+    for ( float &v : t ) v = std::round( v * 10.0f ) / 10.0f;
+    return t;
+}
 
 /** @brief The loudest samples of the kick and of every part. */
 struct PartPeaks
@@ -285,6 +453,7 @@ std::vector<LevelReading> levelSet( SetScore &set, const ParamStore &params, dou
                 {
                     m.m_trimDb = src.m_trimDb;
                     m.m_balDb = src.m_balDb;
+                    m.m_toneDb = src.m_toneDb;
                     m.m_breakDb = src.m_breakDb;
                     m.m_buildDb = src.m_buildDb;
                 }
@@ -379,6 +548,35 @@ void balanceWindow( int part, int role, float &lo, float &hi )
     }
 }
 
+void toneEdges( const std::array<float, 5> &styleMix, ToneDbT &lo, ToneDbT &hi )
+{
+    // The references' shares of the drop's power (Tools/ref_stats.json, 20.10.2026; Uplifting 7 records, Progressive 6,
+    // Dream House 6, Acid 6, Deep 5), in dB: each style's median, and either side of it half the interquartile range of
+    // every record's distance from its style's median, pooled over the styles (at least 1.5 dB) -- one style's quartiles
+    // from six records lay 0.6 dB apart.
+    static const float Lo[5][ToneBands] = { { -10.1f, -5.7f, -10.1f, -9.3f, -14.3f, -15.1f },
+                                            { -8.8f, -4.7f, -10.6f, -11.3f, -16.5f, -15.5f },
+                                            { -9.0f, -5.6f, -9.0f, -11.6f, -17.9f, -16.0f },
+                                            { -7.9f, -5.5f, -10.7f, -14.1f, -19.5f, -21.3f },
+                                            { -9.7f, -5.9f, -7.2f, -10.5f, -16.5f, -16.8f } };
+    static const float Hi[5][ToneBands] = { { -6.0f, -2.7f, -7.1f, -6.3f, -11.3f, -12.1f },
+                                            { -4.7f, -1.7f, -7.6f, -8.3f, -13.5f, -12.5f },
+                                            { -5.0f, -2.6f, -6.0f, -8.6f, -14.9f, -13.0f },
+                                            { -3.8f, -2.5f, -7.7f, -11.1f, -16.5f, -18.3f },
+                                            { -5.6f, -2.9f, -4.2f, -7.5f, -13.5f, -13.8f } };
+    float sum = 0.0f;
+    for ( const float w : styleMix ) sum += w;
+    lo.fill( 0.0f );
+    hi.fill( 0.0f );
+    if ( sum <= 0.0f ) return;
+    for ( size_t st = 0; st < 5; ++st )
+        for ( size_t b = 0; b < static_cast<size_t>( ToneBands ); ++b )
+        {
+            lo[b] += styleMix[st] / sum * Lo[st][b];
+            hi[b] += styleMix[st] / sum * Hi[st][b];
+        }
+}
+
 std::vector<LevelReading> levelScore( Score &score, const ParamStore &params, double seconds,
                                       const std::function<bool()> &stop )
 {
@@ -396,6 +594,7 @@ std::vector<LevelReading> levelScore( Score &score, const ParamStore &params, do
         {
             m.m_trimDb = 0.0f;
             m.m_balDb = BalanceDbT{};
+            m.m_toneDb = ToneDbT{};
             m.m_breakDb = 0.0f;
             m.m_buildDb = 0.0f;
         }
@@ -419,6 +618,34 @@ std::vector<LevelReading> levelScore( Score &score, const ParamStore &params, do
         out[i].m_found = against( peaks );
         out[i].m_bal = corrections( *e, out[i].m_found, m.m_windowDb );
         s.m_levels[i].m_balDb = out[i].m_bal;
+    }
+
+    // 1b. The tone (20.10.2026), with the balance in: the spectrum of the drop's start and its second half, and the
+    // smallest trims that bring every band into the references' range for the style (toneEdges), fitted on that spectrum
+    // (fitTone) -- known before the track plays, they hold for all of it (ToneEq on the track bus).
+    e->load( s );
+    for ( size_t i = 0; i < s.m_levels.size(); ++i )
+    {
+        const LevelMark &m = s.m_levels[i];
+        float            mix = 0.0f;
+        for ( const float w : m.m_styleMix ) mix += w;
+        if ( std::isnan( m.m_targetLufs ) || mix <= 0.0f ) continue;
+        std::vector<double> power, part;
+        for ( const double back : { 0.0, 128.0 } )
+        {
+            double       whole = 0.0;
+            const double at = m.m_peakBeat + ( back > 0.0 ? 64.0 : 0.0 );
+            if ( !readSpectrum( *e, s, at, BalSeconds, part, whole, stop ) ) return {};
+            if ( power.empty() ) power.assign( part.size(), 0.0 );
+            for ( size_t q = 0; q < power.size(); ++q ) power[q] += part[q];
+        }
+        ToneEq flat;
+        flat.prepare( Rate, DeckToneBands, ToneBands );
+        ToneDbT lo, hi;
+        toneLevels( power, flat, ToneDbT{}, out[i].m_bands );
+        toneEdges( m.m_styleMix, lo, hi );
+        out[i].m_tone = fitTone( power, lo, hi );
+        s.m_levels[i].m_toneDb = out[i].m_tone;
     }
 
     // 2. The breakdown against the drop (the correction, checked and refined, and checked again: the gap reported is the
@@ -499,6 +726,9 @@ std::vector<LevelReading> levelScore( Score &score, const ParamStore &params, do
             out[i].m_measured > -70.0f ? std::clamp( m.m_targetLufs - out[i].m_measured, -MostDb, MostDb ) : 0.0f;
         s.m_levels[i].m_trimDb = out[i].m_trim;
     }
+    // The second step a secant (20.10.2026): over -2 dBTP the limiter and the clipper take back part of every dB, a
+    // loud drop half of it (Uplifting, seed 5: +3.4 dB of trim, +1.7 LU), so the step is divided by the slope the first
+    // one measured. Then the drop measured once more with it: m_after is what the track plays at.
     e->load( s );
     for ( size_t i = 0; i < s.m_levels.size(); ++i )
     {
@@ -508,14 +738,30 @@ std::vector<LevelReading> levelScore( Score &score, const ParamStore &params, do
         if ( !got ) return {};
         const float again = static_cast<float>( got->m_integrated );
         if ( again > -70.0f )
-            out[i].m_trim = std::clamp( out[i].m_trim + ( out[i].m_target - again ), -MostDb, MostDb );
+        {
+            const float slope = std::fabs( out[i].m_trim ) > 0.5f
+                                    ? std::clamp( ( again - out[i].m_measured ) / out[i].m_trim, 0.3f, 1.0f )
+                                    : 1.0f;
+            out[i].m_trim = std::clamp( out[i].m_trim + ( out[i].m_target - again ) / slope, -MostDb, MostDb );
+        }
         out[i].m_after = again;
+        s.m_levels[i].m_trimDb = out[i].m_trim;
+    }
+    e->load( s );
+    for ( size_t i = 0; i < s.m_levels.size(); ++i )
+    {
+        if ( std::isnan( s.m_levels[i].m_targetLufs ) ) continue;
+        const std::optional<LoudnessReport> got = measureDrop(
+            *e, s, s.m_levels[i].m_peakBeat, std::max( seconds, sectionSeconds( s, s.m_levels[i].m_peakBeat ) ), stop );
+        if ( !got ) return {};
+        out[i].m_after = static_cast<float>( got->m_integrated );
     }
     for ( size_t i = 0; i < out.size() && i < s.m_levels.size(); ++i ) out[i].m_buildDb = s.m_levels[i].m_buildDb;
     for ( size_t i = 0; i < score.m_levels.size() && i < out.size(); ++i )
     {
         score.m_levels[i].m_trimDb = out[i].m_trim;
         score.m_levels[i].m_balDb = out[i].m_bal;
+        score.m_levels[i].m_toneDb = out[i].m_tone;
         score.m_levels[i].m_breakDb = s.m_levels[i].m_breakDb;
         score.m_levels[i].m_buildDb = s.m_levels[i].m_buildDb;
     }

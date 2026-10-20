@@ -49,7 +49,20 @@ struct LevelReading
     float  m_buildDb = 0.0f;     ///< the builds' correction, dB
     BalanceDbT m_found{};        ///< every part's loudest sample against the kick's as composed, dB (NaN: silent)
     BalanceDbT m_bal{};          ///< the parts' corrections set, dB
+    ToneDbT    m_bands{};        ///< 20.10.2026: the drop's tone bands with the balance in, dB of its whole power
+    ToneDbT    m_tone{};         ///< the tone trims set, dB
 };
+
+/**
+ * @brief 20.10.2026: the range of the references' bands (shares of the drop's power, dB) for a track of @p styleMix --
+ *        per style its median and half the pooled interquartile range either side, blended by the mix. The tone trims
+ *        (LevelMark::toneDb, ToneEq on the track bus, at most 3 dB) are the smallest that bring every band of the drop
+ *        into this range, fitted on its spectrum through the shelves' and bells' exact response.
+ * @param[in]  styleMix  the track's style mix (StyleProfile::m_mix)
+ * @param[out] lo        receives the lower edges, a band each
+ * @param[out] hi        receives the upper edges
+ */
+void toneEdges( const std::array<float, 5> &styleMix, ToneDbT &lo, ToneDbT &hi );
 
 /**
  * @brief Measures every track of @p score (its LevelMarks) with the knobs of @p params and sets their corrections.

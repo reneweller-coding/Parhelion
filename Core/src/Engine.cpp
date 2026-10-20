@@ -83,6 +83,7 @@ void Engine::prepare( double sampleRate, int maxBlock )
     m_smooth = 1.0f - std::exp( -1.0f / ( 0.001f * fs ) );
     m_djEcho.prepare( sampleRate, 3.0, 0x444A4543484Full );   // "DJECHO"
     m_djHall.prepare( sampleRate );
+    m_resonance.prepare( sampleRate );
     m_limiter.prepare( sampleRate );
     for ( BandLimit &b : m_cutLp ) b.prepare( sampleRate, 16000.0f );
     for ( int c = 0; c < 2; ++c )
@@ -203,6 +204,7 @@ void Engine::seek( double beat )
     }
     m_djEcho.reset();
     m_djHall.reset();
+    m_resonance.reset();
     m_limiter.reset();
     for ( Oversampler4 &o : m_clipOs ) o.reset();
     for ( BandLimit &b : m_cutLp ) b.reset();
@@ -329,6 +331,7 @@ void Engine::updateCell()
     m_masterGain = dbToGain( m_params.get( m_params.id( ModuleE::MASTER, 0, master::LEVEL ) ) );
     m_clipDrive = dbToGain( m_params.get( m_params.id( ModuleE::MASTER, 0, master::CLIP ) ) );
     m_limiter.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::CEILING ) ), 60.0f );
+    m_resonance.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::RESONANCE ) ) );
     m_cut = false;   // (Totality's vinyl cut profile is not Parhelion's)
     const float monoKnob = m_params.get( m_params.id( ModuleE::MASTER, 0, master::MONO_BELOW ) );
     const float mono = m_cut ? std::max( monoKnob, 150.0f ) : monoKnob;
@@ -515,6 +518,7 @@ void Engine::mix( float *L, float *R, int n )
             for ( int c = 0; c < 2; ++c ) *chn[c] = m_cutLp[c].process( *chn[c] - ( 1.0f - gr ) * h[c] );
         }
     }
+    m_resonance.process( L, R, n );   // the mix's own resonances, before the clipper meets them
     PARH_PROF_END( MASTER_TONE );
     PARH_PROF_BEGIN( Clipper );
     const float gd = m_clipDrive, t = ClipCeiling;

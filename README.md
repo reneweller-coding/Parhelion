@@ -85,8 +85,13 @@ track's own score cues (the bars, the sections, the drops). `Tools/demo/make_dem
 * **Eighteen factory banks of 1024 presets** each; the composer picks one per synth and track by the style, and the
   choice travels with the track as a program change.
 * **The mix:** the ghost kick on every quarter drives every duck -- the pump, the same curve on every bus --, three
-  rooms (room, plate, hall), a DJ mixer with isolators, a master with a clipper at four times the rate and a true-peak
-  limiter.
+  rooms (room, plate, hall), a DJ mixer with isolators, a master with a resonance suppressor, a clipper at four times
+  the rate and a true-peak limiter at -2 dBTP (a loud master that survives AAC and Opus).
+* **Mastering that knows the score.** Before a track plays, the leveler renders its drop, reads its spectrum the way
+  the references were read and fits the smallest broad equaliser that brings every band into the range of the style's
+  records -- least squares through the filters' exact response, set for the whole track instead of chasing the
+  arrangement. The resonance suppressor finds narrow peaks the layers build together and takes them down while they
+  last, with moving bells and no latency.
 
 ## Playing and export
 

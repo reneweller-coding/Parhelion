@@ -259,6 +259,8 @@ enum : int
     CEILING,
     MONO_BELOW,
     TILT,
+    // 20.10.2026: the resonance suppressor (fx/Resonance.h), before the clipper.
+    RESONANCE,
     COUNT
 };
 }

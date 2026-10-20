@@ -784,6 +784,7 @@ private:
     uint64_t           m_playingId = 0;        ///< m_current's number (m_lock)
     std::vector<float> m_trims[parh::Decks];   ///< the corrections found for the composition m_trimsFor (m_lock)
     std::vector<parh::BalanceDbT> m_bal[parh::Decks];   ///< Phase 18: the parts' corrections found with them (m_lock)
+    std::vector<parh::ToneDbT>    m_tone[parh::Decks];  ///< 20.10.2026: the tone trims found with them (m_lock)
     uint64_t                      m_trimsFor = 0;       ///< the composition m_trims and m_bal belong to (m_lock)
     bool                          m_levelled = false;   ///< m_current carries its corrections (m_lock)
     std::atomic<double>           m_position{ 0.0 };    ///< where the engine is, beats (audio thread writes)

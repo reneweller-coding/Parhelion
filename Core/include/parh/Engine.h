@@ -27,6 +27,7 @@
 #include "parh/Params.h"
 #include "parh/Score.h"
 #include "parh/fx/Dynamics.h"
+#include "parh/fx/Resonance.h"
 #include "parh/fx/Reverb.h"
 #include "parh/fx/TapeEcho.h"
 #include <atomic>
@@ -299,6 +300,12 @@ public:
      */
     void setLevelBalance( int d, const std::vector<BalanceDbT> &bal ) { m_decks[d].setLevelBalance( bal ); }
     /**
+     * @brief 20.10.2026: the tone trims of deck @p d's tracks, found after they began (Deck::setLevelTone).
+     * @param[in] d     the deck
+     * @param[in] tone  one set of tone trims per LevelMark of its score
+     */
+    void setLevelTone( int d, const std::vector<ToneDbT> &tone ) { m_decks[d].setLevelTone( tone ); }
+    /**
      * @brief Phase 18: every deck keeps its parts' loudest samples from now on (Deck::watchPeaks), or stops.
      * @param[in] on  true to keep the peaks, false to stop
      */
@@ -439,6 +446,7 @@ private:
     float           m_cutAtt = 0.1f;       ///< the envelope's attack coefficient (a millisecond)
     float           m_cutRel = 0.001f;     ///< the envelope's release coefficient (50 ms)
     Oversampler4    m_clipOs[2];           ///< the clipper's fourfold oversampling, per channel
+    ResonanceSuppressor m_resonance;       ///< the resonance suppressor (master.resonance)
     TruePeakLimiter m_limiter;             ///< the true-peak limiter (master.ceiling)
 
     std::vector<float> m_deckL[Decks];      ///< per deck: its block, left

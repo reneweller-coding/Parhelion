@@ -267,6 +267,10 @@ constexpr int BalLanes = 12;                                    ///< the kit's l
 constexpr int BalParts = static_cast<int>( BalPartE::COUNT );   ///< lanes and voices
 /** @brief A correction per part, dB (0: none). */
 using BalanceDbT = std::array<float, BalParts>;
+/** @brief 20.10.2026: the tone trims' bands -- 20-60 Hz, 60-150, 150-400, 400-2000, 2-5 kHz, 5-16 kHz (ToneEq). */
+constexpr int ToneBands = 6;
+/** @brief A tone trim per band, dB (0: none). */
+using ToneDbT = std::array<float, ToneBands>;
 extern const char *const BalPartNames[BalParts];   ///< "perc1" .. "perc12", "bass", "acid", "lead", ..., "room"
 
 /**
@@ -290,6 +294,9 @@ struct LevelMark
         0.0f;   ///< the correction of the synths, rooms and effects in every breakdown and break (levelScore)
     float m_buildDb =
         0.0f;   ///< the correction of the synths, effects and percussion in every build: under the drop (levelScore)
+    ToneDbT m_toneDb{};   ///< 20.10.2026: the track's tone trims (levelScore; ToneEq on its bus); 0 until measured
+    std::array<float, 5>
+        m_styleMix{};   ///< the track's styles (StyleProfile::m_mix), for the tone's ranges; 0: none (no tone trims)
 };
 
 /**
@@ -358,6 +365,12 @@ struct Score
      * @return the parts' corrections there in dB
      */
     BalanceDbT balanceAt( double beat ) const;
+    /**
+     * @brief The tone trims at @p beat, dB: the latest mark's (none before the first).
+     * @param[in] beat  the position in beats
+     * @return the tone trims there in dB
+     */
+    ToneDbT toneAt( double beat ) const;
     /** @brief Sorts every list by beat (stable, so equal beats keep the order they were written in). */
     void sort();
     /**

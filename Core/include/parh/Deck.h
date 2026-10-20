@@ -47,6 +47,7 @@
 #include "parh/fx/Cloud.h"
 #include "parh/fx/Plate.h"
 #include "parh/fx/Reverb.h"
+#include "parh/fx/ToneEq.h"
 #include "parh/mix/Ducker.h"
 #include "parh/mix/TranceGate.h"
 #include "parh/synth/Kick.h"
@@ -68,6 +69,9 @@
 
 namespace parh
 {
+
+/** @brief 20.10.2026: the tone trims' shelves and bells on the track bus, a band each (Leveler's tone bands). */
+extern const ToneBand DeckToneBands[ToneBands];
 
 /**
  * @brief Where the decks add the levels of the mixer's strips while the plugin's mixer page looks (01.10.2026): per strip
@@ -311,6 +315,11 @@ public:
      * @param[in] bal  one set of part corrections per LevelMark of the score
      */
     void setLevelBalance( const std::vector<BalanceDbT> &bal ) { m_lateBal.assign( bal.begin(), bal.end() ); }
+    /**
+     * @brief 20.10.2026: the tone trims of its tracks (one set per LevelMark), found after they began; as the trims.
+     * @param[in] tone  one set of tone trims per LevelMark of the score
+     */
+    void setLevelTone( const std::vector<ToneDbT> &tone ) { m_lateTone.assign( tone.begin(), tone.end() ); }
     /**
      * @brief From now on keeps the loudest sample of the kick and of every part (the Leveler's reading).
      * @param[in] on  true to keep the peaks, false to stop
@@ -598,6 +607,13 @@ private:
     float                   m_kickPeak = 0.0f;            ///< the kick's loudest sample since watchPeaks(true)
     float                   m_partPeak[BalParts] = {};    ///< every part's loudest sample since watchPeaks(true)
     std::vector<BalanceDbT> m_lateBal;   ///< setLevelBalance: the parts' corrections found while playing
+    // 20.10.2026: the track's tone trims (LevelMark::toneDb) on the track bus, after the trim; gliding like it.
+    ToneEq               m_toneEq;           ///< the trims' shelves and bells
+    ToneEq::State        m_toneState;        ///< the mix's filter memory
+    ToneDbT              m_toneNow{};        ///< the trims as they stand, dB
+    ToneDbT              m_toneTarget{};     ///< the trims of the track that plays now
+    float                m_toneCoef = 0.0f;  ///< their glide per sample (about a second)
+    std::vector<ToneDbT> m_lateTone;         ///< setLevelTone: the tone trims found while playing
 
     std::vector<float> m_kickBuf;                ///< the kick's click and body, mono
     std::vector<float> m_bodyBuf;                ///< the kick's body alone, mono
@@ -642,8 +658,9 @@ private:
     /** @brief A stem's own copy of the track bus's linear stages. */
     struct StemBus
     {
-        Svf   m_hp[2][2];       ///< the group high pass: two stages per channel
-        float m_tilt[2] = {};   ///< the tilt's low pass, per channel
+        Svf           m_hp[2][2];       ///< the group high pass: two stages per channel
+        float         m_tilt[2] = {};   ///< the tilt's low pass, per channel
+        ToneEq::State m_tone;           ///< the tone trims' filter memory
     };
     StemBus m_stemBus[STEMS];            ///< per stem: its copy of the group high pass and the tilt
     float   m_satGain[2][Raster] = {};   ///< per channel and sample of a raster cell: the drum bus saturation's gain

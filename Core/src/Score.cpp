@@ -85,6 +85,17 @@ const char *const BalPartNames[BalParts] = { "perc1",   "perc2",   "perc3",  "pe
                                              "lead",    "counter", "pluck",  "arp",     "pad",    "stab",  "piano",
                                              "strings", "choir",   "brass",  "timpani", "room",   "fx" };
 
+ToneDbT Score::toneAt( double beat ) const
+{
+    ToneDbT t{};
+    for ( const LevelMark &m : m_levels )
+    {
+        if ( m.m_beat > beat ) break;
+        t = m.m_toneDb;
+    }
+    return t;
+}
+
 BalanceDbT Score::balanceAt( double beat ) const
 {
     BalanceDbT b{};
