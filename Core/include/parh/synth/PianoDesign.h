@@ -93,27 +93,63 @@ struct PianoSpec
      * Not knobs of the page: the design's own numbers, fitted note by note to Pianoteq 8's Steinway D (NY Steinway Model
      * D) -- 48 notes, C1 to C7 at four velocities, by Nelder-Mead on the level over the keyboard and the velocity, the
      * octave spectra per register, the brightness and how it grows with the blow, the two decays, the knock and the body
-     * of the first 400 ms, the damper (Tools/pianoref/compare.py; PLAN, "Das Piano gegen Pianoteq"). The defaults are the
-     * fit; the neutral values (no shelf, 0 dB, 25/s and 0.5, 0, 1, 100 Hz, 0 dB, 1, 1, 1) are the design before it.
+     * of the first 400 ms, the damper (Tools/pianoref/compare.py; PLAN, "Das Piano gegen Pianoteq"). The neutral values
+     * (no shelf, 0 dB, 25/s and 0.5, 0, 1, 100 Hz, 0 dB, 1, 1, 1) are the design before it. The defaults are the second
+     * fit (20.10.2026, PLAN "Das Piano mit Stulovs Hämmern"): Stulov's hammers, against eight of Pianoteq's grands at once
+     * -- the mean of their totals 13.60 before, 11.33 now --, twelve knobs searched (the spectrum profile among them).
      * @{ */
-    float m_felt =
-        0.7f;   ///< factor on every hammer's stiffness, under the page's hardness (the fit: 1.16; 0.7 for the brightness)
+    float m_felt = 0.3027f;   ///< factor on every hammer's stiffness, under the page's hardness (30.09.2026: 0.7)
     float m_coupling =
-        0.296f;   ///< factor on the bridge's admittance, under the page's impedance (a looser coupling: a slower prompt sound)
+        0.2392f;   ///< factor on the bridge's admittance, under the page's impedance (a looser coupling: a slower prompt sound)
     float m_radiation =
-        372.7f;   ///< Hz: the sound is the board's acceleration below, its velocity above (a shelf; 0 none)
+        106.9f;   ///< Hz: the sound is the board's acceleration below, its velocity above (a shelf; 0 none)
     float m_radiationEnd = 4505.0f;   ///< Hz: where the shelf's fall stops (0: it falls on)
-    float m_voiceBass = 3.64f;        ///< dB on the lowest key's bridge force, linear over the keys to none at C4
-    float m_voiceTreble = 7.54f;      ///< dB on the highest key's, linear from C4
-    float m_damperRate = 11.0f;       ///< the damper's added decay at full contact on a 0.6 m string, 1/s
+    float m_voiceBass = 10.63f;       ///< dB on the lowest key's bridge force, linear over the keys to none at C4
+    float m_voiceTreble = 10.83f;     ///< dB on the highest key's, linear from C4
+    float m_damperRate = 10.61f;      ///< the damper's added decay at full contact on a 0.6 m string, 1/s
     float m_damperLength = 0.2f;   ///< how the damper's decay goes with the string's length: (0.6 m / L)^damperLength
     ///< (0.2 by hand: the Steinway damps evenly, 20..30 dB in 0.3 s; the fit's 0.5: bass 15, treble 34)
-    float m_hardVelocity = 0.646f;   ///< the felt's stiffness over the velocity: times (velocity / 0.75)^hardVelocity
-    float m_knock = 100.2f;          ///< factor on the key's thump into the board (the action's knock)
+    float m_hardVelocity = 1.116f;   ///< the felt's stiffness over the velocity: times (velocity / 0.75)^hardVelocity
+    float m_knock = 60.71f;          ///< factor on the key's thump into the board (the action's knock)
     float m_bodyCorner = 50.9f;      ///< Hz: under it the board's modes are held back in the sound (little net volume)
-    float m_highBank = 7.95f;        ///< dB on the high bank (the board above its computed modes) against the modes
+    float m_highBank = 6.058f;       ///< dB on the high bank (the board above its computed modes) against the modes
     float m_boardLoss = 0.539f;      ///< factor on the board's loss factor (less: the body rings longer)
+    /// dB on the output (20.10.2026): a fit sees the levels against C4 only, this keeps the voicing as loud as the one of
+    /// 30.09.2026 over the 48 notes (the grands 2.5 dB under it without)
+    float m_gainDb = 2.5f;
     /** @} */
+    /// A felt strip between hammers and strings, 0 none .. 1 thick (Nacreous, 20.10.2026; Pianoteq's celeste): a softer
+    /// felt as Stulov's voicing makes one (Acta Acustica 91, 2005: needled felt -- its stiffness down, its exponent a
+    /// quarter lower, its relaxation half again as slow, its hysteresis as it was): the exponent half a step lower and
+    /// the relaxation up to twice as slow; the stiffness is m_felt's.
+    float m_strip = 0.0f;
+    /// The hammers: 0 Chaigne and Askenfelt's (1994) as tuned on 30.09.2026; 1 Stulov's measured set (Acta Acustica 91,
+    /// 2005, an unvoiced Abel set: F0 = 15500 e^(0.059 N) N/mm^p, p from 3 to 4, 1 - eps from 0.01 to 0.003, tau0 from
+    /// 2.4 to 1.4 us, the mass 11 g to 5.3 g over the keys N = 1 .. 88), its hysteresis integrated exactly over every
+    /// sub-step (20.10.2026, from Nacreous; PLAN "Das Piano mit Stulovs Hämmern").
+    int m_hammerModel = 1;
+    /// The spectrum profile (Nacreous, 20.10.2026; Pianoteq's voicing has one): partial n >= 2 drives the bridge times
+    /// n^-tilt, the tilt at C1, C4 and C7 and between them over the keys (0: the physics as it is; the fit: the middle's
+    /// upper partials raised, the treble's lowered).
+    float m_tiltBass = 0.0922f;
+    float m_tiltMid = -0.5085f;    ///< ... at C4
+    float m_tiltTreble = 2.222f;   ///< ... at C7
+    /// A loss growing with the square root of the partial (Nacreous, 20.10.2026; the air's friction in Valette and
+    /// Cuesta's damping, as Chabassier's and the neural note models take it): partial n decays faster by
+    /// partialLoss b1 (sqrt(n) - 1), b1 the string's own loss (0: Bank's b1 + b3 w^2 alone).
+    float m_partialLoss = 0.0f;
+    /// How much of the felt factor (m_felt) the treble keeps (Nacreous, 20.10.2026; Pianoteq's felt presets keep their
+    /// treble): the factor's logarithm times 1 up to C4, times feltTreble at C7, between them over the keys (1: alike).
+    float m_feltTreble = 1.0f;
+    /// The strings' own loss: 0 Bank's b1 + b3 w^2; 1 a constant damping ratio, sigma = zeta w with zeta 5e-5 for a
+    /// wound and 7.5e-5 for a plain string (Miranda Valiente, Squicciarini and Thompson, JASA 155(5), 2024, measured on
+    /// strings lifted off the bridge; the bridge's coupling adds the rest, mostly in the low partials; Nacreous, 20.10.2026:
+    /// further from Pianoteq than 0).
+    int m_lossModel = 0;
+    /// Una corda (Nacreous, 20.10.2026; Miranda Valiente, Squicciarini, Thompson, Norris and Hernandez, J. Phys.: Conf.
+    /// Ser. 2909, 2024): the action shifted, the hammer strikes all but the last string of a course of two or three; the
+    /// string left out rings along through the bridge -- no beating, a longer aftersound, fewer highs.
+    bool m_unaCorda = false;
     /**
      * @brief Whether two specs build the same design (the cache).
      * @return true when they do
@@ -159,6 +195,7 @@ struct PianoKey
     double m_hammerEps = 0.85;      ///< the felt's hysteresis
     double m_hammerTau = 1e-5;      ///< the felt's relaxation time, s
     int    m_oversample = 4;        ///< sub-steps per sample while the hammer touches
+    bool   m_hammerExact = false;   ///< the hysteresis integrated exactly for a linear input (PianoSpec::m_hammerModel)
     // The coupled modes (vertical and horizontal courses).
     PianoModes         m_modes;          ///< the course's coupled modes
     std::vector<float> m_spr;            ///< per sub-step: pole, real part
@@ -236,6 +273,15 @@ struct PianoDesign
  * @return the design
  */
 std::shared_ptr<const PianoDesign> designPiano( const PianoSpec &spec, double sampleRate );
+
+/**
+ * @brief The spec of @p instrument with its own voicing (20.10.2026; PLAN, "Das Piano mit Stulovs Hämmern"): the grands
+ *        keep PianoSpec's defaults (fitted against eight of Pianoteq's grands at once), the upright and Soft take theirs
+ *        (against three uprights, against five felt presets). The page's knobs stay at their defaults.
+ * @param[in] instrument  a PianoInstrumentE (clamped)
+ * @return the spec
+ */
+PianoSpec voicedSpec( int instrument );
 
 /**
  * @brief The bridge's admittance at key @p key (0 .. 87) and frequency @p hz, s/kg, as the design uses it.

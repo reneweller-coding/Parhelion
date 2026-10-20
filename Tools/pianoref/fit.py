@@ -1,7 +1,8 @@
 """Fit the piano's voicing (PianoSpec, PianoDesign.h) to a reference piano (30.09.2026).
 
-    python Tools/pianoref/fit.py ref.wav [--probe build/msvc/Tools/pianoprobe/Release/parh_pianoprobe.exe] [--evals 320]
-                                 [--work dir] [--show key=value ...]
+    python Tools/pianoref/fit.py ref.wav [ref2.wav ...] [--probe build/msvc/Tools/pianoprobe/Release/parh_pianoprobe.exe]
+                                 [--evals 320] [--work dir] [--show key=value ...] [--start key=value ...]
+                                 [--fixed key=value ...] [--names felt,coupling,...]
 
 ref.wav plays notes_mid.py's notes (see compare.py for how to render it with Pianoteq). Every evaluation renders the same
 notes with parh_pianoprobe and the knobs of the moment and measures both files the same way (compare.py's measures):
@@ -14,8 +15,11 @@ notes with parh_pianoprobe and the knobs of the moment and measures both files t
     energy, mean absolute difference, dB;
   - body: 45..180 Hz in 0..60 ms and 60..400 ms at C4, G4, C5 against the note, rms, dB.
 The objective weighs them into one number (evaluate()) and Nelder-Mead searches the design's knobs (NAMES), started at
-the design's defaults of 30.09.2026 (the Steinway fit). Only numbers are written; the audio stays where it was rendered.
---show renders and prints one set of knobs note by note instead of fitting.
+the grands' defaults of 20.10.2026 (Stulov's hammers, the fit against eight grands; the Steinway fit of 30.09.2026
+before). Only numbers are written; the audio stays where it was rendered.
+--show renders and prints one set of knobs note by note instead of fitting. With several references (20.10.2026) the
+objective is the mean of their totals -- one voicing for a family of pianos, not one instrument --; --names searches only
+the knobs named, the others stay at --start.
 """
 import argparse
 import json
@@ -100,7 +104,7 @@ def parts(rows, ref, xb, xr_bands, xl, xr_low):
         for p in (48, 55, 60, 64, 67, 72):
             lo = next(m["c1"] for (pp, v, m) in rs if pp == p and v == 32)
             hi = next(m["c1"] for (pp, v, m) in rs if pp == p and v == 124)
-            r.append(np.log2(hi / lo))
+            r.append(np.log2(hi / lo) if lo > 0 and hi > 0 else 4.0)   # a silent note: a large miss, not a crash
         return np.array(r)
     out["vel"] = float(np.sqrt(np.mean((vel(rows) - vel(ref)) ** 2)))
     out["band"] = float(np.mean([np.mean(np.abs(xb[k] - xr_bands[k])) for k in REG]))
@@ -114,36 +118,48 @@ def total(p):
 
 
 NAMES = ["felt", "hard-velocity", "coupling", "radiation", "radiation-end", "voice-bass", "voice-treble", "damper", "damper-length",
-         "knock", "body-corner", "high-bank", "board-loss"]
-DEFAULTS = {"felt": 0.7, "hard-velocity": 0.646, "coupling": 0.296, "radiation": 372.7, "radiation-end": 4505.0, "voice-bass": 3.64,
-            "voice-treble": 7.54, "damper": 11.0, "damper-length": 0.2, "knock": 100.2, "body-corner": 50.9, "high-bank": 7.95,
-            "board-loss": 0.539}
+         "knock", "body-corner", "high-bank", "board-loss", "tilt-bass", "tilt-mid", "tilt-treble", "partial-loss",
+         "felt-treble"]
+DEFAULTS = {"felt": 0.3027, "hard-velocity": 1.116, "coupling": 0.2392, "radiation": 106.9, "radiation-end": 4505.0,
+            "voice-bass": 10.63, "voice-treble": 10.83, "damper": 10.61, "damper-length": 0.2, "knock": 60.71,
+            "body-corner": 50.9, "high-bank": 6.058, "board-loss": 0.539, "tilt-bass": 0.0922, "tilt-mid": -0.5085,
+            "tilt-treble": 2.222, "partial-loss": 0.0, "felt-treble": 1.0}
 LOGS = {"felt", "coupling", "radiation", "radiation-end", "knock", "body-corner", "board-loss"}
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("ref")
+    ap.add_argument("ref", nargs="+", help="the reference renders; the objective: the mean of their totals")
     ap.add_argument("--probe", default=str(ROOT / "build" / "msvc" / "Tools" / "pianoprobe" / "Release" / "parh_pianoprobe.exe"))
     ap.add_argument("--evals", type=int, default=320)
     ap.add_argument("--work", default=str(ROOT / "work" / "pianoref"))
     ap.add_argument("--show", nargs="*")
+    ap.add_argument("--start", nargs="*", default=[], help="key=value: where the search begins instead of the defaults")
+    ap.add_argument("--fixed", nargs="*", default=[], help="key=value: passed to the probe on every render, not searched")
+    ap.add_argument("--names", default=",".join(NAMES), help="the knobs searched, comma-separated (the others at --start)")
     a = ap.parse_args()
     work = Path(a.work)
     work.mkdir(parents=True, exist_ok=True)
-    xr, sr = read_wav(a.ref)
-    ref = (table(xr, sr), bands(xr, sr), lowband(xr, sr))
+    refs = []
+    for path in a.ref:
+        xr, sr = read_wav(path)
+        refs.append((table(xr, sr), bands(xr, sr), lowband(xr, sr)))
+    ref = refs[0]
     note_list = ",".join("%d:%.3f:%.1f" % (p, v / 127.0, h) for _, p, v, h in notes())
 
     def evaluate(kw):
         args = [a.probe, "--notes", note_list, "--lead", "0.5", "--gap", "2", "--out", str(work / "fit.wav")]
+        for s in a.fixed:
+            k, v = s.split("=", 1)
+            args += ["--" + k, v]
         for k, v in kw.items():
             args += ["--" + k, "%.6g" % v]
         subprocess.run(args, capture_output=True, check=True)
         x, _ = read_wav(str(work / "fit.wav"))
-        rows = table(x, sr)
-        p = parts(rows, ref[0], bands(x, sr), ref[1], lowband(x, sr), ref[2])
-        return total(p), p, rows
+        rows, xb, xl = table(x, sr), bands(x, sr), lowband(x, sr)
+        ps = [parts(rows, r[0], xb, r[1], xl, r[2]) for r in refs]
+        p = {k: float(np.mean([q[k] for q in ps])) for k in ps[0]}
+        return float(np.mean([total(q) for q in ps])), p, rows
 
     if a.show is not None:
         kw = dict(DEFAULTS)
@@ -157,12 +173,21 @@ def main():
         print("total %.2f  " % t + "  ".join("%s %.2f" % (k, v) for k, v in p.items()))
         return 0
 
-    def unpack(z):
-        return {k: float(np.exp(z[i])) if k in LOGS else float(z[i]) for i, k in enumerate(NAMES)}
+    start = dict(DEFAULTS)
+    for s in a.start:
+        k, v = s.split("=")
+        start[k] = float(v)
+    names = a.names.split(",")
 
-    z0 = np.array([np.log(DEFAULTS[k]) if k in LOGS else DEFAULTS[k] for k in NAMES])
+    def unpack(z):
+        kw = dict(start)
+        kw.update({k: float(np.exp(z[i])) if k in LOGS else float(z[i]) for i, k in enumerate(names)})
+        return kw
+
+    z0 = np.array([np.log(start[k]) if k in LOGS else start[k] for k in names])
     step = np.array([0.4 if k in LOGS else {"hard-velocity": 0.4, "voice-bass": 3.0, "voice-treble": 3.0, "damper": 2.0,
-                                             "damper-length": 0.2, "high-bank": 3.0}[k] for k in NAMES])
+                                             "damper-length": 0.2, "high-bank": 3.0, "tilt-bass": 0.5, "tilt-mid": 0.5,
+                                             "tilt-treble": 0.5, "partial-loss": 4.0, "felt-treble": 0.3}[k] for k in names])
     log = open(work / "fit_log.jsonl", "a")
     best = [1e9, None]
 

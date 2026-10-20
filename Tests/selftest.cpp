@@ -1960,7 +1960,8 @@ void testModulation()
  * name unique within its bank, a kit lane given only presets of its role; and a sample of every bank (every 64th preset,
  * a different one per bank) played through the engine against the module's default sound -- finite, audible, within
  * 24 dB of it. With PARH_BANK_TRIMS=\<file\> every preset is played and the trims (PresetTrims.inl: the default's loudness
- * less the preset's, in tenths of a dB) are written to \<file\>.
+ * less the preset's, in tenths of a dB) are written to \<file\>; with PARH_BANK_ONLY=\<n\> as well only bank n (Presets.h's
+ * order) is played, the others keep the trims they have (20.10.2026: the piano's new hammers).
  */
 struct BankId
 {
@@ -2107,6 +2108,8 @@ void testPresetBank()
     // The sample (or, with PARH_BANK_TRIMS, every preset): through the engine against the default sound.
     const char *trimsPath = std::getenv( "PARH_BANK_TRIMS" );
     const bool  all = trimsPath != nullptr && trimsPath[0] != 0;
+    const char *onlyText = std::getenv( "PARH_BANK_ONLY" );
+    const int   only = all && onlyText != nullptr && onlyText[0] != 0 ? std::atoi( onlyText ) : -1;
     // The jobs: every bank's default sound (-1) and its presets (all, or every 128th, a different one per bank), on
     // every core (each render its own engine).
     struct Job
@@ -2117,6 +2120,7 @@ void testPresetBank()
     std::vector<Job> jobs;
     for ( int bi = 0; bi < PresetBanks; ++bi )
     {
+        if ( only >= 0 && bi != only ) continue;
         jobs.push_back( { bi, -1, 0.0 } );
         for ( int i = all ? 0 : ( bi * 7 ) % 128; i < PresetsPerBank; i += all ? 1 : 128 )
             jobs.push_back( { bi, i, 0.0 } );
@@ -2144,7 +2148,12 @@ void testPresetBank()
     double                          worst = 0.0;
     std::string                     worstName;
     std::vector<std::vector<short>> trims( PresetBanks, std::vector<short>( PresetsPerBank, 0 ) );
-    std::vector<double>             ref( PresetBanks, 0.0 );
+    for ( int bi = 0; only >= 0 && bi < PresetBanks; ++bi )   // the banks not played keep theirs
+        for ( int i = 0; i < PresetsPerBank; ++i )
+            trims[static_cast<size_t>( bi )][static_cast<size_t>( i )] = static_cast<short>( std::lround(
+                10.0f *
+                factoryPresets( Banks[bi].m_module, Banks[bi].m_instance )[static_cast<size_t>( i )].m_trimDb ) );
+    std::vector<double> ref( PresetBanks, 0.0 );
     for ( const Job &j : jobs )
         if ( j.m_preset < 0 ) ref[static_cast<size_t>( j.m_bank )] = j.m_loud;
     for ( const Job &j : jobs )

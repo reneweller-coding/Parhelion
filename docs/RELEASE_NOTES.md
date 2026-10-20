@@ -2,6 +2,11 @@
 
 ## 1.4.0 (16.10.2026, not released)
 
+**A better piano.** Its hammers are now Stulov's measured set (stiffness, exponent, hysteresis and mass key by key,
+the felt's hysteresis integrated exactly), and each instrument is voiced against several of Pianoteq's at once: the
+grand against eight concert grands (closer to every one of them), the upright against three uprights, Soft against
+five felt pianos.
+
 **256 DJ sets to begin with.** The Sets button in the header opens the browser on the factory's DJ sets and on your own
 `.parhset` files; the one taken is composed and plays. 200 keep one of the five styles all night -- every style through
 the five arcs, eight sets an arc, now and then leaning towards another style --, 56 go across the styles as their arc

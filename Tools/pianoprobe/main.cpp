@@ -383,7 +383,11 @@ int main( int argc, char **argv )
     int                 instrument = 0;
     std::string         notes, out = "piano.wav";
     float               pedal = 0.0f, lead = 0.0f, gap = 1.0f;
-    PianoSpec tune;   // the design's knobs (30.09.2026: the comparison with a reference piano, Tools/pianoref)
+    // The instrument first: the design's knobs (30.09.2026: the comparison with a reference piano, Tools/pianoref) start
+    // at its voicing (voicedSpec, 20.10.2026).
+    for ( int i = 1; i + 1 < argc; ++i )
+        if ( !std::strcmp( argv[i], "--instrument" ) ) instrument = std::atoi( argv[i + 1] );
+    PianoSpec tune = voicedSpec( instrument );
     bool      doInfo = false, doMeasure = false;
     for ( int i = 1; i < argc; ++i )
     {
@@ -442,6 +446,25 @@ int main( int argc, char **argv )
             tune.m_felt = static_cast<float>( std::atof( argv[++i] ) );
         else if ( !std::strcmp( argv[i], "--coupling" ) && i + 1 < argc )
             tune.m_coupling = static_cast<float>( std::atof( argv[++i] ) );
+        // The design's fields of 20.10.2026 (from Nacreous): the spectrum profile, the losses, the hammers, una corda.
+        else if ( !std::strcmp( argv[i], "--tilt-bass" ) && i + 1 < argc )
+            tune.m_tiltBass = static_cast<float>( std::atof( argv[++i] ) );
+        else if ( !std::strcmp( argv[i], "--tilt-mid" ) && i + 1 < argc )
+            tune.m_tiltMid = static_cast<float>( std::atof( argv[++i] ) );
+        else if ( !std::strcmp( argv[i], "--tilt-treble" ) && i + 1 < argc )
+            tune.m_tiltTreble = static_cast<float>( std::atof( argv[++i] ) );
+        else if ( !std::strcmp( argv[i], "--partial-loss" ) && i + 1 < argc )
+            tune.m_partialLoss = static_cast<float>( std::atof( argv[++i] ) );
+        else if ( !std::strcmp( argv[i], "--felt-treble" ) && i + 1 < argc )
+            tune.m_feltTreble = static_cast<float>( std::atof( argv[++i] ) );
+        else if ( !std::strcmp( argv[i], "--strip" ) && i + 1 < argc )
+            tune.m_strip = static_cast<float>( std::atof( argv[++i] ) );
+        else if ( !std::strcmp( argv[i], "--hammer-model" ) && i + 1 < argc )
+            tune.m_hammerModel = std::atoi( argv[++i] );
+        else if ( !std::strcmp( argv[i], "--loss-model" ) && i + 1 < argc )
+            tune.m_lossModel = std::atoi( argv[++i] );
+        else if ( !std::strcmp( argv[i], "--una-corda" ) && i + 1 < argc )
+            tune.m_unaCorda = std::atoi( argv[++i] ) != 0;
     }
     if ( doInfo ) info( instrument );
     if ( doMeasure ) measure();

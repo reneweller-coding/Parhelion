@@ -205,8 +205,7 @@ void Deck::load( const Score &score )
                 if ( k.m_param == b + param ) return k.m_value;
             return m_params->get( b + param );
         };
-        PianoSpec spec;
-        spec.m_instrument = static_cast<int>( std::lround( value( piano::INSTRUMENT ) ) );
+        PianoSpec spec = voicedSpec( static_cast<int>( std::lround( value( piano::INSTRUMENT ) ) ) );
         spec.m_hardness = value( piano::HARDNESS );
         spec.m_strike = value( piano::STRIKE );
         spec.m_unison = value( piano::UNISON );

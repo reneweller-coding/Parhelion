@@ -68,7 +68,7 @@ void resonate( const float *pr, const float *pi, const float *gr, const float *g
         for ( int h = 0; h < 8; h += W )
         {
             const int m = g + h;
-            const VT  Pr = loadLanes<VT>( pr + m ), Pi = loadLanes<VT>( pi + m ), Cr = loadLanes<VT>( cr + m ),
+            const VT  Pr = loadLanes<VT>( pr + m ), Pim = loadLanes<VT>( pi + m ), Cr = loadLanes<VT>( cr + m ),
                       Ci = loadLanes<VT>( ci + m );
             VT        Zr = loadLanes<VT>( zr + m ), Zi = loadLanes<VT>( zi + m );
             if ( in != nullptr )
@@ -77,8 +77,8 @@ void resonate( const float *pr, const float *pi, const float *gr, const float *g
                 for ( int i = 0; i < n; ++i )
                 {
                     const VT x = lanes<VT>( in[i] );
-                    const VT nr = vfmadd( Gr, x, vfnmadd( Pi, Zi, Pr * Zr ) );
-                    const VT ni = vfmadd( Gi, x, vfmadd( Pi, Zr, Pr * Zi ) );
+                    const VT nr = vfmadd( Gr, x, vfnmadd( Pim, Zi, Pr * Zr ) );
+                    const VT ni = vfmadd( Gi, x, vfmadd( Pim, Zr, Pr * Zi ) );
                     Zr = nr;
                     Zi = ni;
                     float *a = acc + i * 8 + h;
@@ -89,8 +89,8 @@ void resonate( const float *pr, const float *pi, const float *gr, const float *g
             {
                 for ( int i = 0; i < n; ++i )
                 {
-                    const VT nr = vfnmadd( Pi, Zi, Pr * Zr );
-                    const VT ni = vfmadd( Pi, Zr, Pr * Zi );
+                    const VT nr = vfnmadd( Pim, Zi, Pr * Zr );
+                    const VT ni = vfmadd( Pim, Zr, Pr * Zi );
                     Zr = nr;
                     Zi = ni;
                     float *a = acc + i * 8 + h;
@@ -347,6 +347,7 @@ void Piano::startVoice( Voice &v, int key, float velocity, double late )
     v.m_yh = ys + v0 * late / m_sampleRate;
     v.m_vh = v0;
     v.m_hyst = 0.0;
+    v.m_upPrev = 0.0;
     v.m_contact = true;
     v.m_contactSteps = 0;
     v.m_apart = 0;
@@ -427,7 +428,16 @@ void Piano::contactBlock( Voice &v, float *force, int n )
                       static_cast<double>( k.m_hi[static_cast<size_t>( m )] ) * zi[m];
             const double u = v.m_yh - ys;
             const double up = u > 0.0 ? std::pow( u, k.m_hammerP ) : 0.0;
-            v.m_hyst = a * v.m_hyst + ( 1.0 - a ) * up;
+            if ( k.m_hammerExact )
+            {
+                // The one-pole over u^p exactly, u^p linear over the sub-step: with tau0 far under the sub-step it is
+                // u^p less tau0 times its slope -- the felt's rate-dependent force (Stulov 1995).
+                v.m_hyst =
+                    a * v.m_hyst + up - a * v.m_upPrev - ( k.m_hammerTau / Ts ) * ( 1.0 - a ) * ( up - v.m_upPrev );
+                v.m_upPrev = up;
+            }
+            else
+                v.m_hyst = a * v.m_hyst + ( 1.0 - a ) * up;
             double F = u > 0.0 ? k.m_q0 * static_cast<double>( v.m_hardMul ) * ( up - k.m_hammerEps * v.m_hyst ) : 0.0;
             if ( F < 0.0 ) F = 0.0;
             v.m_vh -= F / k.m_hammerMass * Ts;
@@ -476,7 +486,7 @@ void Piano::boardBlock( BoardState &s, const float ( *region )[MaxBlock], float 
         {
             const int m = g + h;
             const VT  Pr = loadLanes<VT>( &b.m_modes.m_pr[static_cast<size_t>( m )] ),
-                      Pi = loadLanes<VT>( &b.m_modes.m_pi[static_cast<size_t>( m )] );
+                      Pim = loadLanes<VT>( &b.m_modes.m_pi[static_cast<size_t>( m )] );
             const VT  Gr = loadLanes<VT>( &b.m_modes.m_gr[static_cast<size_t>( m )] ),
                       Gi = loadLanes<VT>( &b.m_modes.m_gi[static_cast<size_t>( m )] );
             const VT  Ml = loadLanes<VT>( &m_micL[static_cast<size_t>( m )] ),
@@ -492,8 +502,8 @@ void Piano::boardBlock( BoardState &s, const float ( *region )[MaxBlock], float 
             {
                 VT x = S[0] * lanes<VT>( region[0][i] );
                 for ( int r = 1; r < PianoRegions; ++r ) x = vfmadd( S[r], lanes<VT>( region[r][i] ), x );
-                const VT nr = vfmadd( Gr, x, vfnmadd( Pi, Zi, Pr * Zr ) );
-                const VT ni = vfmadd( Gi, x, vfmadd( Pi, Zr, Pr * Zi ) );
+                const VT nr = vfmadd( Gr, x, vfnmadd( Pim, Zi, Pr * Zr ) );
+                const VT ni = vfmadd( Gi, x, vfmadd( Pim, Zr, Pr * Zi ) );
                 Zr = nr;
                 Zi = ni;
                 // The mode's acceleration, radiated to the listening points (and driving the sympathetic strings).
@@ -521,7 +531,7 @@ void Piano::boardBlock( BoardState &s, const float ( *region )[MaxBlock], float 
         {
             const int m = g + h;
             const VT  Pr = loadLanes<VT>( &b.m_high.m_pr[static_cast<size_t>( m )] ),
-                      Pi = loadLanes<VT>( &b.m_high.m_pi[static_cast<size_t>( m )] );
+                      Pim = loadLanes<VT>( &b.m_high.m_pi[static_cast<size_t>( m )] );
             const VT  Gr = loadLanes<VT>( &b.m_high.m_gr[static_cast<size_t>( m )] ),
                       Gi = loadLanes<VT>( &b.m_high.m_gi[static_cast<size_t>( m )] );
             const VT  Hl = loadLanes<VT>( &b.m_highL[static_cast<size_t>( m )] ),
@@ -535,8 +545,8 @@ void Piano::boardBlock( BoardState &s, const float ( *region )[MaxBlock], float 
             {
                 VT x = S[0] * lanes<VT>( region[0][i] );
                 for ( int r = 1; r < PianoRegions; ++r ) x = vfmadd( S[r], lanes<VT>( region[r][i] ), x );
-                const VT nr = vfmadd( Gr, x, vfnmadd( Pi, Zi, Pr * Zr ) );
-                const VT ni = vfmadd( Gi, x, vfmadd( Pi, Zr, Pr * Zi ) );
+                const VT nr = vfmadd( Gr, x, vfnmadd( Pim, Zi, Pr * Zr ) );
+                const VT ni = vfmadd( Gi, x, vfmadd( Pim, Zr, Pr * Zi ) );
                 Zr = nr;
                 Zi = ni;
                 float *al = m_accL + i * 8 + h;

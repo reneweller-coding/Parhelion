@@ -23,6 +23,40 @@ aus einer im Dokument zitierten Quelle, **[A]** daraus abgeleitet, **[I]** infer
 gemessen. Was dieser Plan neu vorschlägt, ist [I], bis es gemessen ist.
 
 
+## Das Piano mit Stulovs Hämmern (20.10.2026, aus Nacreous)
+
+Nutzer (in Nacreous, dessen Filztasten jetzt Parhelions Piano spielen): „Update das Piano dann auch in anderen
+Programmen, wo es verwendet wird, wenn es sich substantiell verbessern lässt.“ Gemessen wie am 30.09.2026
+(Tools/pianoref: 48 Noten C1 bis C7 zu vier Anschlägen gegen Pianoteq 8, `fit.py`s Zahl, kleiner ist näher), aber
+gegen mehrere Instrumente zugleich: `fit.py` nimmt jetzt mehrere Referenzen (das Ziel ist das Mittel ihrer Zahlen),
+`--names` sucht nur die genannten Knöpfe, `--fixed` gibt dem Probe weitere Flags (Hammermodell, Instrument).
+- **Die Hämmer** (`PianoSpec::m_hammerModel` 1, die Vorgabe): Stulovs gemessener Satz (Acta Acustica 91, 2005:
+  F0 = 15500 e^(0,059 N) N/mm^p, p von 3 bis 4, 1 - eps von 0,01 bis 0,003, tau0 von 2,4 bis 1,4 µs, die Masse von 11
+  bis 5,3 g); die Hysterese über jeden Unterschritt exakt integriert (die Haltestufe verlor den Ratenterm, wo tau0 unter
+  dem Unterschritt liegt). 0 bleibt Chaigne und Askenfelt, wie am 30.09.2026 gestimmt.
+- **Neu im Design**, aus Nacreous: das Spektrumprofil (`m_tiltBass`, `m_tiltMid`, `m_tiltTreble`: Teilton n treibt den
+  Steg mal n^-tilt), ein mit der Wurzel des Teiltons wachsender Verlust (`m_partialLoss`, Valette und Cuesta), der
+  Filz im Diskant (`m_feltTreble`), ein Filzstreifen (`m_strip`, nach Stulovs Intonation), eine konstante
+  Dämpfungsrate der Saiten (`m_lossModel` 1, Miranda Valiente u. a. 2024; weiter von Pianoteq, aus) und una corda
+  (`m_unaCorda`, Miranda Valiente u. a. 2024: der Hammer trifft eine Saite des Chors weniger; ohne Knopf in Parhelion).
+  `parh_pianoprobe` nimmt sie alle (`--tilt-bass` .. `--una-corda`).
+- **Eine Intonation je Instrument** (`voicedSpec`; Deck und Probe beginnen dort): Stulovs Hämmer mit der Intonation des
+  30.09. allein waren gegen die Flügel im Mittel kaum besser (13,60 -> 13,39), Upright und Soft
+  schlechter. Darum je Instrument gefittet:
+  - *Grand und Baby Grand* (die Vorgaben von PianoSpec; zwölf Knöpfe, 200 Auswertungen) gegen acht Flügel -- NY
+    Steinway D Classical, Steinway B, Bechstein, Blüthner, YC5, Steingraeber, Grotrian, Petrof --: im Mittel
+    13,60 -> 11,33, jeder einzelne besser (Steinway D 11,55 -> 9,66, Steinway B 13,16 -> 10,42, Bechstein 12,54 -> 10,45, Blüthner 13,56 -> 10,70, YC5 14,66 -> 11,82, Steingraeber 14,31 -> 11,39, Grotrian 17,12 -> 15,72, Petrof 11,86 -> 10,47). Baby Grand mit derselben
+    Intonation: Steinway B 13,73 -> 13,06, YC5 15,03 -> 14,55, Bechstein 12,63 -> 12,25.
+  - *Upright* (zwölf Knöpfe, 62 Auswertungen) gegen K2, U4 tall und U4 small: im Mittel
+    16,71 -> 13,21 (K2 17,59 -> 12,30, U4 tall 17,46 -> 14,26, U4 small 15,09 -> 13,08).
+  - *Soft* (vierzehn Knöpfe, auch Filz im Diskant und Wurzelverlust; 100 Auswertungen) gegen Felt I und II
+    des Steinway D und Felt I von Bechstein, Blüthner und U4: im Mittel 24,86 -> 14,36
+    (Steinway D Felt I 22,71 -> 13,46, Steinway D Felt II 22,77 -> 12,05, Bechstein Felt I 29,25 -> 16,08, Blüthner Felt I 25,25 -> 15,43, U4 Felt I 24,31 -> 14,78).
+- **Die Bank** des Pianos neu getrimmt (`PARH_BANK_TRIMS` mit dem neuen `PARH_BANK_ONLY=11`: nur die Piano-Bank
+  gespielt, die anderen behalten ihre Trims): 964 der 1024 Trims geändert, im Mittel um 2,2 dB, jetzt -5,5 bis +1,4 dB (vorher -3,4 bis +2,6). Davor jede Intonation so laut wie die des 30.09. über die 48 Noten (`m_gainDb`: die Flügel +2,5 dB, Upright -0,9, Soft +17,3 -- ein Fit sieht nur die Pegel gegen C4; ohne das lag Soft 17 dB leiser und die Trims reichten bis +11 dB).
+- **CPU**: `parh_pianoprobe --cost`: C4 mit Pedal 3,99 % eines Kerns, C2 mit mitklingenden Saiten 1,89 %, das Brett allein 0,36 %. Die Moden bleiben dieselben; die exakte Hysterese kostet eine Multiplikation mehr je Unterschritt des Kontakts.
+- **Prüfsteine**: selftest 154/154, doccheck; `testPiano` 10/10; `testPresetBank` mit `PARH_BANK_ONLY=11` (1024 gespielt, größter Abstand 5,5 dB).
+
 ## Parhelion Sets, die Render-App der Familie (16.10.2026, 1.4.0)
 
 Nutzer (in Empyrean, nach Empyrean Journeys): „Können wir solche ein Zusatz-Progrämmchen auch für die anderen

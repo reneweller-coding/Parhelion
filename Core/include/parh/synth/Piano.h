@@ -149,6 +149,7 @@ private:
         double             m_yh = 0.0;           ///< the hammer's displacement
         double             m_vh = 0.0;           ///< the hammer's velocity
         double             m_hyst = 0.0;         ///< the felt's hysteresis state
+        double             m_upPrev = 0.0;       ///< the last sub-step's u^p (the exact hysteresis)
         int                m_contactSteps = 0;   ///< sub-steps since the contact began
         int                m_apart = 0;          ///< sub-steps the felt has been apart from the strings in a row
         float              m_damper = 0.0f;      ///< the felt's contact, 0 .. 1

@@ -800,12 +800,29 @@ void scaleStrings( PianoDesign &d, const Instrument &ins )
         const double kk = k;
         key.m_hammerMass = std::exp(
             overKeys( kk, { { 15, std::log( 0.0049 ) }, { 39, std::log( 0.00297 ) }, { 75, std::log( 0.0022 ) } } ) );
-        key.m_hammerP = overKeys( kk, { { 0, 2.3 }, { 39, 2.5 }, { 87, 3.2 } } );
+        const double strip = std::clamp( static_cast<double>( d.m_spec.m_strip ), 0.0, 1.0 );
+        key.m_hammerP = overKeys( kk, { { 0, 2.3 }, { 39, 2.5 }, { 87, 3.2 } } ) - 0.5 * strip;
         const double logK = overKeys( kk, { { 15, 8.6 }, { 39, 9.65 }, { 75, 11.0 } } );
         key.m_hammerEps = 0.85;
-        key.m_q0 =
-            std::pow( 10.0, logK ) * d.m_spec.m_hardness * d.m_spec.m_felt * ins.m_hardness / ( 1.0 - key.m_hammerEps );
-        key.m_hammerTau = std::exp( overKeys( kk, { { 0, std::log( 15e-6 ) }, { 87, std::log( 4e-6 ) } } ) );
+        const double felt =
+            std::exp( std::log( std::max( 1e-3, static_cast<double>( d.m_spec.m_felt ) ) ) *
+                      overKeys( kk, { { 39, 1.0 }, { 75, static_cast<double>( d.m_spec.m_feltTreble ) } } ) );
+        key.m_q0 = std::pow( 10.0, logK ) * d.m_spec.m_hardness * felt * ins.m_hardness / ( 1.0 - key.m_hammerEps );
+        key.m_hammerTau =
+            std::exp( overKeys( kk, { { 0, std::log( 15e-6 ) }, { 87, std::log( 4e-6 ) } } ) ) * ( 1.0 + strip );
+        if ( d.m_spec.m_hammerModel == 1 )
+        {
+            // Stulov's measured set (PianoSpec::m_hammerModel): N the hammer's number from the lowest key.
+            const double N = kk + 1.0, x = ( N - 1.0 ) / 87.0;
+            key.m_hammerMass = 1e-3 * ( 11.074 - 0.074 * N + 0.0001 * N * N );
+            key.m_hammerP = 3.0 + 1.0 * x - 0.5 * strip;
+            key.m_hammerEps = 1.0 - 0.01 * ( 1.0 - 0.7 * x );
+            key.m_hammerTau = 2.4e-6 * ( 1.0 - 0.4 * x ) * ( 1.0 + strip );
+            // F0 in N/mm^p, the compression in metres: times 1000^p.
+            key.m_q0 = 15500.0 * std::exp( 0.059 * N ) * std::pow( 1000.0, key.m_hammerP ) * d.m_spec.m_hardness *
+                       felt * ins.m_hardness;
+            key.m_hammerExact = true;
+        }
         key.m_oversample = key.m_midi >= 84 ? 8 : 4;
     }
 }
@@ -1103,6 +1120,8 @@ void designKey( PianoDesign &d, const Instrument &ins, int k, Rng &r )
     for ( int j = 0; j < N; ++j ) cents[j] += d.m_spec.m_condition * r.gaussian() * 0.5 + 0.03 * j;
     double irregular[3];
     for ( int j = 0; j < N; ++j ) irregular[j] = 1.0 + 0.03 * r.bipolar();
+    // Una corda (PianoSpec::m_unaCorda): the hammer on the first Ns strings, its force shared among them.
+    const int Ns = d.m_spec.m_unaCorda && N >= 2 ? N - 1 : N;
     // The partials up to 12 kHz (or 0.45 fs), at most 140.
     const double fTop = std::min( 0.45 * fs, 12000.0 );
     int          K = 0;
@@ -1118,6 +1137,10 @@ void designKey( PianoDesign &d, const Instrument &ins, int k, Rng &r )
     const float *shape = &d.m_board.m_keyShape[static_cast<size_t>( k * static_cast<int>( d.m_board.m_freq.size() ) )];
     const double b1 = key.m_wound ? 0.4 : 0.2, b3 = ( key.m_wound ? 1e-8 : 5e-9 ) * ins.m_stringLoss;
     const double hammerWidth = key.m_midi >= 84 ? 0.008 : 0.012;
+    // The spectrum profile (PianoSpec::m_tiltBass ..): the partials' drive on the bridge, n^-tilt.
+    const double tilt = overKeys( static_cast<double>( k ), { { 3, static_cast<double>( d.m_spec.m_tiltBass ) },
+                                                              { 39, static_cast<double>( d.m_spec.m_tiltMid ) },
+                                                              { 75, static_cast<double>( d.m_spec.m_tiltTreble ) } } );
     const double Ts = T / key.m_oversample;
     int          mode = 0;
     for ( int pol = 0; pol < 2; ++pol )
@@ -1129,30 +1152,34 @@ void designKey( PianoDesign &d, const Instrument &ins, int k, Rng &r )
             const cd     Y = admittanceAt( d.m_board, shape, fk ) * static_cast<double>( d.m_spec.m_impedance ) *
                              static_cast<double>( d.m_spec.m_coupling ) * ( pol == 0 ? 1.0 : 0.25 );
             const cd     kappa = boundedCoupling( 2.0 * key.m_f0 * key.m_z0 * Y, N, fk, ins, d.m_spec.m_boardLoss );
-            const double sigmaInt = b1 + b3 * wk * wk;
-            cd           s[3], lam[3];
+            const double sigmaInt =
+                ( d.m_spec.m_lossModel == 1 ? ( key.m_wound ? 5e-5 : 7.5e-5 ) * wk * ins.m_stringLoss
+                                            : b1 + b3 * wk * wk ) +
+                static_cast<double>( d.m_spec.m_partialLoss ) * b1 * ( std::sqrt( kk ) - 1.0 );
+            cd s[3], lam[3];
             for ( int j = 0; j < N; ++j ) s[j] = cd( -sigmaInt, wk * std::pow( 2.0, cents[j] / 1200.0 ) );
             courseEigen( s, N, kappa, lam );
             // The hammer's force on a string, per unit force on the course, in the partial's modal equation.
             const double spatial =
                 std::sin( kk * PiD * key.m_strikeRatio ) * sinc( kk * PiD * hammerWidth / ( 2.0 * key.m_length ) );
             const double common = 2.0 / ( key.m_mu * key.m_length ) * spatial / N * ( pol == 0 ? 1.0 : 0.05 );
-            const double wOut =
-                ( ( kk & 1 ) ? -1.0 : 1.0 ) * kk * PiD * key.m_tension / key.m_length * ( pol == 0 ? 1.0 : 0.3 );
-            const cd c( 0.0, -1.0 / wk );
+            const double wOut = ( ( kk & 1 ) ? -1.0 : 1.0 ) * kk * PiD * key.m_tension / key.m_length *
+                                ( pol == 0 ? 1.0 : 0.3 ) * ( tilt != 0.0 ? std::pow( kk, -tilt ) : 1.0 );
+            const cd     c( 0.0, -1.0 / wk );
             for ( int m = 0; m < N; ++m )
             {
-                cd v[3], sum = 0.0, vv = 0.0, vb = 0.0;
+                cd v[3], sum = 0.0, vv = 0.0, vb = 0.0, hit = 0.0;
                 for ( int j = 0; j < N; ++j )
                 {
                     v[j] = 1.0 / ( s[j] - lam[m] );
                     sum += v[j];
                     vv += v[j] * v[j];
-                    vb += v[j] * ( common * irregular[j] );
+                    vb += j < Ns ? v[j] * ( common * irregular[j] * N / Ns ) : cd( 0.0 );
+                    if ( j < Ns ) hit += v[j];
                 }
                 const cd     gamma = vb / vv;
                 const cd     bridge = wOut * c * sum * gamma;
-                const cd     hammer = pol == 0 ? spatial * c * ( sum / static_cast<double>( N ) ) * gamma : cd( 0.0 );
+                const cd     hammer = pol == 0 ? spatial * c * ( hit / static_cast<double>( Ns ) ) * gamma : cd( 0.0 );
                 const cd     disp = static_cast<double>( kk ) * c * ( sum / static_cast<double>( N ) ) * gamma;
                 const cd     p = std::exp( lam[m] * T ), g = ( p - 1.0 ) / lam[m];
                 const cd     ps = std::exp( lam[m] * Ts ), gs = ( ps - 1.0 ) / lam[m];
@@ -1281,11 +1308,66 @@ std::shared_ptr<PianoDesign> build( const PianoSpec &spec, double sampleRate )
         for ( float &x : key.m_br ) x *= g;
         for ( float &x : key.m_bi ) x *= g;
     }
-    d->m_outGain = 50.0f;   // a mezzo-forte C4 at about -13 dBFS with the level at -6 dB
+    d->m_outGain =
+        50.0f * std::pow( 10.0f, 0.05f * spec.m_gainDb );   // a mezzo-forte C4 at about -13 dBFS, level -6 dB
     return d;
 }
 
 }   // namespace
+
+PianoSpec voicedSpec( int instrument )
+{
+    PianoSpec s;
+    s.m_instrument = std::clamp( instrument, 0, PianoInstruments - 1 );
+    if ( s.m_instrument == static_cast<int>( PianoInstrumentE::UPRIGHT ) )
+    {
+        // Against Pianoteq's K2, U4 tall and U4 small: fit.py's mean total 16.71 with the voicing of 30.09.2026, 13.21.
+        s.m_felt = 0.9056f;
+        s.m_hardVelocity = 0.2325f;
+        s.m_coupling = 0.357f;
+        s.m_radiation = 537.4f;
+        s.m_radiationEnd = 4505.0f;
+        s.m_voiceBass = 5.428f;
+        s.m_voiceTreble = 1.209f;
+        s.m_damperRate = 9.151f;
+        s.m_damperLength = 0.2f;
+        s.m_knock = 146.4f;
+        s.m_bodyCorner = 50.9f;
+        s.m_highBank = 2.659f;
+        s.m_boardLoss = 0.539f;
+        s.m_tiltBass = 0.6411f;
+        s.m_tiltMid = -0.3252f;
+        s.m_tiltTreble = 0.6958f;
+        s.m_partialLoss = 0.0f;
+        s.m_feltTreble = 1.0f;
+        s.m_gainDb = -0.9f;   // as loud as before over the 48 notes
+    }
+    else if ( s.m_instrument == static_cast<int>( PianoInstrumentE::SOFT ) )
+    {
+        // Against Felt I and II of the NY Steinway D and Felt I of the Bechstein, the Blüthner and the U4: 24.86 with the
+        // voicing of 30.09.2026, 14.36.
+        s.m_felt = 0.9658f;
+        s.m_hardVelocity = 0.005f;
+        s.m_coupling = 1.902f;
+        s.m_radiation = 51.41f;
+        s.m_radiationEnd = 4505.0f;
+        s.m_voiceBass = 3.064f;
+        s.m_voiceTreble = 5.22f;
+        s.m_damperRate = 5.158f;
+        s.m_damperLength = 0.2f;
+        s.m_knock = 131.2f;
+        s.m_bodyCorner = 50.9f;
+        s.m_highBank = 0.9641f;
+        s.m_boardLoss = 0.539f;
+        s.m_tiltBass = 0.684f;
+        s.m_tiltMid = 0.4818f;
+        s.m_tiltTreble = 1.462f;
+        s.m_partialLoss = 5.539f;
+        s.m_feltTreble = 1.459f;
+        s.m_gainDb = 17.3f;   // as loud as before over the 48 notes (the fit's felt swallows 17 dB)
+    }
+    return s;
+}
 
 std::shared_ptr<const PianoDesign> designPiano( const PianoSpec &spec, double sampleRate )
 {
