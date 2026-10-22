@@ -255,6 +255,16 @@ SetScore composeSet( const ParamStore &p, uint64_t seed, double minutes, const C
 {
     const DramaturgyE dram = static_cast<DramaturgyE>( p.getInt( p.id( ModuleE::SET, 0, set::DRAMATURGY ) ) );
     const bool        wander = p.getInt( p.id( ModuleE::SET, 0, set::JOURNEY ) ) != 0;
+    // All (22.10.2026, a mix of the styles rather than the arc's part of them): the arc's own range of energy
+    // stretched over the whole ladder, Deep at its quietest and Acid at its loudest; a flat arc walks it by time.
+    const bool        all = p.getInt( p.id( ModuleE::SET, 0, set::JOURNEY ) ) >= 2;
+    float             eLow = 1.0f, eHigh = 0.0f;
+    for ( int k = 0; k <= 100; ++k )
+    {
+        const float ek = setEnergy( dram, 0.01f * static_cast<float>( k ) );
+        eLow = std::min( eLow, ek );
+        eHigh = std::max( eHigh, ek );
+    }
     const int         blendBars = p.getInt( p.id( ModuleE::SET, 0, set::BLEND_BARS ) ) == 0 ? 32 : 64;
     const float       trackMinutes = p.get( p.id( ModuleE::SET, 0, set::TRACK_MINUTES ) );
     const double      totalSeconds = std::max( 1.0, minutes ) * 60.0;
@@ -276,7 +286,9 @@ SetScore composeSet( const ParamStore &p, uint64_t seed, double minutes, const C
         if ( i > 0 && stop && stop() ) break;
         const float  t = static_cast<float>( std::min( 1.0, seconds / totalSeconds ) );
         const float  e = setEnergy( dram, t );
-        StyleProfile prof = wander ? ladderProfile( setLadder( dram, t, e ) ) : fixed;
+        const float  x = all ? 4.0f * ( eHigh - eLow > 0.05f ? ( e - eLow ) / ( eHigh - eLow ) : t )
+                             : setLadder( dram, t, e );
+        StyleProfile prof = wander ? ladderProfile( x ) : fixed;
         // Sunrise: the last track (the one that will end the set) the most euphoric -- Uplifting with its orchestra.
         const bool last = seconds + 0.85 * trackMinutes * 60.0 >= totalSeconds;
         if ( dram == DramaturgyE::SUNRISE && last )

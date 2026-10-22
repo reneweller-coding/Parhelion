@@ -663,12 +663,13 @@ const ParamDesc DjFxParams[djfx::COUNT] = {
 
 const char *const DramaturgyChoiceNames[] = { "Warm-up", "Peak", "Closing", "Sunrise",
                                               "Journey" };   ///< set.dramaturgy: the set's arc
-const char *const JourneyNames[] = { "Stay", "Wander" };     ///< set.journey: the key stays or wanders
+const char *const JourneyNames[] = { "Stay", "Wander", "All" };   ///< set.journey: the style stays, wanders along the
+                                                                   ///< arc's part of the ladder or all of it (22.10.2026)
 const char *const BlendNames[] = { "32 bars", "64 bars" };   ///< set.blend: how long two tracks overlap
 /** The set (PLAN 6.8): trance tracks are extended mixes, blended over their DJ intros and outros. */
 const ParamDesc SetParams[set::COUNT] = {
     { "dramaturgy", "Dramaturgy", "", 0.0f, 4.0f, 1.0f, CurveE::CHOICE, DramaturgyChoiceNames },
-    { "journey", "Styles", "", 0.0f, 1.0f, 0.0f, CurveE::CHOICE, JourneyNames },
+    { "journey", "Styles", "", 0.0f, 2.0f, 0.0f, CurveE::CHOICE, JourneyNames },
     { "blend", "Blend", "", 0.0f, 1.0f, 0.0f, CurveE::CHOICE, BlendNames },
     { "minutes", "Set Length", "min", 0.0f, 720.0f, 0.0f, CurveE::LINEAR },
     { "track_minutes", "Track Time", "min", 3.0f, 10.0f, 6.0f, CurveE::LINEAR },

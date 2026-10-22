@@ -50,6 +50,7 @@ struct Saved
 struct Row
 {
     int   m_style = -1;     ///< the style (StyleE), -1 for a set
+    bool  m_mix = false;    ///< a mix of all the styles (22.10.2026): a set whose energy walks the styles' ladder
     int   m_factory = -1;   ///< the factory set (parh/FactorySets.h), -1 for none
     Saved m_saved;          ///< the saved set
 };
@@ -101,6 +102,12 @@ bool knobsOf( parh::ParamStore &p, const Row &row, const renderkit::Request &r, 
         p.set( p.id( ModuleE::SET, 0, set::MINUTES ),
                static_cast<float>( SetMinutes[std::clamp( r.option( "what" ), 0, 5 )] ) );
         p.set( p.id( ModuleE::SET, 0, set::DRAMATURGY ), static_cast<float>( r.option( "dramaturgy", 1 ) ) );
+        if ( row.m_mix )
+        {
+            // A mix of the styles is a set (an hour where the panel says a track); All walks the whole ladder.
+            if ( p.get( p.id( ModuleE::SET, 0, set::MINUTES ) ) <= 0.0f ) p.set( p.id( ModuleE::SET, 0, set::MINUTES ), 60.0f );
+            p.set( p.id( ModuleE::SET, 0, set::JOURNEY ), 2.0f );
+        }
         out = seed;
         return true;
     }
@@ -367,6 +374,29 @@ public:
             row.m_style = s;
             add( std::move( item ), std::move( row ) );
         }
+        {
+            // A mix of the styles (22.10.2026): a DJ set whose energy walks the whole ladder, Deep at its lowest, Acid at its highest.
+            float lo = 1e9f, hi = 0.0f;
+            for ( int s = 0; s < static_cast<int>( StyleE::COUNT ); ++s )
+            {
+                lo = std::min( lo, styleProfile( static_cast<StyleE>( s ) ).m_bpmLow );
+                hi = std::max( hi, styleProfile( static_cast<StyleE>( s ) ).m_bpmHigh );
+            }
+            renderkit::Item item;
+            item.m_name = "All five styles";
+            item.m_kind = "Mix";
+            item.m_cells.add( "Mix" );
+            item.m_cells.add( juce::String( StyleNames[static_cast<int>( StyleE::DEEP )] ) + " .. " +
+                              StyleNames[static_cast<int>( StyleE::ACID )] );
+            item.m_cells.add( juce::String( lo, 0 ) + " .. " + juce::String( hi, 0 ) + " BPM" );
+            item.m_cells.add( "a set" );
+            item.m_keys = { std::nan( "" ), std::nan( "" ), static_cast<double>( lo ), std::nan( "" ) };
+            item.m_detail = "mix all styles journey";
+            Row row;
+            row.m_style = 0;
+            row.m_mix = true;
+            add( std::move( item ), std::move( row ) );
+        }
         // the factory's DJ sets (parh/FactorySets.h): played as they are, the dice their own
         for ( int i = 0; i < numFactorySets(); ++i )
         {
@@ -460,6 +490,13 @@ public:
                    ( s.m_set > 0.0 ? "DJ set of " + juce::String( s.m_set, 0 ) + " min" : juce::String( "track" ) ) +
                    ", " + juce::String( s.m_style ) + "\nseed " + juce::String( static_cast<juce::int64>( s.m_seed ) ) +
                    ", played as you saved it";
+        }
+        if ( rw->m_mix )
+        {
+            const int what = std::clamp( r.option( "what" ), 0, 5 );
+            return juce::String( "A mix of all five styles: a DJ set of " ) +
+                   juce::String( what > 0 ? SetMinutes[what] : 60.0, 0 ) +
+                   " minutes whose energy walks Deep, Progressive, Dream House, Uplifting and Acid (set.journey All)";
         }
         const parh::StyleProfile &prof = parh::styleProfile( static_cast<parh::StyleE>( rw->m_style ) );
         const int                 what = std::clamp( r.option( "what" ), 0, 5 );
