@@ -263,6 +263,10 @@ enum : int
     RESONANCE,
     // 20.10.2026: the image (fx/Image.h): the width per band into the trance references' range, the mono guard.
     IMAGE,
+    // 21.10.2026: the tonal balance (fx/Balance.h): six bands' shares into the trance references' range.
+    BALANCE,
+    // 21.10.2026: the pad's centre dipped under the lead, in the lead's bands (fx/MidDuck.h), dB.
+    MID_DUCK,
     COUNT
 };
 }

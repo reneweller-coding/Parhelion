@@ -297,6 +297,8 @@ const ParamDesc MasterParams[master::COUNT] = {
     { "tilt", "Tilt", "dB", -12.0f, 12.0f, 1.5f, CurveE::LINEAR },
     { "resonance", "Resonance", "", 0.0f, 1.0f, 0.4f, CurveE::LINEAR },   // moderate: a dense mix's own peaks
     { "image", "Image", "", 0.0f, 1.0f, 1.0f, CurveE::LINEAR },   // the width per band toward the references
+    { "balance", "Balance", "", 0.0f, 1.0f, 1.0f, CurveE::LINEAR },   // 21.10.2026: the tonal balance toward them
+    { "mid_duck", "Mid Duck", "dB", 0.0f, 6.0f, 3.0f, CurveE::LINEAR },   // 21.10.2026: the pad's centre under the lead
 };
 
 /**

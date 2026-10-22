@@ -91,7 +91,7 @@ const std::vector<GroupSpec> &layoutOf( parh::ModuleE m )
         { "Buses", F::SOURCE, { "drum_sat", "low_cut", "*synth_level" } },
     };
     static const std::vector<GroupSpec> master = {
-        { "Tone", F::FILTER, { "*tilt", "mono_below", "resonance", "image" } },
+        { "Tone", F::FILTER, { "*tilt", "mono_below", "resonance", "image", "balance", "mid_duck" } },
         { "Glue", F::ENVELOPE, { "threshold", "ratio" } },
         { "Out", F::SPACE, { "*level", "clip", "ceiling" } },
     };

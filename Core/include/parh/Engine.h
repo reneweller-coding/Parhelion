@@ -27,6 +27,7 @@
 #include "parh/Params.h"
 #include "parh/Score.h"
 #include "parh/fx/Dynamics.h"
+#include "parh/fx/Balance.h"
 #include "parh/fx/Image.h"
 #include "parh/fx/Resonance.h"
 #include "parh/fx/Reverb.h"
@@ -449,6 +450,7 @@ private:
     Oversampler4    m_clipOs[2];           ///< the clipper's fourfold oversampling, per channel
     ResonanceSuppressor m_resonance;       ///< the resonance suppressor (master.resonance)
     ImageMatch          m_image;           ///< the width per band (master.image)
+    BalanceMatch        m_balance;         ///< the tonal balance (master.balance)
     TruePeakLimiter m_limiter;             ///< the true-peak limiter (master.ceiling)
 
     std::vector<float> m_deckL[Decks];      ///< per deck: its block, left

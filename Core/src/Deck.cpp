@@ -58,6 +58,7 @@ void Deck::prepare( const ParamStore *params, double sampleRate, int index )
         m_gate[i].prepare( sampleRate );
         m_polyDuck[i].prepare( sampleRate );
     }
+    m_midDuck.prepare( sampleRate );
     m_retDuck.prepare( sampleRate );
     m_piano.prepare( sampleRate );
     m_pianoDuck.prepare( sampleRate );
@@ -304,6 +305,7 @@ void Deck::seek( int64_t sample )
         m_poly[i].seedPhases( 0x9E3779B97F4A7C15ull * static_cast<uint64_t>( i + 1 ) +
                               static_cast<uint64_t>( m_index ) );
         m_gate[i].reset();
+        if ( i == 0 ) m_midDuck.reset();
         m_polyDuck[i].reset();
         m_lastDuck[i] = 1.0f;
     }
@@ -1005,6 +1007,7 @@ void Deck::render( int64_t sample, float *L, float *R, int n, float *const *stem
         const double beat = m_beat + ( spanOffset + static_cast<double>( i ) ) * m_beatsPerSample;
         float        rl = 0.0f, rr = 0.0f, pl = 0.0f, pr = 0.0f, hl = 0.0f, hr = 0.0f, sl = 0.0f, sr = 0.0f;
         m_cloudInL[k] = m_cloudInR[k] = 0.0f;
+        float lead = 0.0f;   // the lead's centre, the key of the pad's mid duck (it is mixed first)
         for ( int v = 0; v < PolyInstances; ++v )
         {
             float            l = m_polyL[v][k] * m_balGain[static_cast<int>( BalPartE::LEAD ) + v] * m_synthGain;
@@ -1015,6 +1018,10 @@ void Deck::render( int64_t sample, float *L, float *R, int n, float *const *stem
                 const float o = TranceGate::open( beat, s.m_pattern, s.m_duty, s.m_attackBeats, s.m_releaseBeats );
                 m_gate[v].apply( l, r, o, s.m_depth, s.m_tone );
             }
+            if ( v == static_cast<int>( PolyInstanceE::LEAD ) )
+                lead = 0.5f * ( l + r );
+            else if ( v == static_cast<int>( PolyInstanceE::PAD ) )
+                m_midDuck.tick( l, r, lead );   // the pad's centre makes room for the lead (21.10.2026)
             rl += l * s.m_sends.m_room;
             rr += r * s.m_sends.m_room;
             pl += l * s.m_sends.m_plate;

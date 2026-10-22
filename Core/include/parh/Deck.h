@@ -41,6 +41,7 @@
  */
 #pragma once
 #include "parh/Params.h"
+#include "parh/fx/MidDuck.h"
 #include "parh/NoteTap.h"
 #include "parh/Score.h"
 #include "parh/fx/Dynamics.h"
@@ -148,6 +149,11 @@ public:
      * @param[in] index       which deck it is, 0 .. 2
      */
     void prepare( const ParamStore *params, double sampleRate, int index );
+    /**
+     * @brief How far the pad's centre dips under the lead (master.mid_duck, fx/MidDuck.h).
+     * @param[in] db  the most it dips in a band, dB (0: off)
+     */
+    void setMidDuck( float db ) { m_midDuck.set( db ); }
     /**
      * @brief Plays @p score from now on (allocates).
      * @param[in] score  the score to play
@@ -515,6 +521,7 @@ private:
     Poly       m_poly[PolyInstances];       ///< the polyphonic voices: lead, counter, pluck, arp, pad, stab
     TranceGate m_gate[PolyInstances];       ///< per voice: its trance gate
     Ducker     m_polyDuck[PolyInstances];   ///< per voice: its pump
+    MidDuck    m_midDuck;                   ///< the pad's centre under the lead (master.mid_duck)
     Ducker     m_retDuck;                   ///< the returns' pump
     Piano      m_piano;                     ///< the physical piano (PLAN 5.8)
     Ducker     m_pianoDuck;                 ///< the piano's pump

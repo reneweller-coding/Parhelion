@@ -90,6 +90,15 @@ void Engine::prepare( double sampleRate, int maxBlock )
     static const float ImageHi[ImageMatch::Bands] = { -14.9f, -7.3f, -5.2f, -4.3f, -8.3f };
     m_image.prepare( sampleRate );
     m_image.setRanges( ImageLo, ImageHi );
+    // The tonal balance's range (21.10.2026): each band's share of the whole in dB, the first and third quartile of
+    // 27 trance records (Family/tools/mix_audit.py, their third-octave curves folded).
+    static const float BalanceLo[BalanceMatch::Bands] = { -30.8f, -5.3f, -6.0f, -10.7f, -12.6f, -16.0f };
+    static const float BalanceHi[BalanceMatch::Bands] = { -22.6f, -3.2f, -4.3f, -7.1f, -9.3f, -11.7f };
+    m_balance.prepare( sampleRate );
+    m_balance.setRanges( BalanceLo, BalanceHi );
+    m_balance.setTiming( 30.0f, 0.1f, 3.0f, 1.0f, 3.0f );   // a composed piece: learnt on its loudest passages and held
+    m_balance.setNeutral( true );                   // and the whole's power kept: the stems keep their place
+    m_balance.setLowEdge( 35.6f );                  // the sub as the references measure it (from 35.6 Hz)
     m_limiter.prepare( sampleRate );
     for ( BandLimit &b : m_cutLp ) b.prepare( sampleRate, 16000.0f );
     for ( int c = 0; c < 2; ++c )
@@ -340,6 +349,8 @@ void Engine::updateCell()
     m_limiter.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::CEILING ) ), 60.0f );
     m_resonance.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::RESONANCE ) ) );
     m_image.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::IMAGE ) ) );
+    m_balance.set( m_params.get( m_params.id( ModuleE::MASTER, 0, master::BALANCE ) ) );
+    for ( Deck &d : m_decks ) d.setMidDuck( m_params.get( m_params.id( ModuleE::MASTER, 0, master::MID_DUCK ) ) );
     m_cut = false;   // (Totality's vinyl cut profile is not Parhelion's)
     const float monoKnob = m_params.get( m_params.id( ModuleE::MASTER, 0, master::MONO_BELOW ) );
     const float mono = m_cut ? std::max( monoKnob, 150.0f ) : monoKnob;
@@ -528,6 +539,7 @@ void Engine::mix( float *L, float *R, int n )
     }
     m_resonance.process( L, R, n );   // the mix's own resonances, before the clipper meets them
     m_image.process( L, R, n );       // the width per band (fx/Image.h)
+    m_balance.process( L, R, n );     // the tonal balance (fx/Balance.h, 21.10.2026)
     PARH_PROF_END( MASTER_TONE );
     PARH_PROF_BEGIN( Clipper );
     const float gd = m_clipDrive, t = ClipCeiling;
