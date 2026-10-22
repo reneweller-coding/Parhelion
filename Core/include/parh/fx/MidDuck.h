@@ -186,7 +186,8 @@ private:
                 want = m_depth * std::clamp( ( lead + 6.0f ) / 12.0f, 0.0f, 1.0f );
             }
             const float step = m_depth * ( want > m_dip[b] ? m_attackStep : m_releaseStep );
-            const float next = m_dip[b] + std::clamp( want - m_dip[b], -std::max( step, 0.01f ), std::max( step, 0.01f ) );
+            const float next =
+                m_dip[b] + std::clamp( want - m_dip[b], -std::max( step, 0.01f ), std::max( step, 0.01f ) );
             if ( next != m_dip[b] )
             {
                 m_dip[b] = next;
