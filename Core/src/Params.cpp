@@ -292,12 +292,13 @@ const ParamDesc MasterParams[master::COUNT] = {
     { "threshold", "Glue Threshold", "dB", -40.0f, 0.0f, -12.0f, CurveE::LINEAR },
     { "ratio", "Glue Ratio", "", 1.0f, 10.0f, 1.5f, CurveE::LOG },
     { "clip", "Clip Drive", "dB", 0.0f, 9.0f, 2.0f, CurveE::LINEAR },
-    { "ceiling", "Ceiling", "dBTP", -6.0f, 0.0f, -2.0f, CurveE::LINEAR },   // -2: a loud master survives AAC and Opus
+    { "ceiling", "Ceiling", "dBTP", -6.0f, 0.0f, -3.0f, CurveE::LINEAR },   // -3: Opus lifted -2 by up to 2.3 dB
     { "mono_below", "Mono Below", "Hz", 40.0f, 250.0f, 120.0f, CurveE::LOG },
     { "tilt", "Tilt", "dB", -12.0f, 12.0f, 1.5f, CurveE::LINEAR },
     { "resonance", "Resonance", "", 0.0f, 1.0f, 0.4f, CurveE::LINEAR },   // moderate: a dense mix's own peaks
     { "image", "Image", "", 0.0f, 1.0f, 1.0f, CurveE::LINEAR },   // the width per band toward the references
-    { "balance", "Balance", "", 0.0f, 1.0f, 1.0f, CurveE::LINEAR },   // 21.10.2026: the tonal balance toward them
+    { "balance", "Balance", "", 0.0f, 1.0f, 0.0f, CurveE::LINEAR },   // 22.10.2026: off -- the tone trims already aim at each
+                                                                        // style's references; Balance's pooled ones fought them
     { "mid_duck", "Mid Duck", "dB", 0.0f, 6.0f, 3.0f, CurveE::LINEAR },   // 21.10.2026: the pad's centre under the lead
 };
 
