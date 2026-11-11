@@ -25,6 +25,13 @@ ratings is on; a set's teases levelled with their tracks' corrections), rendered
 family's render app (Tools/renderapp, the same in all six instruments); `--list`, `--render`, and a self-test of every
 format and the queue (ctest `renderapp`).
 
+**The tonal balance, corrected** (11.11.2026). The master's Balance had aimed at ranges worked out from the reference
+recordings' third-octave curves read two thirds of an octave too high: a sub far under the records' (-31 to -23 dB of
+the whole where 27 trance records keep -11 to -7), the mids, the presence and the air over them. The table now comes
+from the tool that measures the recordings (Family/tools/mix_audit.py --balance-ranges), and the sub counts from 22 Hz
+as theirs does (35.6 Hz before). Balance stays off by default in Parhelion: switched on, it now brings the five demos'
+bands nearer the records than they stand without it, but Parhelion's own measures of a mix do not gain by it.
+
 ## 1.3.0 (15.10.2026): the family plays together
 
 **The family jam** (Settings > Family jam: Off, Lead or Follow; in the plugin and in the standalone). The five

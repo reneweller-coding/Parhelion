@@ -91,14 +91,18 @@ void Engine::prepare( double sampleRate, int maxBlock )
     m_image.prepare( sampleRate );
     m_image.setRanges( ImageLo, ImageHi );
     // The tonal balance's range (21.10.2026): each band's share of the whole in dB, the first and third quartile of
-    // 27 trance records (Family/tools/mix_audit.py, their third-octave curves folded).
-    static const float BalanceLo[BalanceMatch::Bands] = { -30.8f, -5.3f, -6.0f, -10.7f, -12.6f, -16.0f };
-    static const float BalanceHi[BalanceMatch::Bands] = { -22.6f, -3.2f, -4.3f, -7.1f, -9.3f, -11.7f };
+    // 27 trance records (Family/tools/mix_audit.py --balance-ranges trance).
+    // Corrected 11.11.2026: the first table (-30.8 .. -22.6, -5.3 .. -3.2, -6.0 .. -4.3, -10.7 .. -7.1,
+    // -12.6 .. -9.3, -16.0 .. -11.7) was worked out with the recordings' third-octave curve read as if it began
+    // at 40 Hz; it begins at 24.8 Hz, so every band stood two thirds of an octave too low -- the sub's aim far under
+    // the recordings', the bands above it over them.
+    static const float BalanceLo[BalanceMatch::Bands] = { -11.1f, -4.5f, -8.9f, -11.7f, -13.6f, -18.1f };
+    static const float BalanceHi[BalanceMatch::Bands] = { -6.8f, -3.3f, -5.6f, -8.1f, -10.4f, -13.5f };
     m_balance.prepare( sampleRate );
     m_balance.setRanges( BalanceLo, BalanceHi );
     m_balance.setTiming( 30.0f, 0.1f, 3.0f, 1.0f, 3.0f );   // a composed piece: learnt on its loudest passages and held
     m_balance.setNeutral( true );                   // and the whole's power kept: the stems keep their place
-    m_balance.setLowEdge( 35.6f );                  // the sub as the references measure it (from 35.6 Hz)
+    m_balance.setLowEdge( 22.1f );                  // the sub as the references measure it (from 22.1 Hz)
     m_limiter.prepare( sampleRate );
     for ( BandLimit &b : m_cutLp ) b.prepare( sampleRate, 16000.0f );
     for ( int c = 0; c < 2; ++c )
